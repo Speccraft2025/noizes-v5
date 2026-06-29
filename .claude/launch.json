@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "noizes-studio",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "/Users/speccraftmedialtd./Documents/Web/Noizes V5/studio",
+      "port": 5174,
+      "autoPort": true
+    }
+  ]
+}

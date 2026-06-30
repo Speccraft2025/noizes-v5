@@ -11,15 +11,14 @@
   let iframeSrc = '';
   let blobUrls = [];
 
-  // iOS PWA install prompt
   let showInstallBanner = false;
-  let isStandalone = false;
+  let showInstallTip = false;
 
   onMount(() => {
     const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    const standalone = window.matchMedia('(display-mode: standalone)').matches
       || window.navigator.standalone === true;
-    if (iOS && !isStandalone) showInstallBanner = true;
+    if (iOS && !standalone) showInstallBanner = true;
   });
 
   function reset() {
@@ -138,35 +137,51 @@
     <div class="w-full max-w-lg">
 
       {#if showInstallBanner}
-        <div class="mb-8 rounded-2xl p-5 relative"
-          style="background: rgba(123,92,240,0.08); border: 1px solid rgba(123,92,240,0.25);">
-          <button on:click={() => showInstallBanner = false}
-            class="absolute top-3 right-3 text-xs px-2 py-0.5 rounded"
-            style="color: #555; background: none; border: none; cursor: pointer;">✕</button>
-          <p class="text-xs font-bold mb-3" style="color: #7B5CF0; letter-spacing:.06em;">INSTALL FOR OFFLINE USE</p>
-          <p class="text-sm text-white font-semibold mb-1">Add Noizes to your Home Screen</p>
-          <p class="text-xs mb-4" style="color: var(--ink-muted);">Install once — open .nz files offline forever, no internet needed.</p>
-          <div class="flex flex-col gap-2.5">
-            {#each [
-              ['1', '⬜', 'Tap the Share button', 'The □↑ icon in Safari\'s bottom toolbar'],
-              ['2', '＋', 'Tap "Add to Home Screen"', 'Scroll down in the Share sheet if needed'],
-              ['3', '⬟', 'Open Noizes from your home screen', 'Then come back here to open your .nz file'],
-            ] as [n, icon, label, sub]}
-              <div class="flex items-start gap-3">
-                <div class="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black"
-                  style="background: rgba(123,92,240,0.2); color: #7B5CF0;">{n}</div>
-                <div>
-                  <p class="text-xs font-semibold text-white">{icon} {label}</p>
-                  <p class="text-xs" style="color: var(--ink-muted);">{sub}</p>
+        <!-- Install tip popover -->
+        {#if showInstallTip}
+          <div class="fixed inset-0 z-50 flex items-end justify-center pb-24 px-6"
+            style="background: rgba(0,0,0,0.6);"
+            on:click={() => showInstallTip = false}>
+            <div class="w-full max-w-sm rounded-2xl p-5 relative"
+              style="background: #1a1a1a; border: 1px solid rgba(123,92,240,0.3);">
+              <p class="text-xs font-bold mb-3" style="color: #7B5CF0; letter-spacing:.06em;">ADD TO HOME SCREEN</p>
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center gap-3">
+                  <span class="text-xl">⬆</span>
+                  <p class="text-sm text-white">Tap the <strong>Share</strong> button in Safari's bottom toolbar</p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="text-xl">＋</span>
+                  <p class="text-sm text-white">Tap <strong>"Add to Home Screen"</strong></p>
                 </div>
               </div>
-            {/each}
+              <div class="mt-4 pt-4 border-t text-center" style="border-color: rgba(255,255,255,0.08);">
+                <span class="text-xs" style="color: var(--ink-muted);">Tap anywhere to dismiss</span>
+              </div>
+              <!-- Pointer arrow toward bottom -->
+              <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0"
+                style="border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 12px solid #1a1a1a;"></div>
+            </div>
           </div>
-          <!-- Arrow pointing down toward Safari toolbar -->
-          <div class="mt-4 flex items-center justify-center gap-2 text-xs" style="color: #7B5CF0;">
-            <span>Share button is at the bottom of Safari</span>
-            <span class="animate-bounce">↓</span>
+        {/if}
+
+        <!-- Banner -->
+        <div class="flex items-center gap-3 mb-6 px-4 py-3 rounded-2xl"
+          style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+          <div class="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center text-lg"
+            style="background: linear-gradient(135deg,#7B5CF0,#4B6BF0);">⬟</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-white leading-tight">Get the Noizes app</p>
+            <p class="text-xs" style="color: var(--ink-muted);">Open .nz files offline on your iPhone</p>
           </div>
+          <button on:click={() => showInstallTip = true}
+            class="shrink-0 text-sm font-bold px-4 py-2 rounded-xl"
+            style="background: #7B5CF0; color: #fff;">
+            Install
+          </button>
+          <button on:click={() => showInstallBanner = false}
+            class="shrink-0 text-lg leading-none"
+            style="color: #444; background: none; border: none; cursor: pointer;">×</button>
         </div>
       {/if}
       <div class="text-center mb-10">

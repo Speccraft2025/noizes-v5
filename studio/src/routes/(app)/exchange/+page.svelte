@@ -71,42 +71,44 @@
     <p class="t-caption mb-4">All Releases</p>
     <div class="space-y-2">
       {#each feed as ed, i}
-        <div class="glass rounded-xl px-5 py-4 flex items-center gap-5 group cursor-pointer transition-all duration-200 hover:border-opacity-50" style="border-color: rgba(255,255,255,0.06);">
-          <!-- Votes -->
-          <div class="text-center w-10 shrink-0">
-            <button class="text-xs font-black transition-colors" style="color: var(--ink-muted);">▲</button>
-            <p class="text-sm font-black text-white">{ed.votes}</p>
-          </div>
+        <div class="glass rounded-xl p-4 group cursor-pointer transition-all duration-200" style="border-color: rgba(255,255,255,0.06);">
+          <div class="flex items-center gap-3">
 
-          <!-- Cover thumb -->
-          <div class="w-12 h-12 rounded-lg shrink-0 flex items-center justify-center text-lg font-black"
-            style="background: radial-gradient(ellipse, {colors[i % 6]}25, transparent); border: 1px solid {colors[i % 6]}30; color: {colors[i % 6]};">
-            {ed.artist[0]}
-          </div>
-
-          <!-- Info -->
-          <div class="flex-1 min-w-0">
-            <div class="flex items-baseline gap-2 mb-0.5">
-              <span class="text-xs font-bold uppercase tracking-widest" style="color: {colors[i % 6]};">{ed.artist}</span>
-              <span style="color: var(--border-dim);">·</span>
-              <span class="text-xs" style="color: var(--ink-muted);">{ed.genre} · {ed.year} · {ed.location}</span>
+            <!-- Votes -->
+            <div class="flex flex-col items-center shrink-0 w-8">
+              <button class="text-xs font-black leading-none" style="color: var(--ink-muted);">▲</button>
+              <span class="text-xs font-black text-white mt-0.5">{ed.votes}</span>
             </div>
-            <h3 class="text-base font-black text-white leading-tight group-hover:opacity-80 transition-opacity">{ed.title}</h3>
-            <div class="flex gap-3 mt-1">
-              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(255,255,255,0.05); color: var(--ink-muted);">{ed.edition_type}</span>
-              {#if ed.available !== null}
-                <span class="text-xs" style="color: var(--ink-muted);">{ed.available} of {ed.edition_size} left</span>
-              {:else}
-                <span class="text-xs" style="color: var(--ink-muted);">Open edition</span>
-              {/if}
-              <span class="text-xs" style="color: var(--ink-muted);">💬 {ed.comments}</span>
+
+            <!-- Cover thumb -->
+            <div class="w-11 h-11 rounded-lg shrink-0 flex items-center justify-center text-base font-black"
+              style="background: {colors[i % 6]}18; border: 1px solid {colors[i % 6]}35; color: {colors[i % 6]};">
+              {ed.artist[0]}
+            </div>
+
+            <!-- Info -->
+            <div class="flex-1 min-w-0">
+              <p class="text-xs font-bold uppercase tracking-widest truncate" style="color: {colors[i % 6]};">{ed.artist}</p>
+              <h3 class="text-sm font-black text-white leading-snug truncate">{ed.title}</h3>
+              <p class="text-xs mt-0.5 truncate" style="color: var(--ink-muted);">{ed.genre} · {ed.location}</p>
+            </div>
+
+            <!-- Price & CTA -->
+            <div class="shrink-0 text-right">
+              <p class="text-sm font-black text-white">{fmt(ed.price, ed.currency)}</p>
+              <button class="mt-1.5 text-xs font-semibold px-3 py-1 rounded-full" style="background: rgba(255,255,255,0.07); border: 1px solid var(--border-dim); color: var(--ink-secondary);">Acquire</button>
             </div>
           </div>
 
-          <!-- Price & CTA -->
-          <div class="text-right shrink-0">
-            <p class="text-base font-black text-white">{fmt(ed.price, ed.currency)}</p>
-            <button class="btn-ghost mt-2 py-1.5 px-4 text-xs rounded-full">Acquire</button>
+          <!-- Bottom meta row -->
+          <div class="flex items-center gap-3 mt-2.5 ml-11 pl-3" style="border-left: 1px solid var(--border-dim);">
+            <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(255,255,255,0.04); color: var(--ink-muted);">{ed.edition_type}</span>
+            {#if ed.available !== null}
+              <span class="text-xs" style="color: var(--ink-muted);">{ed.available}/{ed.edition_size} left</span>
+            {:else}
+              <span class="text-xs" style="color: var(--ink-muted);">Open edition</span>
+            {/if}
+            <span class="text-xs ml-auto" style="color: var(--ink-muted);">◉ {ed.comments}</span>
           </div>
         </div>
       {/each}

@@ -1,0 +1,33 @@
+{
+  "name": "Noizes",
+  "short_name": "Noizes",
+  "description": "Music as a cultural object. Open and experience .nz packages.",
+  "start_url": "/viewer.html",
+  "display": "standalone",
+  "background_color": "#030303",
+  "theme_color": "#030303",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["music", "entertainment"],
+  "file_handlers": [
+    {
+      "action": "/viewer.html",
+      "accept": {
+        "application/zip": [".nz"]
+      }
+    }
+  ]
+}

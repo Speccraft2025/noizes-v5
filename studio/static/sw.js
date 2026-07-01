@@ -1,7 +1,16 @@
-const CACHE = 'noizes-v1';
+const CACHE = 'noizes-v2';
 
-// Cache everything fetched from our own origin
-self.addEventListener('install', () => self.skipWaiting());
+// Precache the standalone viewer on install — makes it fully offline
+const PRECACHE = ['/viewer.html'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(PRECACHE))
+      .then(() => self.skipWaiting())
+  );
+});
+
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -12,7 +21,6 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // Only cache same-origin GET requests
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
   e.respondWith(
@@ -21,8 +29,7 @@ self.addEventListener('fetch', e => {
         const network = fetch(e.request).then(res => {
           if (res.ok) cache.put(e.request, res.clone());
           return res;
-        }).catch(() => cached); // offline fallback to cache
-        // Return cached immediately if available, update in background
+        }).catch(() => cached);
         return cached || network;
       })
     )

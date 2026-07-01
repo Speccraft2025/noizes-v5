@@ -108,7 +108,7 @@
     <div class="rounded-xl p-4" style="background: rgba(123,92,240,0.1); border: 1px solid rgba(123,92,240,0.3);">
       <p class="t-caption mb-1" style="color: #7B5CF0;">Package Ready</p>
       <p class="font-mono text-sm text-white">{exportedFilename}</p>
-      <p class="text-xs mt-2" style="color: var(--ink-muted);">Downloaded to your machine. Open experience.html to play.</p>
+      <p class="text-xs mt-2" style="color: var(--ink-muted);">Downloaded to your machine. Drag it into <a href="/open" class="underline" style="color: #7B5CF0;">Noizes Viewer</a> to play, or extract and open experience.html directly.</p>
     </div>
   {/if}
 

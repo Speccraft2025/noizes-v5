@@ -1,6 +1,11 @@
 import { createSupabaseServerClient } from '$lib/server/supabase.js';
 import { redirect } from '@sveltejs/kit';
 
+export function handleError({ error, event }) {
+  console.error('[handleError]', event.url.pathname, error?.message ?? error);
+  return { message: error?.message ?? 'Internal Error' };
+}
+
 const CREATOR_ROUTES = ['/studio'];
 const AUTH_ROUTES = ['/collection'];
 

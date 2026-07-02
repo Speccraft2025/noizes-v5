@@ -21,7 +21,15 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // Only handle same-origin GETs; skip navigation requests (SSR pages redirect)
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (e.request.mode === 'navigate') return;
+
+  // Only cache /viewer.html and static assets under /_app/
+  const isViewer = url.pathname === '/viewer.html';
+  const isStatic = url.pathname.startsWith('/_app/immutable/');
+  if (!isViewer && !isStatic) return;
 
   e.respondWith(
     caches.open(CACHE).then(cache =>

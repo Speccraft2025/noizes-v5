@@ -105,6 +105,7 @@ export async function buildPackage({ identity, edition, rights, assets }) {
   const safeName = (identity.title || 'untitled').replace(/[^a-z0-9]/gi, '_').toLowerCase();
   const filename = `${safeName}_${edition.edition_type.replace(/\s+/g, '_').toLowerCase()}.nz`;
 
+  // Trigger browser download
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -112,7 +113,8 @@ export async function buildPackage({ identity, edition, rights, assets }) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 
-  return filename;
+  // Return blob + original files so caller can publish to Supabase
+  return { filename, blob, audioFile: assets.audioFile, coverFile: assets.coverFile };
 }
 
 function arrayBufferToBase64(buffer) {

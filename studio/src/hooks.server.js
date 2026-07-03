@@ -3,7 +3,7 @@ import { redirect } from '@sveltejs/kit';
 
 export function handleError({ error, event }) {
   console.error('[handleError]', event.url.pathname, error?.message ?? error);
-  return { message: error?.message ?? 'Internal Error' };
+  return { message: 'An error occurred.' };
 }
 
 const CREATOR_ROUTES = ['/studio'];
@@ -13,16 +13,16 @@ export async function handle({ event, resolve }) {
   const supabase = createSupabaseServerClient(event);
   event.locals.supabase = supabase;
 
-  const { data: { session } } = await supabase.auth.getSession();
-  event.locals.session = session;
-  event.locals.user = session?.user ?? null;
+  const { data: { user } } = await supabase.auth.getUser();
+  event.locals.user = user ?? null;
+  event.locals.session = user ? { user } : null;
 
   // Load profile if authenticated
-  if (session?.user) {
+  if (user) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
     event.locals.profile = profile;
   } else {
@@ -33,13 +33,13 @@ export async function handle({ event, resolve }) {
 
   // Guard creator-only routes
   if (CREATOR_ROUTES.some(r => path.startsWith(r))) {
-    if (!session) throw redirect(303, `/auth/login?next=${path}`);
+    if (!user) throw redirect(303, `/auth/login?next=${path}`);
     if (event.locals.profile?.role !== 'creator') throw redirect(303, '/exchange');
   }
 
   // Guard auth-required routes
   if (AUTH_ROUTES.some(r => path.startsWith(r))) {
-    if (!session) throw redirect(303, `/auth/login?next=${path}`);
+    if (!user) throw redirect(303, `/auth/login?next=${path}`);
   }
 
   return resolve(event, {

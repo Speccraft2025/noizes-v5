@@ -1,13 +1,8 @@
 <script>
-  const collection = [
-    { id: 1, artist: 'KMRU', title: 'Peel', edition_type: 'Archive Edition', acquired: '2024-03-12', edition_number: 33, edition_size: 100, currency: 'EUR', price: 15, genre: 'Ambient', location: 'Berlin, DE', year: '2022', color: '#4B6BF0' },
-    { id: 2, artist: 'Blinky Bill', title: 'Hali Halisi', edition_type: 'Open Edition', acquired: '2024-05-01', edition_number: null, edition_size: null, currency: 'KES', price: 500, genre: 'Afro-Soul', location: 'Nairobi, KE', year: '2024', color: '#7B5CF0' },
-  ];
+  export let data;
+  $: ({ collection, events } = data);
 
-  const events = [
-    { date: '2024-05-01', work: 'Blinky Bill — Hali Halisi', event: 'purchased', price: 'KES 500' },
-    { date: '2024-03-12', work: 'KMRU — Peel', event: 'purchased', price: 'EUR 15' },
-  ];
+  const colors = ['#4B6BF0', '#7B5CF0', '#F04BD8', '#7B5CF0', '#4B6BF0', '#F04BD8'];
 </script>
 
 <div class="max-w-5xl mx-auto px-6 py-8">
@@ -30,17 +25,18 @@
     </div>
   {:else}
     <div class="space-y-3 mb-10">
-      {#each collection as item}
+      {#each collection as item, i}
+        {@const color = colors[i % colors.length]}
         <div class="glass rounded-2xl p-5 flex gap-5 group transition-all duration-200">
           <!-- Cover -->
           <div class="w-20 h-20 shrink-0 rounded-xl flex items-center justify-center text-2xl font-black"
-            style="background: radial-gradient(ellipse, {item.color}25, transparent); border: 1px solid {item.color}25; color: {item.color};">
+            style="background: radial-gradient(ellipse, {color}25, transparent); border: 1px solid {color}25; color: {color};">
             {item.artist[0]}
           </div>
 
           <!-- Info -->
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-bold uppercase tracking-widest mb-0.5" style="color: {item.color};">{item.artist}</p>
+            <p class="text-xs font-bold uppercase tracking-widest mb-0.5" style="color: {color};">{item.artist}</p>
             <h3 class="text-xl font-black text-white mb-2">{item.title}</h3>
             <div class="flex gap-4 flex-wrap">
               <span class="text-xs" style="color: var(--ink-muted);">{item.genre} · {item.year} · {item.location}</span>
@@ -48,7 +44,7 @@
             <div class="flex gap-3 mt-2 flex-wrap">
               <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(255,255,255,0.05); color: var(--ink-muted);">{item.edition_type}{item.edition_number ? ` #${item.edition_number}` : ''}{item.edition_size ? ` / ${item.edition_size}` : ''}</span>
               <span class="text-xs" style="color: var(--ink-muted);">Acquired {item.acquired}</span>
-              <span class="text-xs" style="color: var(--ink-muted);">{item.currency} {item.price}</span>
+              <span class="text-xs" style="color: var(--ink-muted);">{item.currency} {Number(item.price).toLocaleString()}</span>
             </div>
           </div>
 

@@ -4,38 +4,82 @@
 
   let exporting = false;
   let exported = false;
+  let published = false;
+  let publishError = '';
   let exportedFilename = '';
   let error = '';
   let progress = 0;
+  let statusLabel = 'Forging package…';
 
   $: canExport = $identity.artist && $identity.title && $identity.year;
 
   async function doExport() {
     exporting = true;
     error = '';
+    publishError = '';
     exported = false;
+    published = false;
     progress = 0;
+    statusLabel = 'Forging package…';
 
-    const steps = [10, 25, 45, 65, 80, 95];
+    const steps = [10, 25, 45, 65, 80];
     for (const p of steps) {
       await new Promise(r => setTimeout(r, 180));
       progress = p;
     }
 
+    let result;
     try {
-      exportedFilename = await buildPackage({
+      result = await buildPackage({
         identity: $identity,
         edition: $edition,
         assets: $assets,
         rights: $rights
       });
-      progress = 100;
+      exportedFilename = result.filename;
+      progress = 90;
       exported = true;
     } catch (e) {
       error = e.message || 'Export failed.';
-    } finally {
       exporting = false;
+      return;
     }
+
+    // Publish to Supabase
+    statusLabel = 'Publishing to Exchange…';
+    try {
+      const form = new FormData();
+      form.append('release_id', $identity.release_id || `nz-${Date.now()}`);
+      form.append('meta', JSON.stringify({
+        artist: $identity.artist,
+        title: $identity.title,
+        genre: $identity.genre,
+        year: $identity.year,
+        location: $identity.location,
+        description: $identity.description,
+        edition_type: $edition.edition_type,
+        edition_name: $edition.edition_name,
+        edition_size: $edition.edition_size,
+        price: $edition.price,
+        currency: $edition.currency,
+      }));
+      form.append('nz', result.blob, result.filename);
+      if (result.coverFile) form.append('cover', result.coverFile, result.coverFile.name);
+      if (result.audioFile) form.append('audio', result.audioFile, result.audioFile.name);
+
+      const res = await fetch('/studio/publish', { method: 'POST', body: form });
+      if (res.ok) {
+        published = true;
+      } else {
+        const body = await res.json().catch(() => ({}));
+        publishError = body.message || `Publish failed (${res.status})`;
+      }
+    } catch (e) {
+      publishError = e.message || 'Publish failed.';
+    }
+
+    progress = 100;
+    exporting = false;
   }
 
   const files = [
@@ -92,7 +136,7 @@
   {#if exporting}
     <div class="space-y-2">
       <div class="flex justify-between text-xs font-mono" style="color: var(--ink-muted);">
-        <span>Forging package…</span>
+        <span>{statusLabel}</span>
         <span>{progress}%</span>
       </div>
       <div class="h-1 rounded-full overflow-hidden" style="background: rgba(255,255,255,0.08);">
@@ -105,10 +149,26 @@
   {/if}
 
   {#if exported}
-    <div class="rounded-xl p-4" style="background: rgba(123,92,240,0.1); border: 1px solid rgba(123,92,240,0.3);">
-      <p class="t-caption mb-1" style="color: #7B5CF0;">Package Ready</p>
-      <p class="font-mono text-sm text-white">{exportedFilename}</p>
-      <p class="text-xs mt-2" style="color: var(--ink-muted);">Downloaded to your machine. Drag it into <a href="/open" class="underline" style="color: #7B5CF0;">Noizes Viewer</a> to play, or extract and open experience.html directly.</p>
+    <div class="rounded-xl p-4 space-y-3" style="background: rgba(123,92,240,0.1); border: 1px solid rgba(123,92,240,0.3);">
+      <div>
+        <p class="t-caption mb-1" style="color: #7B5CF0;">Package Downloaded</p>
+        <p class="font-mono text-sm text-white">{exportedFilename}</p>
+        <p class="text-xs mt-1" style="color: var(--ink-muted);">Drag it into <a href="/open" class="underline" style="color: #7B5CF0;">Noizes Viewer</a> to play offline.</p>
+      </div>
+
+      {#if published}
+        <div class="flex items-center gap-2 pt-2 border-t" style="border-color: rgba(123,92,240,0.2);">
+          <span style="color: #7B5CF0;">✓</span>
+          <p class="text-xs text-white">Published to Exchange — <a href="/exchange" class="underline" style="color: #7B5CF0;">view it live</a></p>
+        </div>
+      {:else if publishError}
+        <div class="pt-2 border-t" style="border-color: rgba(239,68,68,0.2);">
+          <p class="text-xs text-red-400">Exchange publish failed: {publishError}</p>
+          <p class="text-xs mt-1" style="color: var(--ink-muted);">Your .nz file was still downloaded successfully.</p>
+        </div>
+      {:else if !exporting}
+        <p class="text-xs pt-2 border-t" style="border-color: rgba(255,255,255,0.06); color: var(--ink-muted);">Publishing…</p>
+      {/if}
     </div>
   {/if}
 
@@ -118,9 +178,9 @@
     on:click={doExport}
   >
     {#if exporting}
-      Forging…
+      {progress < 90 ? 'Forging…' : 'Publishing…'}
     {:else}
-      ⬡ Export .nz Package
+      ⬡ Forge & Publish .nz
     {/if}
   </button>
 </div>

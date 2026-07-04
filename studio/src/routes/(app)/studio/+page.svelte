@@ -15,7 +15,7 @@
     { id: 4, label: 'Theme',    icon: '⬡' },
     { id: 5, label: 'Edition',  icon: '◎' },
     { id: 6, label: 'Rights',   icon: '◈' },
-    { id: 7, label: 'Forge',    icon: '⬟' },
+    { id: 7, label: 'Compile',    icon: '⬟' },
   ];
 
   let currentStep = 1;

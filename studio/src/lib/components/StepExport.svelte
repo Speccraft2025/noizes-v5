@@ -9,7 +9,7 @@
   let exportedFilename = '';
   let error = '';
   let progress = 0;
-  let statusLabel = 'Forging package…';
+  let statusLabel = 'Compiling package…';
 
   $: canExport = $identity.artist && $identity.title && $identity.year;
 
@@ -20,7 +20,7 @@
     exported = false;
     published = false;
     progress = 0;
-    statusLabel = 'Forging package…';
+    statusLabel = 'Compiling package…';
 
     const steps = [10, 25, 45, 65, 80];
     for (const p of steps) {
@@ -97,7 +97,7 @@
 <div class="space-y-6">
   <div>
     <p class="t-caption mb-2">Step 7</p>
-    <h2 class="text-2xl font-black tracking-tight text-white">The Forge</h2>
+    <h2 class="text-2xl font-black tracking-tight text-white">The Compiler</h2>
     <p class="text-sm mt-1" style="color: var(--ink-muted);">Package your work as a self-contained .nz file.</p>
   </div>
 
@@ -183,9 +183,9 @@
     on:click={doExport}
   >
     {#if exporting}
-      {progress < 90 ? 'Forging…' : 'Publishing…'}
+      {progress < 90 ? 'Compiling…' : 'Publishing…'}
     {:else}
-      ⬡ Forge & Publish .nz
+      ⬡ Compile & Publish .nz
     {/if}
   </button>
 </div>

@@ -19,6 +19,7 @@
     "vite": "^5.0.0"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
     "@sveltejs/adapter-netlify": "^6.0.4",

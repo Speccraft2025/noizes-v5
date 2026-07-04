@@ -28,7 +28,7 @@
   {#if feed.length === 0}
     <div class="glass rounded-2xl p-20 text-center">
       <p class="t-caption mb-3">No releases yet</p>
-      <p class="text-base mb-6" style="color: var(--ink-muted);">The first releases are being forged. Check back soon.</p>
+      <p class="text-base mb-6" style="color: var(--ink-muted);">The first releases are being compiled. Check back soon.</p>
       <a href="/studio" class="btn-spectral rounded-full px-6 py-2.5 text-sm">Create a release →</a>
     </div>
   {:else}

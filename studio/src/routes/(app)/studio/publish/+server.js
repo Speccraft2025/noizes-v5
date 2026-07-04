@@ -5,7 +5,6 @@ import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 
 export async function POST({ request, locals }) {
   if (!locals.user) throw error(401, 'Not authenticated');
-  if (locals.profile?.role !== 'creator') throw error(403, 'Creator account required');
 
   const form = await request.formData();
   const releaseId = form.get('release_id')?.toString() || crypto.randomUUID();

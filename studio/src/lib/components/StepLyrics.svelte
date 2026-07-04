@@ -23,7 +23,7 @@
 
   function getWorker() {
     if (worker) return worker;
-    worker = new Worker(new URL('$lib/workers/whisper.worker.js', import.meta.url), { type: 'module' });
+    worker = new Worker(new URL('../workers/whisper.worker.js', import.meta.url), { type: 'module' });
     worker.onmessage = ({ data }) => {
       if (data.type === 'progress') {
         const p = data.data;

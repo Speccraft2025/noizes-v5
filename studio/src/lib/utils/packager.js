@@ -1,127 +1,97 @@
 import JSZip from 'jszip';
 import { buildExperienceHTML } from './experience.js';
 
-export async function buildPackage({ identity, edition, rights, assets }) {
+export async function buildPackage({ identity, edition, rights, assets, template }) {
   const zip = new JSZip();
-
   const releaseId = identity.release_id || `nz-${Date.now()}`;
   const now = new Date().toISOString();
 
-  // manifest.json
-  const manifestData = {
+  zip.file('manifest.json', JSON.stringify({
     noizes_version: '1.0.0',
-    package_type: 'music',
-    artist: identity.artist,
-    title: identity.title,
-    release_id: releaseId,
-    year: identity.year,
-    genre: identity.genre,
-    location: identity.location,
-    description: identity.description,
-    created_at: now
-  };
-  zip.file('manifest.json', JSON.stringify(manifestData, null, 2));
+    package_type:   'music',
+    artist:         identity.artist,
+    title:          identity.title,
+    release_id:     releaseId,
+    year:           identity.year,
+    genre:          identity.genre,
+    location:       identity.location,
+    description:    identity.description,
+    created_at:     now,
+  }, null, 2));
 
-  // edition.json
-  const editionData = {
-    edition_name: edition.edition_name || edition.edition_type,
-    edition_type: edition.edition_type,
-    edition_size: edition.edition_size || 'unlimited',
-    price: edition.price,
-    currency: edition.currency,
-    transferable: edition.transferable
-  };
-  zip.file('edition.json', JSON.stringify(editionData, null, 2));
+  zip.file('edition.json', JSON.stringify({
+    edition_name:  edition.edition_name || edition.edition_type,
+    edition_type:  edition.edition_type,
+    edition_size:  edition.edition_size || 'unlimited',
+    price:         edition.price,
+    currency:      edition.currency,
+    transferable:  edition.transferable,
+  }, null, 2));
 
-  // rights.json
-  const rightsData = {
+  zip.file('rights.json', JSON.stringify({
     copyright: rights.copyright,
-    license: rights.license,
-    producer: rights.producer
-  };
-  zip.file('rights.json', JSON.stringify(rightsData, null, 2));
+    license:   rights.license,
+    producer:  rights.producer,
+  }, null, 2));
 
-  // credits.json
-  const creditsData = {
+  zip.file('credits.json', JSON.stringify({
     credits: rights.credits
       ? rights.credits.split('\n').map(l => l.trim()).filter(Boolean)
-      : []
-  };
-  zip.file('credits.json', JSON.stringify(creditsData, null, 2));
+      : [],
+  }, null, 2));
 
-  // authenticity.json
-  const authenticityData = {
-    method: 'sha256',
-    signed: false,
-    release_id: releaseId
-  };
-  zip.file('authenticity.json', JSON.stringify(authenticityData, null, 2));
+  zip.file('authenticity.json', JSON.stringify({ method: 'sha256', signed: false, release_id: releaseId }, null, 2));
+  zip.file('technical.json',    JSON.stringify({ packaged_at: now, packager: 'Noizes Studio v1.0.0', noizes_version: '1.0.0' }, null, 2));
 
-  // technical.json
-  const technicalData = {
-    packaged_at: now,
-    packager: 'Noizes Studio v1.0.0',
-    noizes_version: '1.0.0'
-  };
-  zip.file('technical.json', JSON.stringify(technicalData, null, 2));
-
-  // audio
-  let audioName = '';
+  // Audio — embed as data URI in NZ_CONFIG (works on iOS Safari in iframe)
+  let audioBase64 = '';
+  let audioMime   = '';
   if (assets.audioFile) {
-    audioName = assets.audioFile.name;
-    const audioBuffer = await assets.audioFile.arrayBuffer();
-    zip.folder('audio').file(audioName, audioBuffer);
+    const buf  = await assets.audioFile.arrayBuffer();
+    audioMime  = assets.audioFile.type || 'audio/mpeg';
+    audioBase64 = arrayBufferToBase64(buf);
+    // Also store the file in the zip for archival
+    zip.folder('audio').file(assets.audioFile.name, buf);
   }
 
-  // cover — read as base64 for experience.html
+  // Cover
   let coverBase64 = '';
-  let coverMime = '';
+  let coverMime   = '';
   if (assets.coverFile) {
-    const coverBuffer = await assets.coverFile.arrayBuffer();
-    coverMime = assets.coverFile.type || 'image/jpeg';
-    coverBase64 = arrayBufferToBase64(coverBuffer);
-    zip.folder('cover').file(assets.coverFile.name, coverBuffer);
+    const buf  = await assets.coverFile.arrayBuffer();
+    coverMime  = assets.coverFile.type || 'image/jpeg';
+    coverBase64 = arrayBufferToBase64(buf);
+    zip.folder('cover').file(assets.coverFile.name, buf);
   }
 
-  // lyrics
-  if (assets.lyricsFile) {
-    const lyricsBuffer = await assets.lyricsFile.arrayBuffer();
-    zip.folder('lyrics').file(assets.lyricsFile.name, lyricsBuffer);
-  }
-
-  // experience.html
+  // experience.html — fully self-contained
   const experienceHTML = buildExperienceHTML({
-    identity,
-    edition,
-    rights,
-    audioName,
-    coverBase64,
-    coverMime
+    identity, edition, rights,
+    audioBase64, audioMime,
+    coverBase64, coverMime,
+    lyrics:   assets.lyrics || [],
+    template: template      || 'ultra',
   });
   zip.file('experience.html', experienceHTML);
 
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 
   const safeName = (identity.title || 'untitled').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const filename = `${safeName}_${edition.edition_type.replace(/\s+/g, '_').toLowerCase()}.nz`;
+  const filename = `${safeName}_${(template || 'ultra')}_noizes.nz`;
 
-  // Trigger browser download
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
+  const a   = document.createElement('a');
+  a.href    = url;
   a.download = filename;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 
-  // Return blob + original files so caller can publish to Supabase
   return { filename, blob, audioFile: assets.audioFile, coverFile: assets.coverFile };
 }
 
 function arrayBufferToBase64(buffer) {
   let binary = '';
   const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }

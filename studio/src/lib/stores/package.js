@@ -13,11 +13,14 @@ export const identity = writable({
 export const assets = writable({
   audioFile: null,
   coverFile: null,
-  lyricsFile: null,
   audioName: '',
   coverName: '',
-  lyricsName: ''
+  // lyrics: array of {t: ms, text: string} — set by StepLyrics
+  lyrics: []
 });
+
+// Which template / theme the package uses
+export const template = writable('ultra'); // 'ultra' | 'codex' | 'transmission' | 'monument'
 
 export const edition = writable({
   edition_name: '',

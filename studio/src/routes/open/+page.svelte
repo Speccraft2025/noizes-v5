@@ -66,7 +66,9 @@
         const url = URL.createObjectURL(blob);
         blobUrls.push(url);
         const rel = path.replace('audio/', '');
+        // Patch HTML src attributes AND JSON string values in NZ_CONFIG
         html = html.split(`src="audio/${rel}"`).join(`src="${url}"`);
+        html = html.split(`"audio/${rel}"`).join(`"${url}"`);
       }
 
       // Use blob URL for iframe — more compatible than srcdoc on iOS Safari

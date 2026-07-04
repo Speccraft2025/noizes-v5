@@ -1,5 +1,5 @@
 <script>
-  import { identity, edition, assets, rights } from '$lib/stores/package.js';
+  import { identity, edition, assets, rights, template } from '$lib/stores/package.js';
   import { buildPackage } from '$lib/utils/packager.js';
 
   let exporting = false;
@@ -32,9 +32,10 @@
     try {
       result = await buildPackage({
         identity: $identity,
-        edition: $edition,
-        assets: $assets,
-        rights: $rights
+        edition:  $edition,
+        assets:   $assets,
+        rights:   $rights,
+        template: $template,
       });
       exportedFilename = result.filename;
       progress = 90;
@@ -95,7 +96,7 @@
 
 <div class="space-y-6">
   <div>
-    <p class="t-caption mb-2">Step 5</p>
+    <p class="t-caption mb-2">Step 7</p>
     <h2 class="text-2xl font-black tracking-tight text-white">The Forge</h2>
     <p class="text-sm mt-1" style="color: var(--ink-muted);">Package your work as a self-contained .nz file.</p>
   </div>
@@ -116,11 +117,15 @@
       </div>
     {/if}
     {#if $assets.coverName}
-      <div class="flex items-center gap-3 py-1.5" style="border-color: var(--border-dim);">
+      <div class="flex items-center gap-3 py-1.5 border-b" style="border-color: var(--border-dim);">
         <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">cover/</span>
         <span class="text-xs" style="color: var(--ink-muted);">{$assets.coverName}</span>
       </div>
     {/if}
+    <div class="flex items-center gap-3 py-1.5">
+      <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">template</span>
+      <span class="text-xs" style="color: var(--ink-muted);">{$template} · {$assets.lyrics?.length ?? 0} lyric lines synced</span>
+    </div>
   </div>
 
   {#if !canExport}

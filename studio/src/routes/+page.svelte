@@ -50,7 +50,7 @@
   <!-- NAV -->
   <nav class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 h-14 border-b"
     style="background: rgba(3,3,3,0.85); backdrop-filter: blur(20px); border-color: var(--border-dim);">
-    <span class="font-black text-lg tracking-tight text-white">NOIZES</span>
+    <img src="/logo-wordmark.png" alt="NOIZES" class="h-7 w-auto" />
     <div class="flex items-center gap-2">
       {#if showInstall}
         <button on:click={installPWA}

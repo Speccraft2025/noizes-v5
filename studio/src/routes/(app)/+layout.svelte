@@ -31,9 +31,7 @@
 
       <!-- Logo -->
       <a href="/" class="flex items-center gap-2 shrink-0">
-        <span class="font-black text-lg tracking-tight text-white">NOIZES</span>
-        <span class="text-xs font-semibold px-2 py-0.5 rounded-full hidden sm:inline"
-          style="background: var(--spectral-violet-glow); color: var(--spectral-violet); border: 1px solid rgba(123,92,240,0.3);">v5</span>
+        <img src="/logo-wordmark.png" alt="NOIZES" class="h-7 w-auto" />
       </a>
 
       <!-- Desktop nav -->

@@ -194,7 +194,7 @@
 
   <!-- ══ HERO ══ -->
   <section class="relative min-h-screen flex flex-col items-center justify-center text-center px-6 pt-14 pb-20">
-    <div class="relative z-10 max-w-4xl mx-auto">
+    <div class="relative z-10 max-w-4xl mx-auto text-scrim">
       <p class="t-caption mb-6" data-hero-caption>Music was never meant to be just a file.</p>
 
       <h1 class="t-monumental text-white mb-6">
@@ -342,7 +342,7 @@
   </section>
 
   <!-- ══ CLOSING ══ -->
-  <section data-orb="closing" class="text-center px-6 py-28">
+  <section data-orb="closing" class="text-center px-6 py-28 text-scrim-soft">
     <p class="t-caption mb-4" data-st-fade>The new standard</p>
     <h2 class="t-monumental text-white mb-6 max-w-3xl mx-auto leading-tight">
       <span class="block overflow-hidden"><span class="block" data-st-line>This is what music</span></span>
@@ -393,6 +393,29 @@
     opacity: 0.03;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     mix-blend-mode: overlay;
+  }
+
+  /* Soft radial scrims: dim the orb directly behind text blocks so copy
+     stays readable while the orb's edges keep glowing around it */
+  .text-scrim,
+  .text-scrim-soft {
+    position: relative;
+  }
+  .text-scrim::before,
+  .text-scrim-soft::before {
+    content: "";
+    position: absolute;
+    inset: -14% -22%;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .text-scrim::before {
+    background: radial-gradient(ellipse 62% 58% at 50% 50%,
+      rgba(3, 3, 3, 0.72) 0%, rgba(3, 3, 3, 0.38) 52%, transparent 76%);
+  }
+  .text-scrim-soft::before {
+    background: radial-gradient(ellipse 55% 52% at 50% 42%,
+      rgba(3, 3, 3, 0.52) 0%, rgba(3, 3, 3, 0.24) 55%, transparent 78%);
   }
 
   /* No scrolling while the ENTER gate is up */

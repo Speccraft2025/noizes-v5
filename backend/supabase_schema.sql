@@ -64,6 +64,101 @@ create trigger profiles_updated_at
   for each row execute procedure public.set_updated_at();
 
 -- ══════════════════════════════════════════════
+-- KYC + AUTHENTICITY (profiles extensions)
+-- ══════════════════════════════════════════════
+
+alter table public.profiles add column if not exists kyc_status text not null default 'unverified' check (kyc_status in ('unverified', 'pending', 'approved', 'rejected'));
+alter table public.profiles add column if not exists kyc_full_name text;
+alter table public.profiles add column if not exists kyc_country text;
+alter table public.profiles add column if not exists kyc_id_type text;
+alter table public.profiles add column if not exists kyc_id_number text;
+alter table public.profiles add column if not exists kyc_id_document_path text;
+alter table public.profiles add column if not exists kyc_selfie_path text;
+alter table public.profiles add column if not exists kyc_submitted_at timestamptz;
+alter table public.profiles add column if not exists kyc_reviewed_at timestamptz;
+alter table public.profiles add column if not exists kyc_reviewer_id uuid references public.profiles(id);
+alter table public.profiles add column if not exists kyc_reject_reason text;
+alter table public.profiles add column if not exists signing_public_key text;
+
+create table if not exists public.kyc_submissions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  full_name text not null,
+  country text not null,
+  id_type text not null,
+  id_number text not null,
+  id_document_path text,
+  selfie_path text,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  reviewer_id uuid references public.profiles(id),
+  reject_reason text,
+  submitted_at timestamptz default now(),
+  reviewed_at timestamptz
+);
+
+alter table public.kyc_submissions enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename='kyc_submissions' and policyname='Users can read own kyc submissions') then
+    create policy "Users can read own kyc submissions" on public.kyc_submissions for select using (user_id = auth.uid());
+  end if;
+  if not exists (select 1 from pg_policies where tablename='kyc_submissions' and policyname='Users can insert own kyc submissions') then
+    create policy "Users can insert own kyc submissions" on public.kyc_submissions for insert with check (
+      user_id = auth.uid()
+      and status = 'pending'
+      and reviewer_id is null
+      and reviewed_at is null
+    );
+  end if;
+  if not exists (select 1 from pg_policies where tablename='kyc_submissions' and policyname='Admins can read all kyc submissions') then
+    create policy "Admins can read all kyc submissions" on public.kyc_submissions for select using (exists (select 1 from public.profiles where id = auth.uid() and is_admin = true));
+  end if;
+  if not exists (select 1 from pg_policies where tablename='kyc_submissions' and policyname='Admins can update kyc submissions') then
+    create policy "Admins can update kyc submissions" on public.kyc_submissions for update using (exists (select 1 from public.profiles where id = auth.uid() and is_admin = true));
+  end if;
+end $$;
+
+-- Custodial Ed25519 signing keys — service-role only, intentionally has no
+-- client-facing RLS policies so it is unreachable except via the service role.
+create table if not exists public.creator_signing_keys (
+  id uuid references public.profiles(id) on delete cascade primary key,
+  public_key text not null,
+  private_key_encrypted text not null,
+  created_at timestamptz default now()
+);
+
+alter table public.creator_signing_keys enable row level security;
+
+insert into storage.buckets (id, name, public)
+values ('kyc-documents', 'kyc-documents', false)
+on conflict (id) do nothing;
+
+-- "Users can update own profile" (above) is a row-level policy only — it does not
+-- restrict which columns a user can change on their own row. Without this trigger,
+-- any authenticated user could set their own kyc_status to 'approved', point
+-- signing_public_key at a key they control, or grant themselves is_admin, all via a
+-- plain client-side update() call, bypassing KYC review and admin gating entirely.
+create or replace function public.protect_privileged_profile_columns()
+returns trigger as $$
+begin
+  if coalesce(auth.role(), 'service_role') <> 'service_role' then
+    new.is_admin := old.is_admin;
+    new.kyc_status := old.kyc_status;
+    new.kyc_reviewed_at := old.kyc_reviewed_at;
+    new.kyc_reviewer_id := old.kyc_reviewer_id;
+    new.kyc_reject_reason := old.kyc_reject_reason;
+    new.signing_public_key := old.signing_public_key;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+drop trigger if exists protect_privileged_profile_columns on public.profiles;
+create trigger protect_privileged_profile_columns
+  before update on public.profiles
+  for each row execute procedure public.protect_privileged_profile_columns();
+
+-- ══════════════════════════════════════════════
 -- WAITLIST
 -- ══════════════════════════════════════════════
 
@@ -190,3 +285,196 @@ on conflict (id) do nothing;
 -- ADMIN — set your account
 -- ══════════════════════════════════════════════
 update public.profiles set is_admin = true where email = 'jayzelisaac@gmail.com';
+
+-- ══════════════════════════════════════════════
+-- BEATSUNLIMITED — BEAT CATALOG
+-- ══════════════════════════════════════════════
+
+create extension if not exists pgcrypto;
+
+create table if not exists public.beat_catalog (
+  id uuid default gen_random_uuid() primary key,
+  video_id text unique not null,
+  title text not null,
+  producer text not null,
+  producer_url text,
+  genre text,
+  tags text[] not null default '{}',
+  tempo text,
+  license text,
+  thumb text,
+  watch_url text,
+  source text not null default 'seed' check (source in ('seed', 'youtube_api', 'manual')),
+  is_active boolean not null default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.beat_catalog enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename='beat_catalog' and policyname='Active beats are publicly readable') then
+    create policy "Active beats are publicly readable" on public.beat_catalog for select using (is_active = true);
+  end if;
+end $$;
+-- No client-facing insert/update/delete policies — catalog writes go through
+-- the ingestion script (service role) only.
+
+drop trigger if exists beat_catalog_updated_at on public.beat_catalog;
+create trigger beat_catalog_updated_at
+  before update on public.beat_catalog
+  for each row execute procedure public.set_updated_at();
+
+-- ══════════════════════════════════════════════
+-- BEATSUNLIMITED — DEALS (split sheets)
+-- ══════════════════════════════════════════════
+
+create table if not exists public.beat_deals (
+  id uuid default gen_random_uuid() primary key,
+  deal_token text unique not null default encode(gen_random_bytes(16), 'hex'),
+  beat_video_id text not null,
+  beat_title text not null,
+  producer_name text not null,
+  producer_url text,
+  deal_type text not null check (deal_type in ('points', 'hybrid', 'buyout')),
+  master_split numeric not null check (master_split >= 0 and master_split <= 100),
+  publishing_split numeric not null check (publishing_split >= 0 and publishing_split <= 100),
+  upfront_fee numeric not null default 0 check (upfront_fee >= 0),
+  artist_name text not null,
+  artist_signed_at timestamptz not null default now(),
+  producer_signed_name text,
+  producer_signed_at timestamptz,
+  decline_reason text,
+  status text not null default 'proposed' check (status in ('proposed', 'countersigned', 'declined')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.beat_deals enable row level security;
+-- Intentionally no client-facing policies: deals are only reachable through
+-- the token-scoped security-definer RPCs below, so possessing a deal's random
+-- 128-bit token is the sole capability needed (producer countersigns from a
+-- link without an account) and enumeration via the table is impossible.
+
+drop trigger if exists beat_deals_updated_at on public.beat_deals;
+create trigger beat_deals_updated_at
+  before update on public.beat_deals
+  for each row execute procedure public.set_updated_at();
+
+create or replace function public.bu_deal_to_json(d public.beat_deals)
+returns json as $$
+  select json_build_object(
+    'id', d.id,
+    'deal_token', d.deal_token,
+    'beat_video_id', d.beat_video_id,
+    'beat_title', d.beat_title,
+    'producer_name', d.producer_name,
+    'producer_url', d.producer_url,
+    'deal_type', d.deal_type,
+    'master_split', d.master_split,
+    'publishing_split', d.publishing_split,
+    'upfront_fee', d.upfront_fee,
+    'artist_name', d.artist_name,
+    'artist_signed_at', d.artist_signed_at,
+    'producer_signed_name', d.producer_signed_name,
+    'producer_signed_at', d.producer_signed_at,
+    'decline_reason', d.decline_reason,
+    'status', d.status,
+    'created_at', d.created_at
+  );
+$$ language sql stable;
+
+create or replace function public.bu_create_deal(
+  p_beat_video_id text,
+  p_beat_title text,
+  p_producer_name text,
+  p_producer_url text,
+  p_deal_type text,
+  p_master_split numeric,
+  p_publishing_split numeric,
+  p_upfront_fee numeric,
+  p_artist_name text
+) returns json as $$
+declare
+  d public.beat_deals;
+begin
+  if length(trim(p_artist_name)) < 2 then
+    raise exception 'artist name required';
+  end if;
+  insert into public.beat_deals (
+    beat_video_id, beat_title, producer_name, producer_url,
+    deal_type, master_split, publishing_split, upfront_fee, artist_name
+  ) values (
+    p_beat_video_id, p_beat_title, p_producer_name, p_producer_url,
+    p_deal_type, p_master_split, p_publishing_split, coalesce(p_upfront_fee, 0), trim(p_artist_name)
+  ) returning * into d;
+  return public.bu_deal_to_json(d);
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create or replace function public.bu_get_deal(p_token text)
+returns json as $$
+declare
+  d public.beat_deals;
+begin
+  select * into d from public.beat_deals where deal_token = p_token;
+  if not found then return null; end if;
+  return public.bu_deal_to_json(d);
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create or replace function public.bu_countersign_deal(p_token text, p_producer_name text)
+returns json as $$
+declare
+  d public.beat_deals;
+begin
+  if length(trim(p_producer_name)) < 2 then
+    raise exception 'producer name required';
+  end if;
+  update public.beat_deals
+  set status = 'countersigned',
+      producer_signed_name = trim(p_producer_name),
+      producer_signed_at = now()
+  where deal_token = p_token and status = 'proposed'
+  returning * into d;
+  if not found then
+    raise exception 'deal not found or already resolved';
+  end if;
+  return public.bu_deal_to_json(d);
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create or replace function public.bu_decline_deal(p_token text, p_reason text default null)
+returns json as $$
+declare
+  d public.beat_deals;
+begin
+  update public.beat_deals
+  set status = 'declined',
+      decline_reason = nullif(trim(coalesce(p_reason, '')), '')
+  where deal_token = p_token and status = 'proposed'
+  returning * into d;
+  if not found then
+    raise exception 'deal not found or already resolved';
+  end if;
+  return public.bu_deal_to_json(d);
+end;
+$$ language plpgsql security definer set search_path = public;
+
+revoke all on function public.bu_create_deal(text,text,text,text,text,numeric,numeric,numeric,text) from public;
+revoke all on function public.bu_get_deal(text) from public;
+revoke all on function public.bu_countersign_deal(text,text) from public;
+revoke all on function public.bu_decline_deal(text,text) from public;
+grant execute on function public.bu_create_deal(text,text,text,text,text,numeric,numeric,numeric,text) to anon, authenticated;
+grant execute on function public.bu_get_deal(text) to anon, authenticated;
+grant execute on function public.bu_countersign_deal(text,text) to anon, authenticated;
+grant execute on function public.bu_decline_deal(text,text) to anon, authenticated;
+
+-- Producer-supplied MP3s (uploaded with permission, e.g. after a deal or a
+-- direct submission) live in the beat-files bucket; download_url points there
+-- or to the producer's own hosted link. Never populated by ripping YouTube.
+alter table public.beat_catalog add column if not exists download_url text;
+
+insert into storage.buckets (id, name, public)
+values ('beat-files', 'beat-files', true)
+on conflict (id) do nothing;

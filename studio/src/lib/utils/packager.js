@@ -40,19 +40,29 @@ export async function buildPackage({ identity, edition, rights, assets, template
       : [],
   }, null, 2));
 
-  zip.file('authenticity.json', JSON.stringify({ method: 'sha256', signed: false, release_id: releaseId }, null, 2));
-  zip.file('technical.json',    JSON.stringify({ packaged_at: now, packager: 'Noizes Studio v1.0.0', noizes_version: '1.0.0' }, null, 2));
-
   // Audio — embed as data URI in NZ_CONFIG (works on iOS Safari in iframe)
   let audioBase64 = '';
   let audioMime   = '';
+  let audioHash   = null;
   if (assets.audioFile) {
     const buf  = await assets.audioFile.arrayBuffer();
     audioMime  = assets.audioFile.type || 'audio/mpeg';
     audioBase64 = arrayBufferToBase64(buf);
+    audioHash  = await sha256Hex(buf);
     // Also store the file in the zip for archival
     zip.folder('audio').file(assets.audioFile.name, buf);
   }
+
+  // Provisional client-side integrity record. This gets recomputed from the
+  // actual uploaded bytes and signed with the creator's custodial key
+  // server-side at publish time — this copy is only for local/offline exports.
+  zip.file('authenticity.json', JSON.stringify({
+    method: 'sha256',
+    hash: audioHash,
+    signed: false,
+    release_id: releaseId,
+  }, null, 2));
+  zip.file('technical.json',    JSON.stringify({ packaged_at: now, packager: 'Noizes Studio v1.0.0', noizes_version: '1.0.0' }, null, 2));
 
   // Cover
   let coverBase64 = '';
@@ -86,7 +96,7 @@ export async function buildPackage({ identity, edition, rights, assets, template
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 
-  return { filename, blob, audioFile: assets.audioFile, coverFile: assets.coverFile };
+  return { filename, blob, audioFile: assets.audioFile, coverFile: assets.coverFile, audioHash };
 }
 
 function arrayBufferToBase64(buffer) {
@@ -94,4 +104,9 @@ function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
+}
+
+async function sha256Hex(buffer) {
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
 }

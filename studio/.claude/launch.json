@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "noizes-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "templates-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "5200", "/private/tmp/claude-501/-Users-speccraftmedialtd--Documents-Web-Noizes-V5/9843d240-39f3-4083-add5-7c89cce396f0/scratchpad/templates"],
+      "port": 5200
+    },
+    {
+      "name": "noizes-build-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--", "--port", "4173"],
+      "port": 4173
+    }
+  ]
+}

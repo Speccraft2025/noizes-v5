@@ -2,7 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { createSupabaseServerClient } from '$lib/server/supabase.js';
 
 export async function load({ locals, url }) {
-  if (locals.session) throw redirect(303, '/exchange');
+  if (locals.session) throw redirect(303, url.searchParams.get('next') || '/exchange');
   return { notice: url.searchParams.get('notice') };
 }
 
@@ -30,7 +30,7 @@ export const actions = {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${event.url.origin}/auth/callback?next=${next}`,
+        redirectTo: `${event.url.origin}/auth/callback?next=${encodeURIComponent(next)}`,
         queryParams: { access_type: 'offline', prompt: 'consent' }
       }
     });

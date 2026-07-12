@@ -43,6 +43,46 @@
         checks.push({ label: 'noizes_version field', status: 'fail', note: 'No manifest.json' });
       }
 
+      // Authenticity: recompute the audio hash and verify the platform signature.
+      const af = zip.file('authenticity.json');
+      if (af) {
+        try {
+          const authenticity = JSON.parse(await af.async('string'));
+          const audioEntry = files.find(f => f.startsWith('audio/') && !zip.files[f].dir);
+
+          if (audioEntry && authenticity.hash) {
+            const audioBuf = await zip.files[audioEntry].async('arraybuffer');
+            const computedHash = await sha256Hex(audioBuf);
+            const match = computedHash === authenticity.hash;
+            checks.push({ label: 'audio hash matches authenticity.json', status: match ? 'pass' : 'fail', note: match ? 'sha256 verified' : 'Hash mismatch — audio may have been altered' });
+          } else if (authenticity.hash) {
+            checks.push({ label: 'audio hash matches authenticity.json', status: 'warn', note: 'No audio file to verify against' });
+          }
+
+          if (authenticity.signed) {
+            try {
+              const res = await fetch('/validator/verify', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                  hash: authenticity.hash,
+                  signature: authenticity.signature,
+                  publicKey: authenticity.signer_public_key,
+                }),
+              });
+              const { valid } = await res.json();
+              checks.push({ label: 'platform signature', status: valid ? 'pass' : 'fail', note: valid ? 'Signature valid' : 'Signature invalid' });
+            } catch {
+              checks.push({ label: 'platform signature', status: 'warn', note: 'Could not reach verification service' });
+            }
+          } else {
+            checks.push({ label: 'platform signature', status: 'warn', note: 'Not signed (unpublished export)' });
+          }
+        } catch {
+          checks.push({ label: 'authenticity.json', status: 'fail', note: 'Invalid JSON' });
+        }
+      }
+
       const passed = checks.filter(c => c.status === 'pass').length;
       const failed = checks.filter(c => c.status === 'fail').length;
       const warned = checks.filter(c => c.status === 'warn').length;
@@ -57,6 +97,11 @@
     dragging = false;
     const file = e.dataTransfer?.files?.[0];
     if (file) validate(file);
+  }
+
+  async function sha256Hex(buffer) {
+    const digest = await crypto.subtle.digest('SHA-256', buffer);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
   const statusStyle = {

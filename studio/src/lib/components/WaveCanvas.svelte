@@ -2,10 +2,8 @@
   import { onMount } from 'svelte';
 
   let canvas;
-  let mounted = false;
 
   onMount(() => {
-    mounted = true;
     const ctx = canvas.getContext('2d');
     let t = 0;
     let animId;
@@ -54,15 +52,8 @@
   });
 </script>
 
-{#if mounted}
-  <canvas
-    bind:this={canvas}
-    class="fixed inset-0 w-full h-full pointer-events-none"
-    style="z-index: 0;"
-  ></canvas>
-{:else}
-  <canvas
-    class="fixed inset-0 w-full h-full pointer-events-none"
-    style="z-index: 0;"
-  ></canvas>
-{/if}
+<canvas
+  bind:this={canvas}
+  class="fixed inset-0 w-full h-full pointer-events-none"
+  style="z-index: 0;"
+></canvas>

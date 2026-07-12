@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { identity, edition, assets, rights, template } from '$lib/stores/package.js';
   import StepIdentity    from '$lib/components/StepIdentity.svelte';
   import StepAssets      from '$lib/components/StepAssets.svelte';
@@ -19,7 +20,48 @@
   ];
 
   let currentStep = 1;
+
+  // Handoff from beatsunlimited: a countersigned split-sheet deal arrives as
+  // ?source=beatsunlimited&deal=<token>&title=&producer=&master=&pub=.
+  // Purely additive — only prefills empty Rights fields, never overwrites.
+  let importedDeal = null;
+
+  onMount(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('source') !== 'beatsunlimited' || !p.get('producer')) return;
+    importedDeal = {
+      title: p.get('title') || 'a licensed beat',
+      producer: p.get('producer'),
+      master: p.get('master'),
+      pub: p.get('pub'),
+      deal: p.get('deal')
+    };
+    const creditLine =
+      `Producer — ${importedDeal.producer} (master ${importedDeal.master ?? '?'}% / ` +
+      `publishing ${importedDeal.pub ?? '?'}% via beatsunlimited split sheet` +
+      `${importedDeal.deal ? ' ' + importedDeal.deal.slice(0, 8) : ''})`;
+    rights.update((v) => ({
+      ...v,
+      producer: v.producer || importedDeal.producer,
+      credits: v.credits
+        ? (v.credits.includes(creditLine) ? v.credits : v.credits + '\n' + creditLine)
+        : creditLine
+    }));
+  });
 </script>
+
+{#if importedDeal}
+  <div class="px-6 py-3 text-sm flex items-center gap-3 border-b"
+    style="background: rgba(255,90,31,0.08); border-color: rgba(255,90,31,0.25); color: #ffb599;">
+    <span class="font-black" style="color: #ff5a1f;">beatsunlimited</span>
+    <span>
+      Deal imported — "{importedDeal.title}" by {importedDeal.producer}.
+      Split terms were added to the Rights step.
+    </span>
+    <button type="button" class="ml-auto text-xs font-bold" style="color: var(--ink-muted);"
+      on:click={() => importedDeal = null}>Dismiss</button>
+  </div>
+{/if}
 
 <div class="flex min-h-[calc(100vh-56px)]">
   <!-- Left step rail -->

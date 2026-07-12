@@ -46,29 +46,67 @@
       return;
     }
 
-    // Publish to Supabase
-    statusLabel = 'Publishing to Exchange…';
+    // Publish to Supabase. Files go straight from the browser to Supabase
+    // Storage via signed upload URLs — Netlify functions reject request
+    // bodies over 6MB, so the .nz/audio/cover can't be POSTed to our server.
+    statusLabel = 'Uploading to Exchange…';
     try {
-      const form = new FormData();
-      form.append('release_id', $identity.release_id || `nz-${Date.now()}`);
-      form.append('meta', JSON.stringify({
-        artist: $identity.artist,
-        title: $identity.title,
-        genre: $identity.genre,
-        year: $identity.year,
-        location: $identity.location,
-        description: $identity.description,
-        edition_type: $edition.edition_type,
-        edition_name: $edition.edition_name,
-        edition_size: $edition.edition_size,
-        price: $edition.price,
-        currency: $edition.currency,
-      }));
-      form.append('nz', result.blob, result.filename);
-      if (result.coverFile) form.append('cover', result.coverFile, result.coverFile.name);
-      if (result.audioFile) form.append('audio', result.audioFile, result.audioFile.name);
+      const ext = (name) => name?.includes('.') ? name.split('.').pop() : null;
+      const prepRes = await fetch('/studio/publish/upload-urls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          release_id: $identity.release_id,
+          audio_ext: ext(result.audioFile?.name),
+          cover_ext: ext(result.coverFile?.name),
+        }),
+      });
+      if (!prepRes.ok) {
+        const body = await prepRes.json().catch(() => ({}));
+        throw new Error(body.message || `Upload setup failed (${prepRes.status})`);
+      }
+      const { release_id, uploads } = await prepRes.json();
 
-      const res = await fetch('/studio/publish', { method: 'POST', body: form });
+      async function putFile(target, blob, type) {
+        const res = await fetch(target.signedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': type, 'x-upsert': 'true' },
+          body: blob,
+        });
+        if (!res.ok) throw new Error(`Upload to storage failed (${res.status})`);
+      }
+
+      await putFile(uploads.nz, result.blob, 'application/zip');
+      progress = 94;
+      if (uploads.audio && result.audioFile) {
+        await putFile(uploads.audio, result.audioFile, result.audioFile.type || 'audio/mpeg');
+      }
+      if (uploads.cover && result.coverFile) {
+        await putFile(uploads.cover, result.coverFile, result.coverFile.type || 'image/jpeg');
+      }
+      progress = 97;
+
+      statusLabel = 'Publishing to Exchange…';
+      const res = await fetch('/studio/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          release_id,
+          meta: {
+            artist: $identity.artist,
+            title: $identity.title,
+            genre: $identity.genre,
+            year: $identity.year,
+            location: $identity.location,
+            description: $identity.description,
+            edition_type: $edition.edition_type,
+            edition_name: $edition.edition_name,
+            edition_size: $edition.edition_size,
+            price: $edition.price,
+            currency: $edition.currency,
+          },
+        }),
+      });
       if (res.ok) {
         published = true;
       } else {

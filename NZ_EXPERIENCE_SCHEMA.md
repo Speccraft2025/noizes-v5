@@ -1,6 +1,6 @@
-# Noizes Experience Schema — DRAFT v0.1
+# Noizes Experience Schema — v0.2
 
-**Status:** Draft for review — precedes /spec breakdown
+**Status:** Finalized 2026-07-13 — contract for epic #1 (children #2–#8)
 **Applies to:** `.nz` package format v1.x → v2.0, Studio compiler, ULTRA (and future) templates, Validator
 
 ---
@@ -46,6 +46,7 @@ release.nz
 ├── authenticity.json      (existing — hash coverage extended, see §8)
 ├── technical.json         (existing, unchanged)
 ├── experience.json        (NEW — canonical experience data, this spec)
+├── resources.json         (NEW, optional — the ONLY file allowed to contain URLs, §11)
 ├── audio/
 │   ├── main.<ext>         (existing)
 │   └── <rendition>.<ext>  (NEW — alternate versions)
@@ -69,11 +70,12 @@ compile time; the Validator checks it.
   "schema_version": "2.0.0",
   "release_id": "nz-xxxxxxxx",
 
+  "presentation": { }, // §3.5 — preset + enabled modules
   "modes": { },        // §4 — which views exist and their content
   "renditions": [ ],   // §5 — alternate audio versions
   "attachments": [ ],  // §6 — embedded extra files
   "analysis": { },     // §7 — compile-time computed, drives reactive visuals
-  "moments": [ ]       // §7.5 — creator-authored timed annotations
+  "moments": [ ]       // §7.5 — creator-authored timed annotations + score actions
 }
 ```
 
@@ -85,10 +87,40 @@ the v2 template treats every missing block as "mode absent".
 
 1. **No external references.** No field may contain `http(s)://` URLs.
    Assets are referenced by zip path (canonical) / data URI (baked).
+   **Single named exception:** `resources.json` (§11) — a separate optional
+   file, never part of the render path, that MAY contain `https://` and
+   `mailto:` URLs. `experience.json` itself remains URL-free, always.
 2. **Timestamps** are non-negative integers in milliseconds.
 3. **Colors** are hex `#RRGGBB` or `#RRGGBBAA`.
 4. **Text content** is plain text or the whitelisted subset in §4.6
    (no arbitrary HTML — the template renders text, never injects it as markup).
+
+---
+
+## 3.5 Presentation block (presets & modules)
+
+One modular template serves every experience style. The package declares which
+modules (tabs/views) are enabled; presets are Studio-side conveniences that set
+the `modules` array — they are data, not separate template files.
+
+```json
+"presentation": {
+  "preset": "hub",                  // classic | immersive | hub | custom
+  "modules": ["player", "lyrics", "story", "gallery", "visualizer", "support"]
+}
+```
+
+- The template renders the tab bar from `modules` ∩ modes-that-have-data.
+  A module with no backing data is silently omitted.
+- Unknown module ids are ignored (forward compatibility).
+- Missing `presentation` block ⇒ `preset: "custom"` with every data-backed
+  mode enabled (v0.1 behavior).
+- Studio presets:
+  - **Classic** — `player`, `lyrics`, `credits`
+  - **Immersive** — Classic + `story`, `gallery`, `visualizer` (+ score playback)
+  - **Artist Hub** — Immersive + `support`
+- Selecting a preset in Studio never deletes authored content; it only changes
+  visibility.
 
 ---
 
@@ -151,6 +183,15 @@ renderer shipped inside the template (`pulse | field | bars | orbit`);
 `reactive: true` uses live FFT, `false` falls back to `beat_grid` timing only
 (needed where the audio element is served in a context without
 `createMediaElementSource` access).
+
+### 4.8 `support` — artist links (renders `resources.json`)
+
+Renders the groups of `resources.json` (§11) as link cards. Appears only when
+`resources.json` exists in the package AND `modules` includes `support`.
+Every link opens via `<a target="_blank" rel="noopener noreferrer">` on an
+explicit user tap — the template itself performs **zero** network requests.
+No third-party advertising, ever: the only links in a package are the ones the
+creator placed there.
 
 **Text rendering rule:** `body` fields support only: blank line = paragraph
 break, `*italic*`, `**bold**`. The template converts these itself; raw HTML in
@@ -235,9 +276,11 @@ detection), never at play time and never on a server:
 Drives: visualizer mode, lyric background pulse, progress-bar energy shading.
 All fields optional — the visualizer degrades gracefully (palette-only → static).
 
-### 7.5 Moments (creator annotations)
+### 7.5 Moments (creator annotations + Experience Score)
 
-The offline descendant of V3's timestamped comments:
+The offline descendant of V3's timestamped comments, extended into a single
+timed track that *orchestrates* the experience — the Experience Score. There is
+deliberately only ONE timed system in the package.
 
 ```json
 "moments": [
@@ -245,15 +288,31 @@ The offline descendant of V3's timestamped comments:
     "id": "m-01",
     "timestamp_ms": 74000,
     "author": "creator",
+    "action": "show",                  // annotate (default) | show | quote | artwork
     "text": "This is where the choir from the stairwell session comes in.",
-    "attachment_id": "att-03"          // optional link into §6
+    "attachment_id": "att-03",         // link into §6
+    "duration_ms": 8000                // show/quote only
   }
 ]
 ```
 
+Action semantics:
+
+| Action | Requires | Behavior |
+|---|---|---|
+| `annotate` (default) | `text` | v0.1 behavior: progress-bar marker; tap shows the note (+ attachment preview if linked) |
+| `show` | `attachment_id` → kind `image\|gif` | Full-bleed crossfade display of the attachment for `duration_ms` |
+| `quote` | `text` | Typographic text card for `duration_ms` |
+| `artwork` | `attachment_id` → kind `image\|gif` | Swaps the displayed cover; **persists** until the next `artwork` moment or track end; `duration_ms` ignored |
+
 - ≤ 50 creator moments, `text` ≤ 280 chars.
-- Rendered as markers on the progress bar; tapping shows the note (and
-  attachment preview if linked).
+- `duration_ms` default 6000, clamped to 2000–15000 (show/quote only).
+- A moment whose required field is missing or whose `attachment_id` points at a
+  non-image attachment is **invalid** (Validator fails the package).
+- Seek behavior (template contract): on seek, active artwork state is
+  recomputed from all `artwork` moments ≤ playhead; `show`/`quote` moments
+  passed by more than 250 ms are not replayed.
+- Video playback and audio ducking are explicitly **not** part of v2.0.
 - **Listener moments** are a viewer feature, not package data: stored in
   `localStorage` keyed by `release_id`, never written back into the artifact.
 
@@ -263,42 +322,118 @@ The offline descendant of V3's timestamped comments:
 
 Current signing covers the audio hash. v2.0 extends coverage:
 
-- `authenticity.json` gains `"content_hash"`: SHA-256 over a canonical
-  serialization of `experience.json` + the audio bytes of every rendition.
-- The signature (custodial, server-side at publish) signs `content_hash`,
-  so the *experience* — not just the audio — is what's attested.
+- `authenticity.json` gains `"content_hash"`: SHA-256 over the **canonical
+  serialization** of `experience.json`, then `resources.json` (when present),
+  then the raw audio bytes of every rendition in `renditions[]` order
+  (single-audio packages: just the main audio bytes).
+- **Canonical serialization** (must be reproducible across independent
+  implementations): JSON with object keys sorted lexicographically (code-unit
+  order) at every depth, arrays in document order, no insignificant
+  whitespace, UTF-8 encoding, no trailing newline. The hash input is:
+  `utf8(canonical(experience.json))` ‖ `utf8(canonical(resources.json))`
+  (omitted entirely when the file is absent) ‖ rendition bytes.
+- `resources.json` is deliberately **inside** `content_hash`: artist links are
+  baked per edition. Changing a link means issuing a new edition — the
+  archived artifact never silently changes.
+- The signature (custodial Ed25519, server-side at publish) signs
+  `content_hash`, so the *experience* — not just the audio — is what's
+  attested. The legacy audio `hash` field is kept alongside for v1 viewers.
 - Validator: recompute `content_hash` from package contents; any mismatch
-  (including a tampered story text) fails verification.
+  (including a tampered story text or swapped merch link) fails verification.
 - Local/offline exports keep `"signed": false` exactly as today.
 
 ---
 
 ## 9. Studio changes implied (summary — input to /spec)
 
-| Area | Change |
-|---|---|
-| New step: **Experience** | Author story/liner/production text, details rows, moments; toggle modes |
-| StepAssets | Multi-rendition upload with labels; attachments upload with labels/kind |
-| Compile pipeline | Web Audio analysis pass (BPM/onsets/energy/palette); size budget meter; per-attachment bake decision |
-| `packager.js` | Emit `experience.json`, `attachments/`, extra `audio/` entries; extend `NZ_CONFIG` baking; `nz_spec: "2.0"` in manifest; extended hash |
-| ULTRA template | Mode registry + tab bar from `modes`; story/liner/production/credits/gallery/visualizer views; rendition switcher; moment markers |
-| Validator | v2 schema validation; no-external-URL rule; `content_hash` recompute; baked-vs-canonical agreement check |
-| Publish server | Sign extended `content_hash` (signing.js), accept v2 manifests |
+| Area | Change | Issue |
+|---|---|---|
+| New step: **Experience** | Preset picker; story/liner/production text; moments editor (score actions); attachments; resources editor; size meter | #5 |
+| StepAssets | Multi-rendition upload with labels (fast-follow) | #8 |
+| Compile pipeline | Web Audio analysis pass (BPM/onsets/energy/palette); size budget meter; per-attachment bake decision | #3 |
+| `packager.js` | Emit `experience.json`, `resources.json`, `attachments/`, extra `audio/` entries; extend `NZ_CONFIG` baking; `nz_spec: "2.0"`; `content_hash` | #3 |
+| ULTRA template | Mode registry + tab bar; narrative/credits/gallery/visualizer views; score playback engine; support module; connection indicator | #4 |
+| Validator | v2 schema validation; URL carve-out rule; `content_hash` recompute; baked-vs-canonical agreement check | #6 |
+| Publish server | Sign extended `content_hash` (signing.js), accept v2 manifests; shared `contentHash` module | #7 |
 
 **Explicitly out of scope for v2.0** (candidates for v2.1+): world block /
 360° panorama mode, branching, progression & achievements, interactions,
-per-rendition analysis, listener moment export/exchange.
+per-rendition analysis, listener moment export/exchange, video moments,
+audio ducking, live resources endpoint, stems/Atmos/notation modes
+(all distributable today as plain attachments), third-party advertising (never).
 
 ---
 
-## 10. Open questions for /spec
+## 10. Resolved decisions (was: open questions)
 
-1. **Size ceilings** — is 60 MB the right soft cap for the first official
-   artifact? (Target distribution channel matters: direct download vs. Exchange.)
-2. **Rendition–lyrics binding** — do we need per-rendition lyric tracks in v2.0,
-   or is main-only acceptable for artifact #1?
-3. **Visualizer styles** — ship all four renderers in every package (~small JS
-   cost) or let Studio strip unselected ones?
-4. **Moments UX** — progress-bar markers only, or also a list view (its own mode)?
-5. **Does artifact #1 need renditions at all**, or do we ship modes + analysis +
-   moments first and add renditions in a fast-follow?
+Decided 2026-07-13 with epic #1:
+
+1. **Size ceilings** — 60 MB soft cap confirmed (warn, never block). Revisit
+   with real data from artifact #1.
+2. **Rendition–lyrics binding** — main-only in v2.0. Renditions without synced
+   lyrics hide the lyrics mode while active.
+3. **Visualizer styles** — all four renderers ship in every package; the JS
+   cost is small next to embedded audio.
+4. **Moments UX** — progress-bar markers (annotate) plus the score playback
+   layer (show/quote/artwork). No separate list-view mode in v2.0.
+5. **Renditions for artifact #1** — spec'd now (format-complete), built as a
+   non-blocking fast-follow (#8). Artifact #1 may ship single-audio.
+
+---
+
+## 11. `resources.json` — artist links (the URL carve-out)
+
+Optional file. The ONLY place in a `.nz` where URLs may exist. Everything
+required to *experience* the work is inside the package; everything that
+points outward lives here, opened only by explicit user action.
+
+```json
+{
+  "schema_version": "1.0.0",
+  "release_id": "nz-xxxxxxxx",
+  "live_endpoint": null,
+  "groups": [
+    {
+      "id": "listen",
+      "title": "Listen",
+      "links": [
+        { "label": "Spotify", "url": "https://open.spotify.com/…", "kind": "streaming" }
+      ]
+    },
+    {
+      "id": "support",
+      "title": "Support",
+      "links": [
+        { "label": "Merch",        "url": "https://…", "kind": "store" },
+        { "label": "Tour Tickets", "url": "https://…", "kind": "tickets" }
+      ]
+    }
+  ]
+}
+```
+
+Rules:
+
+1. **Scheme whitelist:** every `url` must be `https://` or `mailto:`. Anything
+   else (http, ftp, javascript, data, …) makes the package invalid.
+2. **Never auto-fetched.** The template performs no network requests. Links
+   render as `<a target="_blank" rel="noopener noreferrer">` and open only on
+   user tap. A `.nz` remains fully functional with no network, forever.
+3. **Limits:** ≤ 6 groups, ≤ 10 links per group, `label` ≤ 40 chars,
+   `title` ≤ 24 chars, `url` ≤ 2048 chars.
+4. **Canonical group ids** (template supplies icons and ordering):
+   `listen | watch | follow | support | collect | explore`.
+   Unknown ids render last, unstyled but functional.
+5. **`kind`** is a display hint (`streaming | video | social | store | tickets |
+   donate | website | other`); unknown kinds fall back to `other`.
+6. **`live_endpoint`** is reserved for a future live-resources feature
+   (current tour dates / new releases fetched on explicit "Go Online").
+   In v2.0 it must be `null` and viewers MUST NOT fetch it. Reserving the
+   field now means the feature lands later without a format bump.
+7. **Baked into `content_hash`** (§8): links are part of the attested edition.
+8. **No third-party advertising.** The only promotions in a package are things
+   the creator intentionally placed: their merch, shows, releases, socials.
+
+Viewer contract (connection indicator): offline → "Archived edition — exactly
+as released"; online AND resources present → "Artist links available".
+Cosmetic only — rendering never depends on connectivity.

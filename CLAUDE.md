@@ -16,3 +16,10 @@ Key routing rules:
 - Save progress → invoke /context-save
 - Resume context → invoke /context-restore
 - Author a backlog-ready spec/issue → invoke /spec
+
+## Testing
+
+- Studio tests: `cd studio && npm test` (vitest, `src/**/*.test.js`). See `studio/TESTING.md`.
+- When writing new functions in the compile pipeline (`experience.js`, `packager.js`), write a corresponding test.
+- When fixing a bug, write a regression test; when adding a conditional, test both paths.
+- Never commit code that makes existing tests fail.

@@ -3,7 +3,12 @@ import { createSupabaseServerClient } from '$lib/server/supabase.js';
 
 export async function load({ locals, url }) {
   if (locals.session) throw redirect(303, url.searchParams.get('next') || '/exchange');
-  return { notice: url.searchParams.get('notice') };
+  // ?error= is what the callback redirects with when a sign-in fails; surface it
+  // as a notice so the page always explains itself rather than rendering a bare
+  // form that invites the user to just try again.
+  return {
+    notice: url.searchParams.get('notice') ?? (url.searchParams.get('error') ? 'auth_failed' : null)
+  };
 }
 
 export const actions = {
@@ -22,19 +27,5 @@ export const actions = {
 
     const next = new URL(request.url).searchParams.get('next') || '/exchange';
     throw redirect(303, next);
-  },
-
-  google: async (event) => {
-    const supabase = createSupabaseServerClient(event);
-    const next = new URL(event.request.url).searchParams.get('next') || '/exchange';
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${event.url.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        queryParams: { access_type: 'offline', prompt: 'consent' }
-      }
-    });
-    if (error) return fail(500, { error: error.message });
-    throw redirect(303, data.url);
   }
 };

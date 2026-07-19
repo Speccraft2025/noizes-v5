@@ -2,17 +2,13 @@
 
 ## Automated payment/DB reconciliation for the acquire endpoint
 
-**What:** Retry the `acquisitions` insert with an idempotency key tied to the Daraja (M-Pesa) transaction ID if the first insert fails after payment is already confirmed.
+**Status (2026-07-19):** Largely built. The acquire flow shipped with idempotency from day one (Paystack, not Daraja): `acquisitions.payment_reference` unique index is the idempotency key; the webhook 500s on insert failure so Paystack retries into idempotent re-fulfillment (`studio/src/lib/server/acquire.js`). Every attempted charge is recorded in `payment_intents`.
 
-**Why:** Prevents a real buyer paying with no ownership record created. Acceptable to handle manually (log + manual fix) at 2-3 test artists; not acceptable once real production Daraja credentials and real public users are live.
+**Remaining:** Automated diffing of stuck intents — a periodic query/report for `payment_intents` where `status = 'pending'` and `created_at < now() - interval '1 hour'` (abandoned) and `status = 'needs_reconciliation'` (paid-but-unfulfilled, e.g. sellout race → manual refund). Manual SQL in the Supabase dashboard is fine at current volume.
 
-**Pros:** Closes a real money-with-no-record gap; makes the acquire flow production-safe.
+**Context:** Original scope assumed Daraja (M-Pesa direct); superseded by Paystack (approved 2026-07-19, Spec Music account) which carries M-Pesa as a channel. Design doc: `~/.gstack/projects/Speccraft2025-noizes-v5/speccraftmedialtd.-master-design-20260704-001053.md`.
 
-**Cons:** Extra complexity (idempotency key plumbing, retry logic) not justified at current test volume — deferred deliberately, not an oversight.
-
-**Context:** Lives in `studio/src/routes/(app)/exchange/acquire/+server.js` once the acquire endpoint is built (see design doc: `~/.gstack/projects/Speccraft2025-noizes-v5/speccraftmedialtd.-master-design-20260704-001053.md`, and its `/plan-eng-review` pass). Decided during eng review (D4): log + manual reconciliation for the sandbox-scale test, this TODO before switching to production Daraja credentials.
-
-**Depends on / blocked by:** Nothing blocking; should land before the production-credentials switch, not before the sandbox test.
+**Depends on / blocked by:** Nothing blocking; automate before real public volume.
 
 ## Automated artist payouts (Paystack subaccounts / split payments)
 

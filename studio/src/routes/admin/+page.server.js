@@ -5,13 +5,15 @@ export async function load({ locals }) {
     { count: waitlistCount },
     { count: userCount },
     { data: recentWaitlist },
-    { data: recentUsers }
+    { data: recentUsers },
+    { count: kycPendingCount }
   ] = await Promise.all([
     sb.from('waitlist').select('*', { count: 'exact', head: true }),
     sb.from('profiles').select('*', { count: 'exact', head: true }),
     sb.from('waitlist').select('email, role, created_at').order('created_at', { ascending: false }).limit(5),
     sb.from('profiles').select('display_name, email, role, created_at').order('created_at', { ascending: false }).limit(5),
+    sb.from('kyc_submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
   ]);
 
-  return { waitlistCount, userCount, recentWaitlist, recentUsers };
+  return { waitlistCount, userCount, recentWaitlist, recentUsers, kycPendingCount };
 }

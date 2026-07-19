@@ -3,6 +3,19 @@
 All notable changes to Noizes are documented here.
 Version format: MAJOR.MINOR.PATCH.MICRO — dates are YYYY-MM-DD.
 
+## [0.1.1.0] - 2026-07-20
+
+### Added
+- **KYC verification flow (complete)** — the missing UI layers found during the pressing #1 launch:
+  - `/verify`: identity submission form (name, country, ID type/number, ID photo + selfie) with approved/pending/rejected states and resubmission after rejection
+  - `/admin/kyc`: review queue with signed-URL document previews, approve/reject (+required reason shown to the artist), double-review protection
+  - Admin dashboard KYC-queue stat card + nav link
+- `$lib/server/kyc.js`: shared validation helpers (`validateKycFields`, `canSubmitKyc`, `safeFileExt`) with full test coverage (68 tests total)
+
+### Fixed
+- `/verify` no longer 500s (the page component never existed); logged-out visits redirect to login
+- KYC uploads: user-supplied file extensions sanitized before building storage paths; 5MB combined size guard (Netlify body cap)
+
 ## [0.1.0.0] - 2026-07-19
 
 ### Added

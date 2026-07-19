@@ -1,6 +1,6 @@
 <script>
   export let data;
-  $: ({ waitlistCount, userCount, recentWaitlist, recentUsers } = data);
+  $: ({ waitlistCount, userCount, recentWaitlist, recentUsers, kycPendingCount } = data);
 
   function timeAgo(ts) {
     const diff = Date.now() - new Date(ts);
@@ -24,7 +24,7 @@
       { label: 'Waitlist', value: waitlistCount ?? 0, color: '#7B5CF0', href: '/admin/waitlist' },
       { label: 'Users',    value: userCount ?? 0,    color: '#4B6BF0', href: '/admin/users' },
       { label: 'Creators', value: '—', color: '#F04BD8', href: '/admin/users' },
-      { label: 'Revenue',  value: '—', color: '#c8a96e', href: '#' },
+      { label: 'KYC queue', value: kycPendingCount ?? 0, color: '#c8a96e', href: '/admin/kyc' },
     ] as stat}
       <a href={stat.href} class="glass rounded-2xl p-5 hover:border-opacity-50 transition-all duration-200 block">
         <p class="t-caption mb-2" style="color: {stat.color};">{stat.label}</p>

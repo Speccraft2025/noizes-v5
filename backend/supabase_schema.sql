@@ -143,6 +143,9 @@ returns trigger as $$
 begin
   if coalesce(auth.role(), 'service_role') <> 'service_role' then
     new.is_admin := old.is_admin;
+    -- role gates /studio access and is assigned from the invite at signup —
+    -- never self-escalatable from the client.
+    new.role := old.role;
     new.kyc_status := old.kyc_status;
     new.kyc_reviewed_at := old.kyc_reviewed_at;
     new.kyc_reviewer_id := old.kyc_reviewer_id;
@@ -251,13 +254,14 @@ do $$ begin
   if not exists (select 1 from pg_policies where tablename='acquisitions' and policyname='Users can read own acquisitions') then
     create policy "Users can read own acquisitions" on public.acquisitions for select using (owner_id = auth.uid());
   end if;
-  if not exists (select 1 from pg_policies where tablename='acquisitions' and policyname='Authenticated users can acquire') then
-    create policy "Authenticated users can acquire" on public.acquisitions for insert with check (owner_id = auth.uid());
-  end if;
-  if not exists (select 1 from pg_policies where tablename='acquisitions' and policyname='Owners can update own acquisitions') then
-    create policy "Owners can update own acquisitions" on public.acquisitions for update using (owner_id = auth.uid());
-  end if;
 end $$;
+
+-- Acquisitions are paid objects: every legitimate write goes through the
+-- service role (Paystack fulfillment in the acquire flow). The old client
+-- insert/update policies let any logged-in user mint free acquisitions or
+-- rewrite price/edition/owner via the REST API — drop them.
+drop policy if exists "Authenticated users can acquire" on public.acquisitions;
+drop policy if exists "Owners can update own acquisitions" on public.acquisitions;
 
 create or replace function public.handle_acquisition_insert()
 returns trigger as $$
@@ -273,6 +277,49 @@ drop trigger if exists on_acquisition_created on public.acquisitions;
 create trigger on_acquisition_created
   after insert on public.acquisitions
   for each row execute procedure public.handle_acquisition_insert();
+
+-- ══════════════════════════════════════════════
+-- PAYMENTS (Paystack acquire flow)
+-- ══════════════════════════════════════════════
+
+-- payment_reference: the Paystack transaction reference (nz_<uuid>, generated
+-- server-side at init). The partial unique index is the idempotency key —
+-- webhook and callback can both attempt fulfillment; only one insert wins.
+alter table public.acquisitions add column if not exists payment_reference text;
+
+create unique index if not exists acquisitions_payment_reference_key
+  on public.acquisitions (payment_reference) where payment_reference is not null;
+
+-- Local ledger of every attempted charge. Written service-role-only.
+-- Reconciliation queries: abandoned = status 'pending' older than ~1h;
+-- paid-but-unfulfilled (e.g. sellout race) = 'needs_reconciliation'.
+create table if not exists public.payment_intents (
+  id uuid default gen_random_uuid() primary key,
+  reference text not null unique,
+  release_id uuid references public.releases(id) on delete set null,
+  buyer_id uuid references public.profiles(id) on delete set null,
+  amount_subunits integer not null,
+  currency text not null,
+  status text not null default 'pending'
+    check (status in ('pending', 'succeeded', 'failed', 'needs_reconciliation')),
+  paystack_data jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.payment_intents enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename='payment_intents' and policyname='Buyers can read own intents') then
+    create policy "Buyers can read own intents" on public.payment_intents for select using (buyer_id = auth.uid());
+  end if;
+  -- no insert/update policies: writes go through the service-role client only
+end $$;
+
+drop trigger if exists payment_intents_updated_at on public.payment_intents;
+create trigger payment_intents_updated_at
+  before update on public.payment_intents
+  for each row execute procedure public.set_updated_at();
 
 -- ══════════════════════════════════════════════
 -- STORAGE BUCKET
@@ -478,3 +525,79 @@ alter table public.beat_catalog add column if not exists download_url text;
 insert into storage.buckets (id, name, public)
 values ('beat-files', 'beat-files', true)
 on conflict (id) do nothing;
+
+
+-- ══════════════════════════════════════════════
+-- INVITES (invite-only access gate)
+-- ══════════════════════════════════════════════
+--
+-- Access to Noizes is invite-only. Before this table existed, "invited" and
+-- "signed in with Google for the first time" were indistinguishable: Supabase
+-- auto-provisions an auth.users row for any Google account that completes the
+-- OAuth flow, on_auth_user_created then minted a profile, and nothing checked
+-- whether the email had ever been invited. Any Gmail address could walk in.
+--
+-- public.invites is now the single source of truth for who is allowed an
+-- account. An email must appear here BEFORE an auth.users row can be created
+-- for it — enforced at the database level by require_invite_for_new_user()
+-- below, so it holds regardless of which auth path (or dashboard setting) is
+-- in play.
+--
+-- ⚠️  BACKFILL ORDER MATTERS: the backfill below grants an invite to every
+-- email currently in public.profiles. Delete any uninvited accounts in
+-- Authentication → Users FIRST — deleting the auth.users row cascades the
+-- profiles row away, so it will not be backfilled. Run this script second.
+
+create table if not exists public.invites (
+  email text primary key,
+  role text not null default 'collector' check (role in ('creator', 'collector')),
+  invited_by uuid references public.profiles(id) on delete set null,
+  invited_at timestamptz default now()
+);
+
+alter table public.invites enable row level security;
+
+-- Writes are service-role only (the admin invite action). Admins get read
+-- access so the waitlist screen can show who has already been invited.
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename='invites' and policyname='Admins can read invites') then
+    create policy "Admins can read invites" on public.invites for select
+      using (exists (select 1 from public.profiles where id = auth.uid() and is_admin = true));
+  end if;
+end $$;
+
+-- Backfill: every existing account keeps its access. See the ordering warning above.
+insert into public.invites (email, role, invited_at)
+select lower(p.email), p.role, coalesce(p.created_at, now())
+from public.profiles p
+where p.email is not null
+on conflict (email) do nothing;
+
+-- The gate itself. Rejects the insert outright, so no orphaned auth.users row
+-- is left behind for an uninvited email and OAuth simply fails.
+create or replace function public.require_invite_for_new_user()
+returns trigger as $$
+begin
+  if not exists (select 1 from public.invites where email = lower(new.email)) then
+    raise exception 'noizes_invite_required: % is not on the invite list', new.email
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+drop trigger if exists require_invite_for_new_user on auth.users;
+create trigger require_invite_for_new_user
+  before insert on auth.users
+  for each row execute procedure public.require_invite_for_new_user();
+
+-- Emails are matched case-insensitively everywhere; keep the table canonical.
+create or replace function public.normalize_invite_email()
+returns trigger as $$
+begin new.email := lower(trim(new.email)); return new; end;
+$$ language plpgsql;
+
+drop trigger if exists normalize_invite_email on public.invites;
+create trigger normalize_invite_email
+  before insert or update on public.invites
+  for each row execute procedure public.normalize_invite_email();

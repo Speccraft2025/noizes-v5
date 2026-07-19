@@ -1,8 +1,48 @@
 <script>
+  import { goto } from '$app/navigation';
+
   export let data;
   $: ({ featured, feed } = data);
 
   const colors = ['#7B5CF0', '#4B6BF0', '#F04BD8', '#7B5CF0', '#4B6BF0', '#F04BD8'];
+
+  let acquiring = null; // release id with a checkout in flight
+  let soldOut = {};     // release ids learned sold-out from a 409
+  let acquireError = null;
+
+  async function acquire(r) {
+    if (!data.user) {
+      return goto(`/auth/login?next=${encodeURIComponent('/exchange')}`);
+    }
+    acquiring = r.id;
+    acquireError = null;
+    try {
+      const res = await fetch('/exchange/acquire', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ release_id: r.id }),
+      });
+      if (res.status === 409) {
+        soldOut = { ...soldOut, [r.id]: true };
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        acquireError = body?.message || 'Could not start checkout — try again.';
+        return;
+      }
+      const { authorization_url } = await res.json();
+      window.location.href = authorization_url;
+    } catch {
+      acquireError = 'Could not start checkout — try again.';
+    } finally {
+      acquiring = null;
+    }
+  }
+
+  function isSoldOut(r) {
+    return soldOut[r.id] || available(r) === 0;
+  }
 
   function fmt(price, currency) {
     if (currency === 'KES') return `KES ${Number(price).toLocaleString()}`;
@@ -24,6 +64,12 @@
     <h1 class="t-monumental-small text-white mb-2">Exchange</h1>
     <p class="text-base" style="color: var(--ink-muted);">Browse and acquire cultural objects from artists worldwide.</p>
   </div>
+
+  {#if acquireError}
+    <div class="glass rounded-xl px-4 py-3 mb-6 text-sm" style="border-color: #F04BD850; color: var(--ink-secondary);">
+      {acquireError}
+    </div>
+  {/if}
 
   {#if feed.length === 0}
     <div class="glass rounded-2xl p-20 text-center">
@@ -59,7 +105,11 @@
                 </div>
                 <div class="flex items-center gap-3">
                   <span class="text-sm font-black text-white">{fmt(ed.price, ed.currency)}</span>
-                  <button class="btn-spectral py-1.5 px-4 text-xs rounded-full">Acquire</button>
+                  <button
+                    class="btn-spectral py-1.5 px-4 text-xs rounded-full disabled:opacity-40"
+                    disabled={isSoldOut(ed) || acquiring === ed.id}
+                    on:click|stopPropagation={() => acquire(ed)}
+                  >{isSoldOut(ed) ? 'Sold out' : acquiring === ed.id ? '…' : 'Acquire'}</button>
                 </div>
               </div>
             </div>
@@ -97,7 +147,12 @@
 
               <div class="shrink-0 text-right">
                 <p class="text-sm font-black text-white">{fmt(ed.price, ed.currency)}</p>
-                <button class="mt-1.5 text-xs font-semibold px-3 py-1 rounded-full" style="background: rgba(255,255,255,0.07); border: 1px solid var(--border-dim); color: var(--ink-secondary);">Acquire</button>
+                <button
+                  class="mt-1.5 text-xs font-semibold px-3 py-1 rounded-full disabled:opacity-40"
+                  style="background: rgba(255,255,255,0.07); border: 1px solid var(--border-dim); color: var(--ink-secondary);"
+                  disabled={isSoldOut(ed) || acquiring === ed.id}
+                  on:click|stopPropagation={() => acquire(ed)}
+                >{isSoldOut(ed) ? 'Sold out' : acquiring === ed.id ? '…' : 'Acquire'}</button>
               </div>
             </div>
 

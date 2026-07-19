@@ -1,10 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { identity, edition, assets, rights, template } from '$lib/stores/package.js';
+  import { identity, edition, assets, rights, template, play } from '$lib/stores/package.js';
   import StepIdentity    from '$lib/components/StepIdentity.svelte';
   import StepAssets      from '$lib/components/StepAssets.svelte';
   import StepLyrics      from '$lib/components/StepLyrics.svelte';
   import StepTheme       from '$lib/components/StepTheme.svelte';
+  import StepPlay        from '$lib/components/StepPlay.svelte';
   import StepEdition     from '$lib/components/StepEdition.svelte';
   import StepRights      from '$lib/components/StepRights.svelte';
   import StepExport      from '$lib/components/StepExport.svelte';
@@ -14,9 +15,10 @@
     { id: 2, label: 'Assets',   icon: '◉' },
     { id: 3, label: 'Lyrics',   icon: '≡' },
     { id: 4, label: 'Theme',    icon: '⬡' },
-    { id: 5, label: 'Edition',  icon: '◎' },
-    { id: 6, label: 'Rights',   icon: '◈' },
-    { id: 7, label: 'Compile',    icon: '⬟' },
+    { id: 5, label: 'Games',    icon: '▦' },
+    { id: 6, label: 'Edition',  icon: '◎' },
+    { id: 7, label: 'Rights',   icon: '◈' },
+    { id: 8, label: 'Compile',    icon: '⬟' },
   ];
 
   let currentStep = 1;
@@ -128,8 +130,10 @@
       {:else if currentStep === 4}
         <StepTheme />
       {:else if currentStep === 5}
-        <StepEdition />
+        <StepPlay />
       {:else if currentStep === 6}
+        <StepEdition />
+      {:else if currentStep === 7}
         <StepRights />
       {:else}
         <StepExport />
@@ -171,6 +175,10 @@
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Lyrics</span>
           <span class="text-white">{$assets.lyrics?.length ?? 0} lines</span>
+        </div>
+        <div class="flex justify-between">
+          <span style="color: var(--ink-muted);">Games</span>
+          <span class="text-white">{$play.games.length ? $play.games.length : '—'}</span>
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Edition</span>

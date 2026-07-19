@@ -46,6 +46,22 @@ describe('buildExperienceHTML — play block', () => {
     expect(cfg.play.difficulty).toBe('standard');
     expect(cfg.play.intensity).toBe(1);
   });
+
+  it('preserves an explicit intensity of 0 (falsy but valid)', () => {
+    const cfg = configOf(buildExperienceHTML({ ...base, play: { games: ['bloom'], intensity: 0 } }));
+    expect(cfg.play.intensity).toBe(0);
+  });
+
+  it('rejects a malformed play block (games not an array)', () => {
+    const cfg = configOf(buildExperienceHTML({ ...base, play: { games: 'pulse' } }));
+    expect(cfg.play).toBeNull();
+    expect(cfg.features).not.toContain('play');
+  });
+
+  it('features lists lyrics and play together when both are present', () => {
+    const cfg = configOf(buildExperienceHTML({ ...base, play: { games: ['rush'] } }));
+    expect(cfg.features).toEqual(['lyrics', 'play']);
+  });
 });
 
 describe('buildExperienceHTML — injection integrity', () => {
@@ -73,5 +89,29 @@ describe('template ↔ catalog contract', () => {
 
   it('template gates the Games tab on the play block', () => {
     expect(ULTRA_HTML).toContain("if(!PLAY || !PLAY.games || !PLAY.games.length) return;");
+  });
+});
+
+describe('buildExperienceHTML — script-breakout escaping (XSS regression)', () => {
+  it('escapes </script> in creator-controlled fields so it cannot terminate the config script tag', () => {
+    const html = buildExperienceHTML({
+      ...base,
+      identity: { ...base.identity, artist: 'Evil</script><script>alert(1)</script>' },
+      lyrics: [{ t: 0, text: '</script><img src=x onerror=alert(1)>' }],
+    });
+    // The injected config block must not contain a literal closing script tag
+    // inside a JSON string — "<" is emitted as < instead.
+    const startIdx = html.indexOf('window.NZ_CONFIG =');
+    const endIdx = html.indexOf('<\/script>', startIdx);
+    const block = html.slice(startIdx, endIdx);
+    expect(block).not.toContain('</script>');
+    expect(block).toContain('\\u003c');
+  });
+
+  it('escaped config still parses to the identical values', () => {
+    const artist = 'A</script>B<C';
+    const html = buildExperienceHTML({ ...base, identity: { ...base.identity, artist } });
+    const m = html.match(/window\.NZ_CONFIG = (\{[\s\S]*?\});\n/);
+    expect(JSON.parse(m[1]).artist).toBe(artist);
   });
 });

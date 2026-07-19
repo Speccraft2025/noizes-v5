@@ -8,9 +8,18 @@ const THEMES = {
   monument:    { primary: '#C8A96E', accent: '#E8C88E', bg: '#050403' },
 };
 
-export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template }) {
+export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template, play }) {
   const themeId = template || 'ultra';
   const theme   = THEMES[themeId] || THEMES.ultra;
+
+  // Optional game add-ons — only baked when the creator enabled games
+  const playCfg = (play && Array.isArray(play.games) && play.games.length)
+    ? {
+        games:      play.games,
+        difficulty: play.difficulty || 'standard',
+        intensity:  typeof play.intensity === 'number' ? play.intensity : 1,
+      }
+    : null;
 
   const audioSrc = (audioBase64 && audioMime)
     ? `data:${audioMime};base64,${audioBase64}`
@@ -22,6 +31,7 @@ export function buildExperienceHTML({ identity, edition, rights, audioBase64, au
   const cfg = {
     artist:      identity.artist      || '',
     title:       identity.title       || '',
+    releaseId:   identity.release_id  || '',
     year:        identity.year        || String(new Date().getFullYear()),
     genre:       identity.genre       || '',
     location:    identity.location    || '',
@@ -30,9 +40,13 @@ export function buildExperienceHTML({ identity, edition, rights, audioBase64, au
     coverSrc,
     template:    themeId,
     theme,
-    features:    lyrics && lyrics.length ? ['lyrics'] : [],
+    features:    [
+      ...(lyrics && lyrics.length ? ['lyrics'] : []),
+      ...(playCfg ? ['play'] : []),
+    ],
     lyricOffset: 0,
     lyrics:      lyrics || [],
+    play:        playCfg,
     edition: {
       type:         edition.edition_type || 'Open Edition',
       name:         edition.edition_name || '',
@@ -49,8 +63,11 @@ export function buildExperienceHTML({ identity, edition, rights, audioBase64, au
     },
   };
 
-  // Replace the NZ_CONFIG block in the template using brace-counting
-  const cfgJson   = JSON.stringify(cfg, null, 2);
+  // Replace the NZ_CONFIG block in the template using brace-counting.
+  // Escape "<" as < so creator-controlled strings (artist, lyrics, …)
+  // can never contain "</script>" and break out of the script tag (XSS in
+  // the exported package). < is a valid JSON escape — parse-identical.
+  const cfgJson   = JSON.stringify(cfg, null, 2).replace(/</g, '\\u003c');
   const injection = `<script>\nwindow.NZ_CONFIG = ${cfgJson};\n</script>`;
 
   // Find opening <script>\nwindow.NZ_CONFIG = { and matching }; </script>

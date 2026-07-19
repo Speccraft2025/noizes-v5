@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import { buildExperienceHTML } from './experience.js';
 
-export async function buildPackage({ identity, edition, rights, assets, template }) {
+export async function buildPackage({ identity, edition, rights, assets, template, play }) {
   const zip = new JSZip();
   const releaseId = identity.release_id || `nz-${Date.now()}`;
   const now = new Date().toISOString();
@@ -64,6 +64,20 @@ export async function buildPackage({ identity, edition, rights, assets, template
   }, null, 2));
   zip.file('technical.json',    JSON.stringify({ packaged_at: now, packager: 'Noizes Studio v1.0.0', noizes_version: '1.0.0' }, null, 2));
 
+  // experience.json — canonical v2 experience data (additive; v1 viewers ignore it).
+  // Emitted only when v2 content exists; today that's the play (games) block.
+  if (play && play.games?.length) {
+    zip.file('experience.json', JSON.stringify({
+      schema_version: '2.0.0',
+      release_id:     releaseId,
+      play: {
+        games:      play.games,
+        difficulty: play.difficulty || 'standard',
+        intensity:  typeof play.intensity === 'number' ? play.intensity : 1,
+      },
+    }, null, 2));
+  }
+
   // Cover
   let coverBase64 = '';
   let coverMime   = '';
@@ -81,6 +95,7 @@ export async function buildPackage({ identity, edition, rights, assets, template
     coverBase64, coverMime,
     lyrics:   assets.lyrics || [],
     template: template      || 'ultra',
+    play,
   });
   zip.file('experience.html', experienceHTML);
 

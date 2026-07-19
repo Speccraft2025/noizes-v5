@@ -75,7 +75,8 @@ compile time; the Validator checks it.
   "renditions": [ ],   // §5 — alternate audio versions
   "attachments": [ ],  // §6 — embedded extra files
   "analysis": { },     // §7 — compile-time computed, drives reactive visuals
-  "moments": [ ]       // §7.5 — creator-authored timed annotations + score actions
+  "moments": [ ],      // §7.5 — creator-authored timed annotations + score actions
+  "play": { }          // §7.6 — optional music-reactive game add-ons
 }
 ```
 
@@ -315,6 +316,30 @@ Action semantics:
 - Video playback and audio ducking are explicitly **not** part of v2.0.
 - **Listener moments** are a viewer feature, not package data: stored in
   `localStorage` keyed by `release_id`, never written back into the artifact.
+
+### 7.6 Play block (game add-ons)
+
+Optional music-reactive micro-games, rendered by game engines that ship
+inside the template (like the visualizer renderers — no per-package game
+code, no assets, recolored from the theme/`analysis.palette`).
+
+```json
+"play": {
+  "games": ["bloom", "pulse", "clash"],   // 1–9 ids; [] / absent ⇒ no Games tab
+  "difficulty": "standard",               // gentle | standard | sharp (timing windows)
+  "intensity": 1.0                        // 0.4–1.4 particle/glow budget
+}
+```
+
+- Known game ids in v2.0: `bloom | comet | pulse | serpent | glide | apex |
+  barrels | clash | rush`. Unknown ids are ignored (forward compatibility).
+- Games read the baked `analysis` block when present (beat grid, BPM,
+  palette) plus live `AnalyserNode` data; with neither they degrade to
+  live-analysis-only, same contract as the visualizer (§4.7).
+- Listener state (best streaks, rounds won) lives in `localStorage` keyed by
+  `release_id` — never written back into the artifact.
+- The block is part of `content_hash` (§8) like the rest of
+  `experience.json`.
 
 ---
 

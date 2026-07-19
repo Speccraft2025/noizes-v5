@@ -1,5 +1,5 @@
 <script>
-  import { identity, edition, assets, rights, template } from '$lib/stores/package.js';
+  import { identity, edition, assets, rights, template, play } from '$lib/stores/package.js';
   import { buildPackage } from '$lib/utils/packager.js';
 
   let exporting = false;
@@ -36,6 +36,7 @@
         assets:   $assets,
         rights:   $rights,
         template: $template,
+        play:     $play,
       });
       exportedFilename = result.filename;
       progress = 90;

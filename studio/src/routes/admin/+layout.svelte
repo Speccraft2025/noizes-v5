@@ -7,6 +7,7 @@
     { href: '/admin',          label: 'Overview',  icon: '◎' },
     { href: '/admin/waitlist', label: 'Waitlist',  icon: '◉' },
     { href: '/admin/users',    label: 'Users',     icon: '◈' },
+    { href: '/admin/kyc',      label: 'KYC',       icon: '⬡' },
   ];
 </script>
 

@@ -118,6 +118,14 @@ do $$ begin
   end if;
 end $$;
 
+-- Artist-centric KYC fields (2026-07-20): verification on a music platform is
+-- about the artist identity as much as the legal one. Links are jsonb arrays
+-- of https URLs, validated server-side in $lib/server/kyc.js.
+alter table public.kyc_submissions add column if not exists artist_name text;
+alter table public.kyc_submissions add column if not exists social_links jsonb not null default '[]'::jsonb;
+alter table public.kyc_submissions add column if not exists music_links jsonb not null default '[]'::jsonb;
+alter table public.kyc_submissions add column if not exists years_active text;
+
 -- Custodial Ed25519 signing keys — service-role only, intentionally has no
 -- client-facing RLS policies so it is unreachable except via the service role.
 create table if not exists public.creator_signing_keys (

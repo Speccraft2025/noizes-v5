@@ -3,6 +3,17 @@
 All notable changes to Noizes are documented here.
 Version format: MAJOR.MINOR.PATCH.MICRO — dates are YYYY-MM-DD.
 
+## [0.1.2.0] - 2026-07-20
+
+### Changed
+- **KYC is now artist-centric** (founder feedback from first real dogfood run):
+  - `/verify` adds an artist-identity section: stage name, years active, links to music (required, the verification signal on a music platform) and socials (optional)
+  - `/admin/kyc` shows the artist profile with clickable links; rejection is now a dropdown of canonical reasons (blurry ID, selfie mismatch, wrong format, …) with an "Other…" free-text escape hatch
+- **Strict upload format validation**: JPG/PNG/WebP only, enforced client- and server-side with a HEIC-specific message for iPhone users (first real submission arrived as unreviewable `.heic` — the exact failure this prevents)
+
+### Schema
+- `kyc_submissions`: + `artist_name`, `social_links` (jsonb), `music_links` (jsonb), `years_active` — apply `backend/kyc-artist-fields-2026-07-20.sql`
+
 ## [0.1.1.0] - 2026-07-20
 
 ### Added

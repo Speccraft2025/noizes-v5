@@ -2,6 +2,7 @@ import { fail } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { REJECT_REASONS } from '$lib/server/kyc.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -15,7 +16,7 @@ export async function load() {
 
   const { data: submissions } = await sb
     .from('kyc_submissions')
-    .select('id, user_id, full_name, country, id_type, id_number, id_document_path, selfie_path, status, reject_reason, submitted_at, reviewed_at')
+    .select('id, user_id, full_name, country, id_type, id_number, artist_name, years_active, music_links, social_links, id_document_path, selfie_path, status, reject_reason, submitted_at, reviewed_at')
     .order('submitted_at', { ascending: false })
     .limit(50);
 
@@ -46,17 +47,24 @@ export async function load() {
   return {
     submissions: withUrls,
     pendingCount: withUrls.filter(s => s.status === 'pending').length,
+    rejectReasons: REJECT_REASONS,
   };
 }
 
 async function review({ request, locals }, decision) {
   const form = await request.formData();
   const id = form.get('id')?.toString();
-  const reject_reason = form.get('reject_reason')?.toString().trim() || null;
+  // Dropdown reason, or free text when "other" is picked.
+  const picked = form.get('reject_reason')?.toString().trim();
+  const custom = form.get('reject_reason_custom')?.toString().trim();
+  const reject_reason = (picked === '__other__' ? custom : picked) || null;
 
   if (!UUID_RE.test(id || '')) return fail(400, { error: 'Submission id required.' });
   if (decision === 'rejected' && !reject_reason) {
     return fail(400, { error: 'A reject reason is required — the artist sees it on /verify.' });
+  }
+  if (reject_reason && reject_reason.length > 300) {
+    return fail(400, { error: 'Reject reason is too long (300 chars max).' });
   }
 
   const sb = adminClient();

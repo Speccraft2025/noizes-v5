@@ -6,6 +6,7 @@
 
   $: kyc = data.kyc;
   $: idTypes = data.idTypes ?? [];
+  $: yearsActive = data.yearsActive ?? [];
 
   const ID_TYPE_LABELS = {
     national_id: 'National ID',
@@ -98,22 +99,60 @@
           class="input-dark w-full rounded-xl" placeholder="Document number" />
       </div>
 
+      <div class="pt-2 border-t" style="border-color: var(--border-dim);">
+        <p class="t-caption mb-1" style="color: #7B5CF0;">Your artist identity</p>
+        <p class="text-xs mb-4" style="color: var(--ink-muted);">
+          Noizes verifies artists, not just IDs — show us the artist behind the pressing.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label for="artist_name" class="t-caption block mb-2">Artist / stage name</label>
+            <input id="artist_name" name="artist_name" type="text" required maxlength="100"
+              class="input-dark w-full rounded-xl" placeholder="The name on your releases" />
+          </div>
+          <div>
+            <label for="years_active" class="t-caption block mb-2">Years active</label>
+            <select id="years_active" name="years_active" required class="input-dark w-full rounded-xl">
+              {#each yearsActive as y}
+                <option value={y}>{y} {y === '<1' ? 'year' : 'years'}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label for="music_links" class="t-caption block mb-2">Links to your music <span style="color: #7B5CF0;">*</span></label>
+          <textarea id="music_links" name="music_links" rows="3" required
+            class="input-dark w-full rounded-xl text-sm"
+            placeholder="One per line — Spotify, Apple Music, YouTube, Audiomack, SoundCloud…"></textarea>
+        </div>
+
+        <div>
+          <label for="social_links" class="t-caption block mb-2">Social links <span class="text-xs font-normal" style="color: var(--ink-muted);">(optional, recommended)</span></label>
+          <textarea id="social_links" name="social_links" rows="2"
+            class="input-dark w-full rounded-xl text-sm"
+            placeholder="Instagram, TikTok, X — one per line"></textarea>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label for="id_document" class="t-caption block mb-2">Photo of your ID</label>
-          <input id="id_document" name="id_document" type="file" accept="image/*" required
+          <input id="id_document" name="id_document" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required
             class="input-dark w-full rounded-xl text-xs" />
         </div>
         <div>
           <label for="selfie" class="t-caption block mb-2">Selfie holding your ID</label>
-          <input id="selfie" name="selfie" type="file" accept="image/*" required
+          <input id="selfie" name="selfie" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required
             class="input-dark w-full rounded-xl text-xs" />
         </div>
       </div>
 
       <p class="text-xs" style="color: var(--ink-muted);">
-        Keep both photos under 5MB combined. Your documents are stored privately and only
-        visible to the Noizes review team.
+        <strong class="text-white">JPG, PNG or WebP only</strong> — iPhone HEIC photos can't be reviewed
+        (screenshot the photo and upload that instead). Keep both under 5MB combined. Your documents
+        are stored privately and only visible to the Noizes review team.
       </p>
 
       <button type="submit" class="btn-spectral w-full py-3 rounded-xl font-bold text-sm" disabled={submitting}>

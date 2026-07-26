@@ -1,5 +1,28 @@
 # TODOS
 
+## Embed brand fonts in the .nz experience for exact offline type (2026-07-26)
+
+Removed the Google Fonts `<link>` from `studio/src/lib/templates/ULTRA.html` — it
+was an external network request that broke the "renders fully offline" guarantee
+(and violated the NZ schema's no-external-references rule). The experience now
+falls back to the system sans stack offline. To restore exact brand type (Bebas
+Neue display + Space Grotesk body) offline, embed the woff2 files as base64
+`@font-face` in the template (both are OFL-licensed). ~40–80KB per package,
+negligible next to embedded audio. P2 (cosmetic; offline correctness is already
+fixed).
+
+## Auth — required Supabase dashboard config (not code) (2026-07-26)
+
+Magic-link sign-in + password reset ship in code, but they only work once the
+Supabase project is configured:
+- **URL Configuration → Redirect URLs**: add the production origin + `/auth/callback`
+  (magic link and reset both redirect there). Without it the links error.
+- **Auth → Providers → Email**: enable "leaked password protection"
+  (HaveIBeenPwned) and keep email confirmations on.
+- **OTP/magic-link expiry**: keep short (≤1h) and single-use (default).
+This session couldn't set these (Supabase MCP not authorized here).
+
+
 ## Provenance + resale — remaining pieces (v0.2.0.0, 2026-07-26)
 
 The record layer (signed hash-chained provenance, Living Record, Collector Notes,

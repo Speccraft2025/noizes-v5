@@ -178,6 +178,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if(f) openFile(f);
   });
 
+  // File handler: when the OS launches Noizes to open a .nz (manifest
+  // file_handlers), the file arrives via the Launch Queue, not the input.
+  // Works offline once installed — this is the "open with Noizes" path.
+  if ('launchQueue' in window && 'files' in LaunchParams.prototype) {
+    window.launchQueue.setConsumer(function(params){
+      if (!params || !params.files || !params.files.length) return;
+      params.files[0].getFile().then(function(file){ openFile(file); });
+    });
+  }
+
   closeBtn.addEventListener('click', function(){
     blobUrls.forEach(function(u){ URL.revokeObjectURL(u); });
     blobUrls = [];

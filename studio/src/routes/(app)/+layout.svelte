@@ -31,7 +31,7 @@
 
       <!-- Logo -->
       <a href="/" class="flex items-center gap-2 shrink-0">
-        <img src="/logo-wordmark.png" alt="NOIZES" class="h-7 w-auto" />
+        <img src="/logo-wordmark.png" alt="NOIZES" class="h-8 w-auto" />
       </a>
 
       <!-- Desktop nav -->

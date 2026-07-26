@@ -15,7 +15,7 @@
 
   <div class="relative z-10 w-full max-w-sm">
     <a href="/" class="flex items-center justify-center gap-2 mb-10">
-      <img src="/logo-wordmark.png" alt="NOIZES" class="h-9 w-auto" />
+      <img src="/logo-wordmark.png" alt="NOIZES" class="h-11 w-auto" />
     </a>
 
     {#if form?.success}

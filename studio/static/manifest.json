@@ -22,11 +22,15 @@
     }
   ],
   "categories": ["music", "entertainment"],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
   "file_handlers": [
     {
       "action": "/viewer.html",
       "accept": {
-        "application/zip": [".nz"]
+        "application/zip": [".nz"],
+        "application/octet-stream": [".nz"]
       }
     }
   ]

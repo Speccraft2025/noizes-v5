@@ -1,5 +1,8 @@
 import crypto from 'node:crypto';
 import { env } from '$env/dynamic/private';
+import { verifySignature } from './crypto-verify.js';
+
+export { verifySignature };
 
 const CIPHER = 'aes-256-gcm';
 
@@ -82,16 +85,65 @@ export async function signHash(sb, userId, hashBuffer) {
   return { signature: signature.toString('base64'), publicKey: publicKeyB64 };
 }
 
-/** Verifies an Ed25519 signature. hash is hex, signature/publicKey are base64 strings. */
-export function verifySignature({ hash, signature, publicKey }) {
-  try {
-    const publicKeyObj = crypto.createPublicKey({
-      key: Buffer.from(publicKey, 'base64'),
+/**
+ * Fetches (or lazily generates) the single platform-level registry keypair.
+ * This key attests CUSTODY (provenance events), separate from the per-creator
+ * keys that attest AUTHORSHIP of the .nz content_hash. Its public key is
+ * published so anyone can verify a provenance chain offline.
+ */
+async function loadRegistryKeypair(sb) {
+  const { data: existing } = await sb
+    .from('registry_signing_key')
+    .select('public_key, private_key_encrypted')
+    .eq('id', 1)
+    .maybeSingle();
+
+  if (existing) {
+    const privateKey = crypto.createPrivateKey({
+      key: decrypt(existing.private_key_encrypted),
       format: 'der',
-      type: 'spki',
+      type: 'pkcs8',
     });
-    return crypto.verify(null, Buffer.from(hash, 'hex'), publicKeyObj, Buffer.from(signature, 'base64'));
-  } catch {
-    return false;
+    return { publicKeyB64: existing.public_key, privateKey };
   }
+
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+  const publicKeyB64 = publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+  const privateKeyEncrypted = encrypt(privateKey.export({ type: 'pkcs8', format: 'der' }));
+
+  // Upsert-with-ignore: if a concurrent request created the row first, re-read it.
+  const { error } = await sb
+    .from('registry_signing_key')
+    .insert({ id: 1, public_key: publicKeyB64, private_key_encrypted: privateKeyEncrypted });
+  if (error) {
+    const { data: winner } = await sb
+      .from('registry_signing_key')
+      .select('public_key, private_key_encrypted')
+      .eq('id', 1)
+      .maybeSingle();
+    if (winner) {
+      const privateKeyWon = crypto.createPrivateKey({
+        key: decrypt(winner.private_key_encrypted),
+        format: 'der',
+        type: 'pkcs8',
+      });
+      return { publicKeyB64: winner.public_key, privateKey: privateKeyWon };
+    }
+    throw new Error(`Failed to store registry key: ${error.message}`);
+  }
+
+  return { publicKeyB64, privateKey };
 }
+
+export async function getRegistryPublicKey(sb) {
+  const { publicKeyB64 } = await loadRegistryKeypair(sb);
+  return publicKeyB64;
+}
+
+/** Signs a buffer with the platform registry key. Returns { signature, publicKey } as base64. */
+export async function signWithRegistry(sb, hashBuffer) {
+  const { publicKeyB64, privateKey } = await loadRegistryKeypair(sb);
+  const signature = crypto.sign(null, hashBuffer, privateKey);
+  return { signature: signature.toString('base64'), publicKey: publicKeyB64 };
+}
+

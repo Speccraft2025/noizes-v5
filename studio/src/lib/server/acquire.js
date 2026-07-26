@@ -9,6 +9,31 @@
 // unique-constraint retry loop when concurrent buyers race for numbers.
 export const MAX_EDITION_ATTEMPTS = 5;
 
+// Emits the first two links of an edition's provenance chain on primary sale:
+// seq 0 'created' (minted by the artist) and seq 1 'acquired' (to the buyer).
+// Called only after a winning insert, so duplicate webhooks never double-emit.
+async function openProvenanceChain(sb, { release, acquisition, intent }) {
+  const { appendEvent } = await import('./provenance.js');
+  const editionNumber = acquisition.edition_number;
+  await appendEvent(sb, {
+    releaseId: release.id,
+    editionNumber,
+    kind: 'created',
+    toOwnerId: release.artist_id ?? null,
+    acquisitionId: acquisition.id,
+  });
+  await appendEvent(sb, {
+    releaseId: release.id,
+    editionNumber,
+    kind: 'acquired',
+    fromOwnerId: release.artist_id ?? null,
+    toOwnerId: intent.buyer_id,
+    acquisitionId: acquisition.id,
+    price: acquisition.price_paid,
+    currency: acquisition.currency,
+  });
+}
+
 // Candidate edition numbers to attempt, in order.
 // Open edition (editionSize null/undefined): unnumbered → [null].
 // Limited edition: next numbers after acquiredCount, capped at editionSize
@@ -72,7 +97,7 @@ export async function fulfillAcquisition(sb, intent) {
   for (let attempt = 0; attempt < MAX_EDITION_ATTEMPTS; attempt++) {
     const { data: release, error: relErr } = await sb
       .from('releases')
-      .select('id, edition_size, acquired_count')
+      .select('id, artist_id, edition_size, acquired_count')
       .eq('id', intent.release_id)
       .maybeSingle();
     if (relErr) throw new Error(`release lookup failed: ${relErr.message}`);
@@ -100,6 +125,15 @@ export async function fulfillAcquisition(sb, intent) {
 
     if (!insErr) {
       await setIntentStatus(sb, intent.reference, 'succeeded');
+      // Open the provenance chain for this edition: genesis ('created' by the
+      // artist) then 'acquired' by the buyer. Best-effort — a provenance
+      // failure must never fail a paid, fulfilled acquisition, so we log and
+      // move on rather than throw.
+      try {
+        await openProvenanceChain(sb, { release, acquisition, intent });
+      } catch (e) {
+        console.error(`[acquire] provenance emit failed for ${intent.reference}: ${e.message}`);
+      }
       return { acquisition };
     }
 

@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { buildExperienceHTML } from './experience.js';
+import { buildExperienceHTML, buildGuide } from './experience.js';
 
 export async function buildPackage({ identity, edition, rights, assets, template, play }) {
   const zip = new JSZip();
@@ -65,18 +65,25 @@ export async function buildPackage({ identity, edition, rights, assets, template
   zip.file('technical.json',    JSON.stringify({ packaged_at: now, packager: 'Noizes Studio v1.0.0', noizes_version: '1.0.0' }, null, 2));
 
   // experience.json — canonical v2 experience data (additive; v1 viewers ignore it).
-  // Emitted only when v2 content exists; today that's the play (games) block.
+  // Always carries the Guide (the authored journey); play block when present.
+  const guideBlock = buildGuide({
+    hasLyrics: !!(assets.lyrics && assets.lyrics.length),
+    hasPlay:   !!(play && play.games?.length),
+    authored:  assets.guide,
+  });
+  const experienceJson = {
+    schema_version: '2.0.0',
+    release_id:     releaseId,
+    guide:          guideBlock,
+  };
   if (play && play.games?.length) {
-    zip.file('experience.json', JSON.stringify({
-      schema_version: '2.0.0',
-      release_id:     releaseId,
-      play: {
-        games:      play.games,
-        difficulty: play.difficulty || 'standard',
-        intensity:  typeof play.intensity === 'number' ? play.intensity : 1,
-      },
-    }, null, 2));
+    experienceJson.play = {
+      games:      play.games,
+      difficulty: play.difficulty || 'standard',
+      intensity:  typeof play.intensity === 'number' ? play.intensity : 1,
+    };
   }
+  zip.file('experience.json', JSON.stringify(experienceJson, null, 2));
 
   // Cover
   let coverBase64 = '';
@@ -96,6 +103,7 @@ export async function buildPackage({ identity, edition, rights, assets, template
     lyrics:   assets.lyrics || [],
     template: template      || 'ultra',
     play,
+    guide:    assets.guide,
   });
   zip.file('experience.html', experienceHTML);
 

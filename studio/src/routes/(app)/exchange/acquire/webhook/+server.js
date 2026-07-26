@@ -4,6 +4,7 @@ import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY, PAYSTACK_SECRET_KEY } from '$env/static/private';
 import { verifyPaystackSignature } from '$lib/server/paystack.js';
 import { fulfillAcquisition } from '$lib/server/acquire.js';
+import { fulfillResale } from '$lib/server/resale.js';
 
 // Paystack webhook — the source of truth for payment success. Unauthenticated
 // (no session): trust comes from the HMAC signature over the raw body.
@@ -57,11 +58,16 @@ export async function POST({ request }) {
   }
 
   try {
-    await fulfillAcquisition(sb, intent);
-    await sb
-      .from('payment_intents')
-      .update({ paystack_data: { status: data.status, channel: data.channel, paid_at: data.paid_at, amount: data.amount, currency: data.currency } })
-      .eq('reference', intent.reference);
+    // Primary sale vs resale share the same webhook and idempotency contract.
+    if (intent.kind === 'resale') {
+      await fulfillResale(sb, intent);
+    } else {
+      await fulfillAcquisition(sb, intent);
+      await sb
+        .from('payment_intents')
+        .update({ paystack_data: { status: data.status, channel: data.channel, paid_at: data.paid_at, amount: data.amount, currency: data.currency } })
+        .eq('reference', intent.reference);
+    }
   } catch (e) {
     // 5xx → Paystack retries → idempotent re-fulfillment. This is the
     // "insert fails after payment confirmed" retry path from TODOS.md.

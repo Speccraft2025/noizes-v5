@@ -36,20 +36,25 @@ describe('buildPackage — experience.json (play pass-through)', () => {
     const result = await buildPackage({ ...base, play: { games: ['pulse'] } });
     const zip = await unzip(result);
     const exp = JSON.parse(await zip.file('experience.json').async('string'));
-    expect(exp).toEqual({
-      schema_version: '2.0.0',
-      release_id: 'nz-p-1',
-      play: { games: ['pulse'], difficulty: 'standard', intensity: 1 },
-    });
+    expect(exp.schema_version).toBe('2.0.0');
+    expect(exp.release_id).toBe('nz-p-1');
+    expect(exp.play).toEqual({ games: ['pulse'], difficulty: 'standard', intensity: 1 });
+    // the Guide always ships, even alongside games
+    expect(exp.guide.nodes.map((n) => n.id)).toContain('listen');
     // and the baked HTML carries the same play block
     const html = await zip.file('experience.html').async('string');
     expect(html).toContain('"play"');
   });
 
-  it('omits experience.json for a v1 export (no games), keeping the v1 file set intact', async () => {
+  it('always emits experience.json with a Guide (no play block when no games)', async () => {
     const result = await buildPackage({ ...base, play: { games: [], difficulty: 'standard', intensity: 1 } });
     const zip = await unzip(result);
-    expect(zip.file('experience.json')).toBeNull();
+    const exp = JSON.parse(await zip.file('experience.json').async('string'));
+    // Guide is present; play block is omitted for a games-free export.
+    expect(exp.guide.version).toBe(1);
+    expect(exp.play).toBeUndefined();
+    // arrival → object → listen → record → end for a plain audio object (no lyrics/games)
+    expect(exp.guide.nodes.map((n) => n.id)).toEqual(['arrival', 'object', 'listen', 'record', 'end']);
     for (const name of ['manifest.json', 'edition.json', 'rights.json', 'credits.json', 'authenticity.json', 'technical.json', 'experience.html']) {
       expect(zip.file(name), `${name} missing`).toBeTruthy();
     }

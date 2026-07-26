@@ -1,5 +1,36 @@
 # TODOS
 
+## Provenance + resale — remaining pieces (v0.2.0.0, 2026-07-26)
+
+The record layer (signed hash-chained provenance, Living Record, Collector Notes,
+portable `provenance.json` export, stewardship language) and the resale offer flow
+(offer book, accept, resale checkout, custody transfer with 85% artist royalty
+recorded) shipped. Migration: `backend/provenance-resale-2026-07-26.sql` (must be
+run against Supabase; also requires `SIGNING_KEK` already used by creator signing).
+
+**Remaining / deferred:**
+- **Secondary-market browse (buyer discovery).** Buyers can pay/withdraw their own
+  offers and owners can accept from the collection page, but there is no page that
+  lists editions currently `accepting_offers` for a buyer to *find* and offer on.
+  Add a per-edition secondary listing. P1 for a usable resale loop.
+- **Offline provenance verifier UI.** Export is live (`/provenance/[releaseId]/[edition]`);
+  the standalone self-contained verifier (drag-drop a `provenance.json`, checks the
+  chain offline against the registry key) is not built yet. `verifyChain` /
+  `buildProvenanceDocument` in `studio/src/lib/server/provenance.js` are the reusable
+  core. P2.
+- **Collector-note moderation UI.** `collector_notes.status` supports 'hidden' at the
+  DB level; there is no admin control to hide an abusive note. A folded note is
+  immutable in the signed chain (hiding suppresses on-platform display only). Decide
+  policy + build the control before notes go public. P1 (abuse surface).
+- **Automated resale royalty payout.** `resale.js` records the 85/15 split in
+  `payment_intents.paystack_data` and logs it; payout is manual, same as primary
+  sales. Fold into the Paystack split-settlement TODO below.
+- **Genesis provenance for pre-existing acquisitions.** Chains open on new primary
+  sales only. Editions acquired before this migration have no chain until first
+  transfer. Backfill a 'created'+'acquired' pair per existing acquisition if their
+  history should be visible. P2.
+
+
 ## Automated payment/DB reconciliation for the acquire endpoint
 
 **Status (2026-07-19):** Largely built. The acquire flow shipped with idempotency from day one (Paystack, not Daraja): `acquisitions.payment_reference` unique index is the idempotency key; the webhook 500s on insert failure so Paystack retries into idempotent re-fulfillment (`studio/src/lib/server/acquire.js`). Every attempted charge is recorded in `payment_intents`.

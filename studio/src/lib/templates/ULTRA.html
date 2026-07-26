@@ -50,6 +50,19 @@ window.NZ_CONFIG = {
     difficulty: "standard",
     intensity: 1
   },
+  guide: {
+    version: 1,
+    allowFreeExplore: true,
+    nodes: [
+      { id:"arrival", type:"arrival",     label:"Arrival",          view:"intro" },
+      { id:"object",  type:"object",      label:"The Object",       view:"intro" },
+      { id:"listen",  type:"listen",      label:"Listen",           view:"view-player" },
+      { id:"lyrics",  type:"lyrics",      label:"Lyrics",           view:"view-lyrics" },
+      { id:"play",    type:"interactive", label:"Play",             view:"view-games" },
+      { id:"record",  type:"record",      label:"Collector Record", view:"intro" },
+      { id:"end",     type:"ending",      label:"End",              view:"view-player" }
+    ]
+  },
 };
 </script>
 
@@ -401,6 +414,58 @@ html,body{
   <div class="games-grid" id="games-grid"></div>
 </div>
 
+<!-- ── GUIDE (authored journey) ── -->
+<style>
+.guide-btn{position:fixed;top:calc(var(--safe-t) + 14px);right:14px;z-index:60;
+  width:40px;height:40px;border-radius:50%;border:1px solid var(--border);
+  background:var(--surface);color:var(--text);font-size:16px;cursor:pointer;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+.guide-btn:active{opacity:.6;}
+.guide-scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:70;opacity:0;
+  pointer-events:none;transition:opacity .25s;}
+.guide-scrim.open{opacity:1;pointer-events:auto;}
+.guide-drawer{position:fixed;top:0;right:0;height:100%;width:min(84vw,320px);z-index:80;
+  background:var(--bg);border-left:1px solid var(--border);
+  transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+  padding:calc(var(--safe-t) + 22px) 20px 24px;overflow-y:auto;}
+.guide-drawer.open{transform:translateX(0);}
+.guide-title{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+.guide-step{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:12px;
+  cursor:pointer;color:var(--muted);transition:background .15s,color .15s;}
+.guide-step:active{background:var(--surface);}
+.guide-step.current{background:var(--surface);color:var(--text);}
+.guide-step.visited{color:var(--text);}
+.guide-dot{width:16px;height:16px;border-radius:50%;border:1.5px solid currentColor;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:10px;}
+.guide-step.current .guide-dot{border-color:var(--primary);color:var(--primary);box-shadow:0 0 10px var(--primary);}
+.guide-step.visited .guide-dot{background:var(--primary);border-color:var(--primary);color:#000;}
+.guide-step-label{font-size:14px;font-weight:500;}
+.guide-note{font-size:11px;color:var(--muted);margin-top:18px;line-height:1.5;}
+.intro-card{position:fixed;inset:0;z-index:55;display:none;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:32px;
+  background:radial-gradient(ellipse at top,rgba(123,92,240,.14),var(--bg) 60%);}
+.intro-card.show{display:flex;}
+.intro-kicker{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--primary);margin-bottom:12px;}
+.intro-headline{font-size:26px;font-weight:800;color:var(--text);margin-bottom:12px;}
+.intro-body{font-size:14px;color:var(--muted);max-width:32ch;line-height:1.6;margin-bottom:26px;}
+.intro-next{border:1px solid var(--primary);color:var(--primary);background:transparent;
+  padding:11px 26px;border-radius:999px;font-size:13px;cursor:pointer;}
+.intro-next:active{opacity:.6;}
+</style>
+<button class="guide-btn" id="guide-btn" aria-label="Open guide">☰</button>
+<div class="guide-scrim" id="guide-scrim"></div>
+<nav class="guide-drawer" id="guide-drawer" aria-label="Guide">
+  <div class="guide-title">Guide</div>
+  <div id="guide-steps"></div>
+  <div class="guide-note">The artist's recommended path. You're free to wander off it anytime.</div>
+</nav>
+<div class="intro-card" id="intro-card">
+  <div class="intro-kicker" id="intro-kicker"></div>
+  <div class="intro-headline" id="intro-headline"></div>
+  <div class="intro-body" id="intro-body"></div>
+  <button class="intro-next" id="intro-next">Continue →</button>
+</div>
+
 <!-- ── TAB BAR ── -->
 <div class="tabs">
   <button class="tab active" data-view="view-player">
@@ -544,17 +609,93 @@ if(C.coverSrc){
    ═══════════════════════════════════════════════════ */
 var activeView = 'view-player';
 
+function switchView(target){
+  var el = document.getElementById(target);
+  if(!el) return;
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  el.classList.add('active');
+  var tab = document.querySelector('.tab[data-view="'+target+'"]');
+  if(tab) tab.classList.add('active');
+  activeView = target;
+}
+
 document.querySelectorAll('.tab').forEach(function(tab){
   tab.addEventListener('click',function(){
     var target = tab.dataset.view;
     if(target === activeView) return;
-    document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
-    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
-    document.getElementById(target).classList.add('active');
-    tab.classList.add('active');
-    activeView = target;
+    switchView(target);
   });
 });
+
+/* ═══════════════════════════════════════════════════
+   2b. GUIDE — the authored journey
+   ═══════════════════════════════════════════════════ */
+(function(){
+  var guide = C.guide;
+  if(!guide || !guide.nodes || !guide.nodes.length){
+    var gb = document.getElementById('guide-btn'); if(gb) gb.style.display='none';
+    return;
+  }
+  var stepsEl  = document.getElementById('guide-steps');
+  var drawer   = document.getElementById('guide-drawer');
+  var scrim    = document.getElementById('guide-scrim');
+  var card     = document.getElementById('intro-card');
+  var visited  = {};
+  var current  = null;
+
+  var INTRO = {
+    arrival: { kicker:'Noizes Object', headline:C.title, body:(C.artist ? 'by '+C.artist+'. ' : '')+'Tap to enter the experience.' },
+    object:  { kicker:(C.edition && C.edition.type) || 'Edition', headline:'The Object', body:[(C.edition&&C.edition.type)||'', (C.edition&&C.edition.size?('Edition of '+C.edition.size):''), (C.rights&&C.rights.copyright)||''].filter(Boolean).join(' · ') },
+    record:  { kicker:'Provenance', headline:'Collector Record', body:'Authenticity, edition and ownership history live with this object and travel with every hand-off.' },
+    end:     { kicker:'End', headline:'Thank you for listening', body:'You can revisit any part of this object anytime from the Guide.' }
+  };
+
+  function renderSteps(){
+    stepsEl.innerHTML = '';
+    guide.nodes.forEach(function(node){
+      var row = document.createElement('div');
+      row.className = 'guide-step' + (node.id===current?' current':'') + (visited[node.id]&&node.id!==current?' visited':'');
+      var dot = document.createElement('span'); dot.className='guide-dot';
+      dot.textContent = (visited[node.id]&&node.id!==current) ? '✓' : '';
+      var lbl = document.createElement('span'); lbl.className='guide-step-label'; lbl.textContent = node.label;
+      row.appendChild(dot); row.appendChild(lbl);
+      row.addEventListener('click',function(){ goToNode(node); closeDrawer(); });
+      stepsEl.appendChild(row);
+    });
+  }
+
+  function showIntro(node){
+    var copy = INTRO[node.id] || INTRO[node.type] || { kicker:node.label, headline:node.label, body:'' };
+    document.getElementById('intro-kicker').textContent = copy.kicker || '';
+    document.getElementById('intro-headline').textContent = copy.headline || '';
+    document.getElementById('intro-body').textContent = copy.body || '';
+    card.classList.add('show');
+  }
+
+  function goToNode(node){
+    current = node.id; visited[node.id] = true;
+    card.classList.remove('show');
+    if(node.view === 'intro'){ showIntro(node); }
+    else { switchView(node.view); }
+    renderSteps();
+  }
+
+  function idxOf(id){ for(var i=0;i<guide.nodes.length;i++){ if(guide.nodes[i].id===id) return i; } return -1; }
+
+  document.getElementById('intro-next').addEventListener('click',function(){
+    var i = idxOf(current);
+    if(i>=0 && i < guide.nodes.length-1){ goToNode(guide.nodes[i+1]); }
+    else { card.classList.remove('show'); }
+  });
+
+  function openDrawer(){ drawer.classList.add('open'); scrim.classList.add('open'); }
+  function closeDrawer(){ drawer.classList.remove('open'); scrim.classList.remove('open'); }
+  document.getElementById('guide-btn').addEventListener('click',openDrawer);
+  scrim.addEventListener('click',closeDrawer);
+
+  renderSteps();
+})();
 
 /* ═══════════════════════════════════════════════════
    3. AUDIO PLAYER

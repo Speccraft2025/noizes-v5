@@ -3,6 +3,7 @@ import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY, PAYSTACK_SECRET_KEY } from '$env/static/private';
 import { verifyTransaction } from '$lib/server/paystack.js';
 import { fulfillAcquisition } from '$lib/server/acquire.js';
+import { fulfillResale } from '$lib/server/resale.js';
 
 const REFERENCE_RE = /^nz_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -48,6 +49,12 @@ export async function load({ url, locals }) {
       return { state: 'pending', release };
     }
     try {
+      // Resale returns here too; custody flip is idempotent with the webhook.
+      if (intent.kind === 'resale') {
+        const result = await fulfillResale(sb, intent);
+        if (result.stale) return { state: 'pending', release };
+        return { state: 'success', release, resale: true };
+      }
       const result = await fulfillAcquisition(sb, intent);
       if (result.soldOut) return { state: 'sold_out', release };
       // Release deleted after payment — flagged for manual refund; show the

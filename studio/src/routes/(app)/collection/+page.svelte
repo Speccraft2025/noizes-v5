@@ -1,8 +1,12 @@
 <script>
   import { invalidateAll } from '$app/navigation';
+  import OpenNzModal from '$lib/components/OpenNzModal.svelte';
 
   export let data;
   $: ({ collection, events, myOffers } = data);
+
+  let openItem = null;   // item whose .nz is being opened (drives the modal)
+  function openNz(item) { openItem = item; }
 
   const colors = ['#4B6BF0', '#7B5CF0', '#F04BD8', '#7B5CF0', '#4B6BF0', '#F04BD8'];
 
@@ -151,7 +155,7 @@
             </div>
 
             <div class="flex flex-col gap-2 shrink-0 justify-center">
-              <button class="btn-spectral py-1.5 px-4 text-xs rounded-full">Open .nz</button>
+              <button class="btn-spectral py-1.5 px-4 text-xs rounded-full" on:click={() => openNz(item)}>Open .nz</button>
               <button class="btn-ghost py-1.5 px-4 text-xs rounded-full" on:click={() => toggle(item.id)}>
                 {expanded[item.id] ? 'Hide record' : 'Living Record'}
               </button>
@@ -273,3 +277,5 @@
     </div>
   {/if}
 </div>
+
+<OpenNzModal open={!!openItem} item={openItem} onClose={() => (openItem = null)} />

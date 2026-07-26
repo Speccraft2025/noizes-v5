@@ -11,21 +11,53 @@ export async function load({ locals, url }) {
   };
 }
 
+function nextParam(request) {
+  return new URL(request.url).searchParams.get('next') || '/exchange';
+}
+
 export const actions = {
+  // Password sign-in (kept for people who set one). Invite membership is
+  // re-checked on every request in hooks.server.js, so a valid password for a
+  // de-invited account still can't get in.
   email: async (event) => {
-    const { request } = event;
-    const form = await request.formData();
-    const email = form.get('email')?.toString().trim();
+    const form = await event.request.formData();
+    const email = form.get('email')?.toString().trim().toLowerCase();
     const password = form.get('password')?.toString();
 
-    if (!email || !password) return fail(400, { error: 'Email and password are required.' });
+    if (!email || !password) return fail(400, { error: 'Email and password are required.', mode: 'password' });
 
     const supabase = createSupabaseServerClient(event);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // Uniform message — never reveal whether an email exists.
+    if (error) return fail(401, { error: 'Invalid email or password.', mode: 'password' });
 
-    if (error) return fail(401, { error: 'Invalid email or password.' });
+    throw redirect(303, nextParam(event.request));
+  },
 
-    const next = new URL(request.url).searchParams.get('next') || '/exchange';
-    throw redirect(303, next);
+  // Passwordless magic link — the default, secure + easy-to-recover path. No
+  // password to phish, reuse, or forget; getting back in is always "send me a
+  // link". shouldCreateUser:false keeps it invite-only (never mints an account).
+  magic: async (event) => {
+    const form = await event.request.formData();
+    const email = form.get('email')?.toString().trim().toLowerCase();
+    if (!email) return fail(400, { error: 'Enter your email.', mode: 'magic' });
+
+    const supabase = createSupabaseServerClient(event);
+    const next = nextParam(event.request);
+    const emailRedirectTo = `${event.url.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false, emailRedirectTo }
+    });
+
+    // Do not leak whether the address exists or is invited: always show the
+    // same "check your email" confirmation. An uninvited/unknown address simply
+    // never receives a link. Only a rate-limit is surfaced as a real error.
+    if (error && /rate limit|too many/i.test(error.message)) {
+      return fail(429, { error: 'Too many attempts — wait a minute and try again.', mode: 'magic' });
+    }
+
+    return { sent: true, email };
   }
 };

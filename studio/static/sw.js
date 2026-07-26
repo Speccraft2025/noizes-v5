@@ -1,12 +1,22 @@
-const CACHE = 'noizes-v2';
+const CACHE = 'noizes-v3';
 
-// Precache the standalone viewer on install — makes it fully offline
-const PRECACHE = ['/viewer.html'];
+// Precache everything the standalone viewer needs to launch and run with no
+// network: the viewer itself (inlines JSZip + all CSS/JS, uses system fonts),
+// the manifest, and the icons. viewer.html has zero external requests, so this
+// set is the whole offline app.
+const PRECACHE = [
+  '/viewer.html',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/favicon.png'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(PRECACHE))
+      // Individually so one 404 can't abort the whole precache.
+      .then(c => Promise.allSettled(PRECACHE.map(u => c.add(u))))
       .then(() => self.skipWaiting())
   );
 });
@@ -22,19 +32,19 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Only handle same-origin GETs
+  // Only handle same-origin GETs.
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  // Only cache /viewer.html and static assets under /_app/
   const isViewer = url.pathname === '/viewer.html';
+  const isPrecached = PRECACHE.includes(url.pathname);
   const isStatic = url.pathname.startsWith('/_app/immutable/');
-  if (!isViewer && !isStatic) return;
+  if (!isViewer && !isPrecached && !isStatic) return;
 
-  // Skip navigations to everything except the viewer — SSR pages need a live
-  // network round-trip to redirect/auth correctly. The viewer navigation
-  // (app launch, home-screen relaunch, .nz file open) must work offline.
+  // Navigations: only the viewer is served offline. Other SSR pages need a live
+  // round-trip to auth/redirect correctly, so let them hit the network.
   if (e.request.mode === 'navigate' && !isViewer) return;
 
+  // Cache-first for the offline app shell, revalidating in the background.
   e.respondWith(
     caches.open(CACHE).then(cache =>
       cache.match(e.request).then(cached => {

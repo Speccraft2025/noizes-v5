@@ -20,16 +20,21 @@ create table if not exists public.profiles (
 
 alter table public.profiles add column if not exists is_admin boolean default false;
 alter table public.profiles enable row level security;
+drop policy if exists "Profiles are publicly readable" on public.profiles;
 
 do $$ begin
-  if not exists (select 1 from pg_policies where tablename='profiles' and policyname='Profiles are publicly readable') then
-    create policy "Profiles are publicly readable" on public.profiles for select using (true);
+  if not exists (select 1 from pg_policies where tablename='profiles' and policyname='Users can read own profile') then
+    create policy "Users can read own profile" on public.profiles for select
+      to authenticated using ((select auth.uid()) = id);
   end if;
   if not exists (select 1 from pg_policies where tablename='profiles' and policyname='Users can update own profile') then
-    create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id);
+    create policy "Users can update own profile" on public.profiles for update
+      to authenticated using ((select auth.uid()) = id)
+      with check ((select auth.uid()) = id);
   end if;
   if not exists (select 1 from pg_policies where tablename='profiles' and policyname='Users can insert own profile') then
-    create policy "Users can insert own profile" on public.profiles for insert with check (auth.uid() = id);
+    create policy "Users can insert own profile" on public.profiles for insert
+      to authenticated with check ((select auth.uid()) = id);
   end if;
 end $$;
 
@@ -41,7 +46,7 @@ begin
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)),
-    coalesce(new.raw_user_meta_data->>'role', 'collector')
+    coalesce((select role from public.invites where email = lower(new.email)), 'collector')
   )
   on conflict (id) do nothing;
   return new;
@@ -149,7 +154,8 @@ on conflict (id) do nothing;
 create or replace function public.protect_privileged_profile_columns()
 returns trigger as $$
 begin
-  if coalesce(auth.role(), 'service_role') <> 'service_role' then
+  if current_user not in ('postgres', 'service_role', 'supabase_admin')
+     and coalesce((select auth.jwt()->>'role'), '') <> 'service_role' then
     new.is_admin := old.is_admin;
     -- role gates /studio access and is assigned from the invite at signup —
     -- never self-escalatable from the client.
@@ -186,9 +192,6 @@ alter table public.waitlist enable row level security;
 do $$ begin
   if not exists (select 1 from pg_policies where tablename='waitlist' and policyname='Anyone can join waitlist') then
     create policy "Anyone can join waitlist" on public.waitlist for insert with check (true);
-  end if;
-  if not exists (select 1 from pg_policies where tablename='waitlist' and policyname='Authenticated users can read waitlist') then
-    create policy "Authenticated users can read waitlist" on public.waitlist for select using (auth.role() = 'authenticated');
   end if;
 end $$;
 

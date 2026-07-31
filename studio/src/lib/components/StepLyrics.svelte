@@ -6,7 +6,7 @@
   let rawText   = '';
   let lines     = [];
   let stamps    = [];
-  let mode      = 'edit';       // 'edit' | 'autosyncing' | 'sync' | 'review'
+  let mode      = 'edit';       // 'edit' | 'sync' | 'review'
   let syncIdx   = 0;
   let audioEl;
   let audioUrl  = '';
@@ -14,41 +14,6 @@
   let currentMs = 0;
   let duration  = 0;
   let animFrame;
-  let autoError    = '';
-  let statusMsg    = '';
-  let downloadPct  = null; // null = not downloading, 0–100 = progress
-
-  // ── worker ─────────────────────────────────────────────────────────────────
-  let worker = null;
-
-  function getWorker() {
-    if (worker) return worker;
-    worker = new Worker(new URL('../workers/whisper.worker.js', import.meta.url), { type: 'module' });
-    worker.onmessage = ({ data }) => {
-      if (data.type === 'progress') {
-        const p = data.data;
-        if (p.status === 'downloading' && p.total) {
-          downloadPct = Math.round((p.loaded / p.total) * 100);
-          statusMsg = `Downloading model… ${downloadPct}%`;
-        } else if (p.status === 'loading') {
-          downloadPct = null;
-          statusMsg = 'Loading model into memory…';
-        }
-      } else if (data.type === 'status') {
-        downloadPct = null;
-        statusMsg = data.message;
-      } else if (data.type === 'result') {
-        lines  = data.synced.map(l => l.text);
-        stamps = data.synced.map(l => l.t);
-        saveToStore();
-        mode = 'review';
-      } else if (data.type === 'error') {
-        autoError = data.message;
-        mode = 'edit';
-      }
-    };
-    return worker;
-  }
 
   // ── audio from store ───────────────────────────────────────────────────────
   $: if ($assets.audioFile && !audioUrl) {
@@ -58,7 +23,6 @@
   onDestroy(() => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     cancelAnimationFrame(animFrame);
-    if (worker) { worker.terminate(); worker = null; }
   });
 
   // ── helpers ────────────────────────────────────────────────────────────────
@@ -96,44 +60,6 @@
     const p = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
     audioEl.currentTime = p * (duration / 1000);
     currentMs = p * duration;
-  }
-
-  // ── decode audio to Float32Array at 16 kHz (for Whisper) ──────────────────
-  async function decodeAudioMono16k(file) {
-    const arrayBuffer = await file.arrayBuffer();
-    const tempCtx = new AudioContext();
-    const decoded  = await tempCtx.decodeAudioData(arrayBuffer);
-    await tempCtx.close();
-
-    const sampleRate = 16000;
-    const length     = Math.ceil(decoded.duration * sampleRate);
-    const offCtx     = new OfflineAudioContext(1, length, sampleRate);
-    const src        = offCtx.createBufferSource();
-    src.buffer       = decoded;
-    src.connect(offCtx.destination);
-    src.start();
-    const resampled  = await offCtx.startRendering();
-    return resampled.getChannelData(0); // Float32Array, mono, 16 kHz
-  }
-
-  // ── AUTO-SYNC via Whisper in-browser ───────────────────────────────────────
-  async function autoSync() {
-    if (!$assets.audioFile || !rawText.trim()) return;
-    autoError   = '';
-    statusMsg   = 'Decoding audio…';
-    downloadPct = null;
-    mode        = 'autosyncing';
-
-    try {
-      const float32 = await decodeAudioMono16k($assets.audioFile);
-      statusMsg = 'Starting Whisper…';
-      const w = getWorker();
-      // Transfer the buffer so it isn't copied
-      w.postMessage({ type: 'transcribe', audio: float32, lyrics: rawText }, [float32.buffer]);
-    } catch (err) {
-      autoError = err.message;
-      mode = 'edit';
-    }
   }
 
   // ── MANUAL SYNC ────────────────────────────────────────────────────────────
@@ -211,8 +137,6 @@
     mode      = 'edit';
     syncIdx   = 0;
     stamps    = [];
-    autoError = '';
-    statusMsg = '';
     if (audioEl) { audioEl.pause(); audioEl.currentTime = 0; }
     playing = false;
     cancelAnimationFrame(animFrame);
@@ -233,7 +157,7 @@
     on:loadedmetadata={() => duration = audioEl.duration * 1000}
     on:ended={() => { playing = false; cancelAnimationFrame(animFrame); }}
     style="display:none"
-  />
+  ></audio>
 {/if}
 
 <div class="space-y-5">
@@ -241,7 +165,7 @@
     <p class="t-caption mb-2">Step 3</p>
     <h2 class="text-2xl font-black tracking-tight text-white">Lyrics Sync</h2>
     <p class="text-sm mt-1" style="color: var(--ink-muted);">
-      Whisper AI aligns timestamps automatically. Fine-tune by hand if needed.
+      Sync lyric timestamps against the audio in your browser.
     </p>
   </div>
 
@@ -252,8 +176,9 @@
 
   {:else if mode === 'edit'}
     <div>
-      <label class="label-dark">Paste lyrics — one line per line</label>
+      <label class="label-dark" for="lyrics-input">Paste lyrics — one line per line</label>
       <textarea
+        id="lyrics-input"
         class="w-full rounded-xl p-4 text-sm font-mono leading-relaxed resize-none"
         style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-dim); color: #fff; min-height: 220px; outline: none;"
         placeholder={"I never thought I'd see the day\nI thought that I had finally moved along\n..."}
@@ -264,27 +189,8 @@
       </p>
     </div>
 
-    {#if autoError}
-      <div class="rounded-lg px-4 py-3 text-sm text-red-400" style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);">
-        {autoError}
-      </div>
-    {/if}
-
-    <button class="btn-spectral w-full py-3.5 text-base rounded-xl" disabled={!rawText.trim()} on:click={autoSync}>
-      ✦ Auto-sync with Whisper AI
-    </button>
-    <p class="text-xs text-center -mt-2" style="color: var(--ink-muted);">
-      Runs in your browser · model cached after first use (~466 MB)
-    </p>
-
-    <div class="flex items-center gap-3">
-      <div class="flex-1 h-px" style="background: var(--border-dim);"></div>
-      <span class="text-xs" style="color: var(--ink-muted);">or</span>
-      <div class="flex-1 h-px" style="background: var(--border-dim);"></div>
-    </div>
-
-    <button class="btn-ghost w-full py-2.5 text-sm rounded-xl" disabled={!rawText.trim()} on:click={startSync}>
-      Tap to sync manually →
+    <button class="btn-spectral w-full py-3.5 text-base rounded-xl" disabled={!rawText.trim()} on:click={startSync}>
+      Start lyric sync →
     </button>
 
     {#if $assets.lyrics && $assets.lyrics.length}
@@ -293,35 +199,12 @@
       </p>
     {/if}
 
-  {:else if mode === 'autosyncing'}
-    <!-- ── AUTO-SYNC IN PROGRESS ── -->
-    <div class="glass rounded-2xl p-8 flex flex-col items-center gap-5 text-center">
-      <div class="flex items-end gap-1 h-10">
-        {#each [0,1,2,3,4,5,6] as i}
-          <div class="w-1.5 rounded-full bar" style="background: #7B5CF0; animation-delay: {i * 0.1}s;"></div>
-        {/each}
-      </div>
-      <div>
-        <p class="font-semibold text-white mb-1">{statusMsg || 'Starting…'}</p>
-        {#if downloadPct !== null}
-          <div class="w-48 h-1 rounded-full mx-auto mt-3" style="background: rgba(255,255,255,0.08);">
-            <div class="h-full rounded-full transition-all duration-300" style="width: {downloadPct}%; background: var(--gradient-spectral);"></div>
-          </div>
-          <p class="text-xs mt-2" style="color: var(--ink-muted);">First-time download · cached after this</p>
-        {:else}
-          <p class="text-sm mt-1" style="color: var(--ink-muted);">This may take a moment…</p>
-        {/if}
-      </div>
-      <button class="text-xs btn-ghost py-1 px-3" on:click={restart}>Cancel</button>
-    </div>
-
   {:else if mode === 'sync'}
     <!-- ── MANUAL SYNC ── -->
     <div class="glass rounded-xl p-4 space-y-3">
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <div class="relative h-1.5 rounded-full cursor-pointer" style="background: rgba(255,255,255,0.1);" on:click={seek}>
+      <button type="button" aria-label="Seek audio" class="relative h-1.5 rounded-full cursor-pointer w-full" style="background: rgba(255,255,255,0.1);" on:click={seek}>
         <div class="absolute inset-y-0 left-0 rounded-full" style="background: var(--gradient-spectral); width: {duration ? (currentMs/duration*100) : 0}%;"></div>
-      </div>
+      </button>
       <div class="flex items-center justify-between">
         <span class="font-mono text-xs" style="color: var(--ink-muted);">{fmt(currentMs)}</span>
         <button on:click={togglePlay} class="w-9 h-9 rounded-full flex items-center justify-center border" style="border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #fff;">
@@ -374,10 +257,9 @@
     </div>
 
     <div class="glass rounded-xl p-4 space-y-3">
-      <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <div class="relative h-1.5 rounded-full cursor-pointer" style="background: rgba(255,255,255,0.1);" on:click={seek}>
+      <button type="button" aria-label="Seek audio" class="relative h-1.5 rounded-full cursor-pointer w-full" style="background: rgba(255,255,255,0.1);" on:click={seek}>
         <div class="absolute inset-y-0 left-0 rounded-full" style="background: var(--gradient-spectral); width: {duration ? (currentMs/duration*100) : 0}%;"></div>
-      </div>
+      </button>
       <div class="flex items-center justify-between">
         <span class="font-mono text-xs" style="color: var(--ink-muted);">{fmt(currentMs)}</span>
         <button on:click={togglePlay} class="w-9 h-9 rounded-full flex items-center justify-center border" style="border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #fff;">
@@ -411,14 +293,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  .bar {
-    height: 30%;
-    animation: wave 0.8s ease-in-out infinite alternate;
-  }
-  @keyframes wave {
-    from { height: 20%; opacity: 0.4; }
-    to   { height: 100%; opacity: 1; }
-  }
-</style>

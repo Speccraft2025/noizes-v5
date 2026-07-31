@@ -1,11 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { identity, edition, assets, rights, template, play } from '$lib/stores/package.js';
+  import { identity, edition, assets, rights, template, play, extras } from '$lib/stores/package.js';
   import StepIdentity    from '$lib/components/StepIdentity.svelte';
   import StepAssets      from '$lib/components/StepAssets.svelte';
   import StepLyrics      from '$lib/components/StepLyrics.svelte';
-  import StepTheme       from '$lib/components/StepTheme.svelte';
-  import StepPlay        from '$lib/components/StepPlay.svelte';
+  import StepGuide       from '$lib/components/StepGuide.svelte';
+  import StepExtras      from '$lib/components/StepExtras.svelte';
   import StepEdition     from '$lib/components/StepEdition.svelte';
   import StepRights      from '$lib/components/StepRights.svelte';
   import StepExport      from '$lib/components/StepExport.svelte';
@@ -14,11 +14,10 @@
     { id: 1, label: 'Identity', icon: '◈' },
     { id: 2, label: 'Assets',   icon: '◉' },
     { id: 3, label: 'Lyrics',   icon: '≡' },
-    { id: 4, label: 'Theme',    icon: '⬡' },
-    { id: 5, label: 'Games',    icon: '▦' },
-    { id: 6, label: 'Edition',  icon: '◎' },
-    { id: 7, label: 'Rights',   icon: '◈' },
-    { id: 8, label: 'Compile',    icon: '⬟' },
+    { id: 4, label: 'Extras',     icon: '▦' },
+    { id: 5, label: 'Experience', icon: '⬡' },
+    { id: 6, label: 'Edition',    icon: '◎' },
+    { id: 7, label: 'Publish',    icon: '⬟' },
   ];
 
   let currentStep = 1;
@@ -128,15 +127,13 @@
       {:else if currentStep === 3}
         <StepLyrics />
       {:else if currentStep === 4}
-        <StepTheme />
+        <StepExtras />
       {:else if currentStep === 5}
-        <StepPlay />
+        <StepGuide />
       {:else if currentStep === 6}
         <StepEdition />
       {:else if currentStep === 7}
-        <StepRights />
-      {:else}
-        <StepExport />
+        <div class="space-y-8"><StepRights /><div class="border-t pt-8" style="border-color: var(--border-dim);"><StepExport /></div></div>
       {/if}
     </div>
 
@@ -165,8 +162,8 @@
           <span class="text-white truncate ml-4 text-right">{$identity.title || '—'}</span>
         </div>
         <div class="flex justify-between">
-          <span style="color: var(--ink-muted);">Template</span>
-          <span class="truncate ml-4" style="color: #7B5CF0;">{$template}</span>
+          <span style="color: var(--ink-muted);">Experience</span>
+          <span class="truncate ml-4" style="color: #7B5CF0;">ULTRA V2 · {$assets.guide?.nodes?.length ?? 0} moments</span>
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Audio</span>
@@ -177,19 +174,19 @@
           <span class="text-white">{$assets.lyrics?.length ?? 0} lines</span>
         </div>
         <div class="flex justify-between">
-          <span style="color: var(--ink-muted);">Games</span>
-          <span class="text-white">{$play.games.length ? $play.games.length : '—'}</span>
+          <span style="color: var(--ink-muted);">Extras</span>
+          <span class="text-white">{$play.games.length + ($extras.story ? 1 : 0) + $extras.links.length}</span>
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Edition</span>
-          <span class="text-white truncate ml-4 text-right">{$edition.edition_type || '—'}</span>
+          <span class="text-white truncate ml-4 text-right">{$edition.edition_name || '—'}</span>
         </div>
       </div>
     </div>
 
     <!-- Colour preview for selected theme -->
     <div class="flex-1 flex flex-col items-center justify-center p-6 gap-4">
-      {#if $template === 'ultra'}
+      {#if $template === 'ultra-v2'}
         <div class="w-full rounded-2xl overflow-hidden" style="background: #030303; border: 1px solid rgba(123,92,240,0.3); aspect-ratio: 9/16; max-height: 300px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding: 20px;">
           <div class="w-12 h-12 rounded-xl mb-3" style="background: rgba(123,92,240,0.2); border: 1px solid rgba(123,92,240,0.4);"></div>
           <div class="h-2 rounded w-20 mb-2" style="background: #7B5CF0; opacity:0.8;"></div>
@@ -200,31 +197,7 @@
             <div class="h-1 w-5 rounded" style="background: rgba(255,255,255,0.2);"></div>
           </div>
         </div>
-        <p class="text-xs text-center" style="color: var(--ink-muted);">ULTRA v2 — violet / pink</p>
-      {:else if $template === 'codex'}
-        <div class="w-full rounded-2xl overflow-hidden" style="background: #030608; border: 1px solid rgba(75,107,240,0.3); aspect-ratio: 9/16; max-height: 300px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding: 20px;">
-          <div class="w-12 h-12 rounded-xl mb-3" style="background: rgba(75,107,240,0.2); border: 1px solid rgba(75,107,240,0.4);"></div>
-          <div class="h-2 rounded w-20 mb-2" style="background: #4B6BF0; opacity:0.8;"></div>
-          <div class="h-1.5 rounded w-28 mb-4" style="background: rgba(255,255,255,0.2);"></div>
-          <div class="w-full h-10 rounded-xl" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(75,107,240,0.2);"></div>
-        </div>
-        <p class="text-xs text-center" style="color: var(--ink-muted);">CODEX — cobalt / cyan</p>
-      {:else if $template === 'transmission'}
-        <div class="w-full rounded-2xl overflow-hidden" style="background: #060300; border: 1px solid rgba(240,168,75,0.3); aspect-ratio: 9/16; max-height: 300px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding: 20px;">
-          <div class="w-12 h-12 rounded-xl mb-3" style="background: rgba(240,168,75,0.15); border: 1px solid rgba(240,168,75,0.4);"></div>
-          <div class="h-2 rounded w-20 mb-2" style="background: #F0A84B; opacity:0.8;"></div>
-          <div class="h-1.5 rounded w-28 mb-4" style="background: rgba(255,255,255,0.2);"></div>
-          <div class="w-full h-10 rounded-xl" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(240,168,75,0.2);"></div>
-        </div>
-        <p class="text-xs text-center" style="color: var(--ink-muted);">TRANSMISSION — amber / red</p>
-      {:else}
-        <div class="w-full rounded-2xl overflow-hidden" style="background: #050403; border: 1px solid rgba(200,169,110,0.3); aspect-ratio: 9/16; max-height: 300px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding: 20px;">
-          <div class="w-12 h-12 rounded-xl mb-3" style="background: rgba(200,169,110,0.15); border: 1px solid rgba(200,169,110,0.4);"></div>
-          <div class="h-2 rounded w-20 mb-2" style="background: #C8A96E; opacity:0.8;"></div>
-          <div class="h-1.5 rounded w-28 mb-4" style="background: rgba(255,255,255,0.2);"></div>
-          <div class="w-full h-10 rounded-xl" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(200,169,110,0.2);"></div>
-        </div>
-        <p class="text-xs text-center" style="color: var(--ink-muted);">MONUMENT — gold / warmth</p>
+        <p class="text-xs text-center" style="color: var(--ink-muted);">ULTRA V2 · canonical immersive experience</p>
       {/if}
     </div>
   </div>

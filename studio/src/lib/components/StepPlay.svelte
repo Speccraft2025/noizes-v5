@@ -19,8 +19,8 @@
 
 <div class="space-y-5">
   <div>
-    <p class="t-caption mb-2">Step 5</p>
-    <h2 class="text-2xl font-black tracking-tight text-white">Games</h2>
+    <p class="t-caption mb-2">Interactive extras</p>
+    <h3 class="text-xl font-black tracking-tight text-white">Games</h3>
     <p class="text-sm mt-1" style="color: var(--ink-muted);">
       Optional add-ons that live inside the package and play to your music.
       Pick the ones that fit the song — or none for a pure listening edition.

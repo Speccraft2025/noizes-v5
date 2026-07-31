@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildExperienceHTML } from './experience.js';
+import { buildExperienceHTML, buildGuide } from './experience.js';
 import { GAME_CATALOG } from '../stores/package.js';
 import ULTRA_HTML from '../templates/ULTRA.html?raw';
 
@@ -8,7 +8,7 @@ const base = {
   edition: { edition_type: 'First Edition' },
   rights: {},
   lyrics: [{ t: 0, text: 'line one' }],
-  template: 'ultra',
+  template: 'ultra-v2',
 };
 
 function configOf(html) {
@@ -17,6 +17,26 @@ function configOf(html) {
   expect(m, 'injected NZ_CONFIG not found').toBeTruthy();
   return JSON.parse(m[1]);
 }
+
+describe('buildGuide — Studio authoring', () => {
+  it('preserves creator order and labels while dropping unavailable moments', () => {
+    const guide = buildGuide({
+      hasLyrics: false,
+      hasPlay: true,
+      authored: {
+        allowFreeExplore: false,
+        nodes: [
+          { id: 'play', type: 'interactive', label: 'Enter the rhythm', view: 'view-games' },
+          { id: 'lyrics', type: 'lyrics', label: 'Read along', view: 'view-lyrics' },
+          { id: 'listen', type: 'listen', label: 'Hear it', view: 'view-player' },
+        ],
+      },
+    });
+    expect(guide.allowFreeExplore).toBe(false);
+    expect(guide.nodes.map((node) => node.id)).toEqual(['play', 'listen']);
+    expect(guide.nodes[0].label).toBe('Enter the rhythm');
+  });
+});
 
 describe('buildExperienceHTML — play block', () => {
   it('bakes the play block when games are enabled', () => {
@@ -72,9 +92,10 @@ describe('buildExperienceHTML — injection integrity', () => {
     expect(configOf(html).releaseId).toBe('nz-test-1');
   });
 
-  it('applies the selected theme palette', () => {
+  it('locks archived theme selections to the ULTRA immersive player', () => {
     const html = buildExperienceHTML({ ...base, template: 'transmission' });
-    expect(configOf(html).theme.primary).toBe('#F0A84B');
+    expect(configOf(html).template).toBe('ultra-v2');
+    expect(configOf(html).theme.primary).toBe('#7B5CF0');
   });
 });
 

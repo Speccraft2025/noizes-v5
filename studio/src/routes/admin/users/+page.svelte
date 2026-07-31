@@ -61,7 +61,7 @@
             <td class="px-5 py-3.5">
               <form method="POST" action="?/changeRole" use:enhance>
                 <input type="hidden" name="id" value={u.id} />
-                <select name="role" onchange="this.form.submit()"
+                <select name="role" onchange={(event) => event.currentTarget.form?.requestSubmit()}
                   class="text-xs rounded-full px-2 py-0.5 font-mono border-0 cursor-pointer"
                   style={u.role === 'creator'
                     ? 'background: rgba(123,92,240,0.12); color: #7B5CF0;'

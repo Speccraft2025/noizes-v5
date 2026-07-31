@@ -2,13 +2,42 @@
   import { goto } from '$app/navigation';
 
   export let data;
-  $: ({ featured, feed } = data);
+  $: ({ featured, feed, resale } = data);
 
   const colors = ['#7B5CF0', '#4B6BF0', '#F04BD8', '#7B5CF0', '#4B6BF0', '#F04BD8'];
 
   let acquiring = null; // release id with a checkout in flight
   let soldOut = {};     // release ids learned sold-out from a 409
   let acquireError = null;
+  let offerDrafts = {};
+  let offering = null;
+  let offerMessage = '';
+
+  async function placeOffer(item) {
+    if (!data.user) return goto(`/auth/login?next=${encodeURIComponent('/exchange')}`);
+    const amount = Number(offerDrafts[item.acquisition_id]);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      offerMessage = 'Enter a valid offer amount.';
+      return;
+    }
+    offering = item.acquisition_id;
+    offerMessage = '';
+    try {
+      const res = await fetch('/exchange/offers', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ acquisition_id: item.acquisition_id, amount }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message || 'Could not place offer.');
+      offerMessage = `Offer placed on ${item.artist_name} — ${item.title}.`;
+      offerDrafts = { ...offerDrafts, [item.acquisition_id]: '' };
+    } catch (e) {
+      offerMessage = e.message;
+    } finally {
+      offering = null;
+    }
+  }
 
   async function acquire(r) {
     if (!data.user) {
@@ -69,6 +98,35 @@
     <div class="glass rounded-xl px-4 py-3 mb-6 text-sm" style="border-color: #F04BD850; color: var(--ink-secondary);">
       {acquireError}
     </div>
+  {/if}
+  {#if offerMessage}
+    <div class="glass rounded-xl px-4 py-3 mb-6 text-sm text-white" aria-live="polite">{offerMessage}</div>
+  {/if}
+
+  {#if resale?.length}
+    <section class="mb-10" aria-labelledby="secondary-market-heading">
+      <p class="t-caption mb-2">Secondary market</p>
+      <h2 id="secondary-market-heading" class="text-2xl font-black text-white mb-4">Editions accepting offers</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {#each resale as item, i}
+          {@const color = colors[i % colors.length]}
+          <article class="glass rounded-xl p-5">
+            <p class="text-xs font-bold uppercase tracking-widest" style="color: {color};">{item.artist_name}</p>
+            <h3 class="text-lg font-black text-white">{item.title}</h3>
+            <p class="text-xs mt-1 mb-4" style="color: var(--ink-muted);">
+              {item.edition_type}{item.edition_number ? ` #${item.edition_number}` : ''}{item.edition_size ? ` / ${item.edition_size}` : ''}
+            </p>
+            <div class="flex gap-2">
+              <label class="sr-only" for={`offer-${item.acquisition_id}`}>Offer amount in {item.currency}</label>
+              <input id={`offer-${item.acquisition_id}`} class="input-dark flex-1" type="number" min="1" step="1"
+                placeholder={`${item.currency} offer`} bind:value={offerDrafts[item.acquisition_id]} />
+              <button class="btn-spectral px-4 text-xs rounded-full" disabled={offering === item.acquisition_id}
+                on:click={() => placeOffer(item)}>{offering === item.acquisition_id ? '…' : 'Make offer'}</button>
+            </div>
+          </article>
+        {/each}
+      </div>
+    </section>
   {/if}
 
   {#if feed.length === 0}

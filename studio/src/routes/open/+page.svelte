@@ -141,7 +141,7 @@
       {#if showInstallBanner}
         <!-- Install tip popover -->
         {#if showInstallTip}
-          <div class="fixed inset-0 z-50 flex items-end justify-center pb-24 px-6"
+          <button type="button" aria-label="Dismiss install instructions" class="fixed inset-0 z-50 flex items-end justify-center pb-24 px-6 text-left"
             style="background: rgba(0,0,0,0.6);"
             on:click={() => showInstallTip = false}>
             <div class="w-full max-w-sm rounded-2xl p-5 relative"
@@ -164,7 +164,7 @@
               <div class="absolute -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0"
                 style="border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 12px solid #1a1a1a;"></div>
             </div>
-          </div>
+          </button>
         {/if}
 
         <!-- Banner -->

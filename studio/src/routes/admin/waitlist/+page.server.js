@@ -4,7 +4,7 @@ import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 
 export async function load({ locals }) {
-  const sb = locals.supabase;
+  const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: entries } = await sb
     .from('waitlist')
     .select('*')
@@ -77,7 +77,8 @@ export const actions = {
     const form = await request.formData();
     const id = form.get('id')?.toString();
     if (!id) return fail(400, { error: 'ID required.' });
-    await locals.supabase.from('waitlist').delete().eq('id', id);
+    const adminClient = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    await adminClient.from('waitlist').delete().eq('id', id);
     return { deleted: true };
   }
 };

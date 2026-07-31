@@ -1,5 +1,11 @@
-export async function load({ locals }) {
-  const sb = locals.supabase;
+import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL } from '$env/static/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+
+export async function load() {
+  const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
   const [
     { count: waitlistCount },
@@ -15,5 +21,12 @@ export async function load({ locals }) {
     sb.from('kyc_submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
   ]);
 
-  return { waitlistCount, userCount, recentWaitlist, recentUsers, kycPendingCount };
+  const cutoff = new Date(Date.now() - 3600000).toISOString();
+  const [{ count: stuckCount }, { count: staleCount }] = await Promise.all([
+    sb.from('payment_intents').select('*', { count: 'exact', head: true }).eq('status', 'needs_reconciliation'),
+    sb.from('payment_intents').select('*', { count: 'exact', head: true }).eq('status', 'pending').lt('created_at', cutoff),
+  ]);
+  const reconciliationCount = (stuckCount ?? 0) + (staleCount ?? 0);
+
+  return { waitlistCount, userCount, recentWaitlist, recentUsers, kycPendingCount, reconciliationCount };
 }

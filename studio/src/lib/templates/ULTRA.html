@@ -646,6 +646,14 @@ document.querySelectorAll('.tab').forEach(function(tab){
   var visited  = {};
   var current  = null;
 
+  if(guide.allowFreeExplore === false){
+    document.querySelectorAll('.tab').forEach(function(tab){
+      tab.style.pointerEvents = 'none';
+      tab.setAttribute('aria-disabled','true');
+      tab.style.opacity = '.35';
+    });
+  }
+
   var INTRO = {
     arrival: { kicker:'Noizes Object', headline:C.title, body:(C.artist ? 'by '+C.artist+'. ' : '')+'Tap to enter the experience.' },
     object:  { kicker:(C.edition && C.edition.type) || 'Edition', headline:'The Object', body:[(C.edition&&C.edition.type)||'', (C.edition&&C.edition.size?('Edition of '+C.edition.size):''), (C.rights&&C.rights.copyright)||''].filter(Boolean).join(' · ') },
@@ -668,7 +676,8 @@ document.querySelectorAll('.tab').forEach(function(tab){
   }
 
   function showIntro(node){
-    var copy = INTRO[node.id] || INTRO[node.type] || { kicker:node.label, headline:node.label, body:'' };
+    var copy = INTRO[node.id] || INTRO[node.type] || { kicker:node.label, headline:node.label, body:node.introduction || '' };
+    if(node.introduction){ copy = { kicker:copy.kicker || node.label, headline:copy.headline || node.label, body:node.introduction }; }
     document.getElementById('intro-kicker').textContent = copy.kicker || '';
     document.getElementById('intro-headline').textContent = copy.headline || '';
     document.getElementById('intro-body').textContent = copy.body || '';
@@ -696,7 +705,7 @@ document.querySelectorAll('.tab').forEach(function(tab){
   document.getElementById('guide-btn').addEventListener('click',openDrawer);
   scrim.addEventListener('click',closeDrawer);
 
-  renderSteps();
+  goToNode(guide.nodes[0]);
 })();
 
 /* ═══════════════════════════════════════════════════

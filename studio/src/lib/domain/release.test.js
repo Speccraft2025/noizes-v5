@@ -10,6 +10,7 @@ import {
   normalizeReleaseProject,
   normalizeReleaseType,
   orderedTracks,
+  removeTrack,
   reorderTrack,
   stableUuid,
   validateReleaseProject,
@@ -42,6 +43,11 @@ function publishableProject(overrides = {}) {
   track.primary_audio_ref = asset.asset_id;
   project.audio_versions = [version];
   project.audio_assets = [asset];
+  project.rights.release_rights = {
+    ...project.rights.release_rights,
+    copyright: '© 2026 dBoy',
+    authority_confirmed: true,
+  };
   return project;
 }
 
@@ -147,6 +153,37 @@ describe('normalized release project', () => {
     expect(duplicated.tracks[1].primary_audio_ref).toBe('');
     expect(duplicated.tracks[1].primary_version_id).toBe('');
   });
+
+  it('removes a track and its owned assets, rights, lyrics, and Journey relationships', () => {
+    const project = publishableProject({
+      release: { release_type: 'album', title: 'Two', primary_artist: 'A' },
+      tracks: [{ title: 'One' }, { title: 'Two' }],
+    });
+    const removedId = project.tracks[0].track_id;
+    const removedAssetId = project.audio_assets[0].asset_id;
+    project.lyrics = [{ track_id: removedId, plain_text: 'Gone' }];
+    project.rights.track_rights = [{ track_id: removedId }];
+    project.rights.asset_permissions = [{ asset_id: removedAssetId, confirmed: true }];
+    project.journey.transitions = [{ from_track_id: removedId, to_track_id: project.tracks[1].track_id }];
+    const remainingId = project.tracks[1].track_id;
+    const next = removeTrack(project, removedId);
+    expect(next.tracks).toHaveLength(1);
+    expect(next.tracks[0]).toMatchObject({ track_id: remainingId, position: 1, track_number: 1 });
+    expect(next.audio_assets).toHaveLength(0);
+    expect(next.audio_versions).toHaveLength(0);
+    expect(next.lyrics).toHaveLength(0);
+    expect(next.rights.track_rights).toHaveLength(0);
+    expect(next.rights.asset_permissions).toHaveLength(0);
+    expect(next.journey.transitions).toHaveLength(0);
+  });
+
+  it('preserves explicit per-track credits and release-credit inheritance', () => {
+    const project = createReleaseProject({
+      release: { release_type: 'compilation', title: 'Field Notes', primary_artist: 'Various Artists' },
+      tracks: [{ title: 'Signal', primary_artist: 'Guest', inherit_release_credits: false, credits: { text: 'Recorded by A' } }],
+    });
+    expect(project.tracks[0]).toMatchObject({ inherit_release_credits: false, credits: { text: 'Recorded by A' } });
+  });
 });
 describe('release publication validation', () => {
   it('accepts a complete Single', () => {
@@ -209,6 +246,15 @@ describe('release publication validation', () => {
     const codes = validateReleaseProject(project).errors.map((issue) => issue.code);
     expect(codes).toContain('track_number_duplicate');
     expect(codes).toContain('primary_audio_duplicate');
+  });
+
+  it('accepts a confirmed PDF permission and rejects an orphaned permission record', () => {
+    const project = publishableProject();
+    project.extras = { pdfs: [{ id: 'liner-note', title: 'Liner note', file: { name: 'notes.pdf' } }] };
+    project.rights.asset_permissions = [{ asset_id: 'liner-note', confirmed: true, basis: 'Creator-owned' }];
+    expect(validateReleaseProject(project).errors.map((issue) => issue.code)).not.toContain('permission_asset_missing');
+    project.extras.pdfs = [];
+    expect(validateReleaseProject(project).errors.map((issue) => issue.code)).toContain('permission_asset_missing');
   });
 
   it('rejects track-level edition supply and a mismatched edition release', () => {

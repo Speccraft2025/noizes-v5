@@ -5,6 +5,7 @@ import { normalizeReleaseProject, orderedTracks } from '../domain/release.js';
 import { normalizePlaybackSettings } from '../domain/playback.js';
 import { materializeJourney } from '../domain/journey.js';
 import { buildReleaseArchive, buildReleaseHistory } from '../domain/archive.js';
+import { estimatePackageSize } from '../domain/package-size.js';
 
 const safeFilename = (value, fallback = 'asset') => {
   const cleaned = String(value || fallback).replace(/[^a-z0-9._-]/gi, '_').replace(/_+/g, '_');
@@ -32,6 +33,8 @@ function stripFiles(value) {
  * adapter with the release playback engine; no package data is discarded.
  */
 export async function buildPackage(input) {
+  const onProgress = typeof input.onProgress === 'function' ? input.onProgress : () => {};
+  onProgress({ percent: 1, stage: 'Normalizing release' });
   const legacyCall = !input.project;
   const project = normalizeReleaseProject(input.project ?? {
     identity: input.identity,
@@ -44,6 +47,7 @@ export async function buildPackage(input) {
   const template = CANONICAL_TEMPLATE;
   const play = input.play ?? {};
   const extras = input.extras ?? project.extras ?? {};
+  const sizeReport = estimatePackageSize(project, extras);
   const release = project.release;
   const tracks = orderedTracks(project.tracks);
   const fixedEdition = normalizeEdition(project.edition);
@@ -103,6 +107,7 @@ export async function buildPackage(input) {
       : safeFilename(asset.filename || asset.file.name);
     await writeComponent(asset, `release/audio/${name}`);
   }
+  onProgress({ percent: 14, stage: 'Packaging release assets' });
 
   // PDF extras are release documents and Note Wall records, not anonymous
   // attachments outside the archive hierarchy.
@@ -132,12 +137,13 @@ export async function buildPackage(input) {
       title: pdf.title?.trim() || pdf.name || `Note ${index + 1}`,
       path,
       mime: 'application/pdf',
-      src: `data:application/pdf;base64,${arrayBufferToBase64(buffer)}`,
+      src: path,
     });
   }
+  onProgress({ percent: 20, stage: 'Packaging release documents' });
 
   const trackRecords = [];
-  for (const track of tracks) {
+  for (const [trackIndex, track] of tracks.entries()) {
     const folder = `tracks/${trackFolder(track)}`;
     const versions = project.audio_versions.filter((version) => version.track_id === track.track_id);
     const trackComponents = [];
@@ -202,6 +208,10 @@ export async function buildPackage(input) {
       bonus: track.bonus,
       hidden: track.hidden,
       description: track.description,
+      release_date: track.release_date,
+      source_release: track.source_release,
+      recording_date: track.recording_date,
+      recording_location: track.recording_location,
       artwork_ref: track.artwork_ref,
       primary_audio_component: primaryComponent?.component_id || '',
       duration_ms: primaryComponent?.duration_ms || 0,
@@ -211,7 +221,10 @@ export async function buildPackage(input) {
       })),
       components: trackComponents,
       lyrics: stripFiles(lyricRecord),
-      credits: track.credits ?? {},
+      credits: {
+        inherited_release_credits: track.inherit_release_credits,
+        ...(track.credits ?? {}),
+      },
       rights: project.rights.track_rights?.find((entry) => entry.track_id === track.track_id) ?? {},
       technical: primaryComponent ? {
         mime: primaryComponent.mime,
@@ -223,6 +236,11 @@ export async function buildPackage(input) {
     };
     trackRecords.push(record);
     zip.file(`${folder}/track.json`, JSON.stringify(record, null, 2));
+    onProgress({
+      percent: 20 + Math.round(((trackIndex + 1) / Math.max(1, tracks.length)) * 42),
+      stage: `Packaging track ${trackIndex + 1} of ${tracks.length}`,
+      track_id: track.track_id,
+    });
   }
 
   const releaseRights = project.rights.release_rights ?? project.rights;
@@ -258,6 +276,8 @@ export async function buildPackage(input) {
       track_id: track.track_id,
       producers: track.producers,
       writers: track.writers,
+      inherited_release_credits: track.inherit_release_credits,
+      credits: track.credits ?? {},
     })),
   };
   zip.file('credits.json', JSON.stringify(creditsData, null, 2));
@@ -306,6 +326,7 @@ export async function buildPackage(input) {
   ).map(({ label, url, kind }) => ({ label: label.trim(), url, kind: kind || 'artist', requires_internet: true }));
   const resourcesData = { groups: safeLinks.length ? [{ label: 'Online', links: safeLinks }] : [] };
   zip.file('resources.json', JSON.stringify(resourcesData, null, 2));
+  onProgress({ percent: 68, stage: 'Writing release records' });
 
   const primaryTrack = tracks.find((track) => !track.hidden) ?? tracks[0];
   const primaryAudioAsset = project.audio_assets.find((asset) => asset.asset_id === primaryTrack?.primary_audio_ref)
@@ -404,6 +425,20 @@ export async function buildPackage(input) {
   zip.file('archive.json', JSON.stringify(archiveData, null, 2));
   zip.file('history.json', JSON.stringify(historyData, null, 2));
   zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+  zip.file('README-OFFLINE.txt', [
+    'NOIZES .nz OFFLINE PACKAGE',
+    '',
+    'Recommended: open the intact .nz file in the Noizes /open viewer. It validates component checksums and creates temporary Blob URLs without uploading your files.',
+    '',
+    'Extracted-folder fallback:',
+    '1. Extract the complete archive without renaming or moving internal files.',
+    '2. Open experience.html from the extracted root.',
+    '3. Keep release/, tracks/, and every JSON record beside experience.html.',
+    '',
+    'Browsers may restrict file:// audio, PDF, or cross-file access. If that happens, use the Noizes viewer or serve the extracted folder from any local static file server.',
+    '',
+    'The experience references packaged masters by relative paths. Large audio, video, PDFs, and stems are intentionally not duplicated as data URIs inside experience.html.',
+  ].join('\n'));
 
   const legacyIdentity = {
     artist: release.primary_artist,
@@ -490,8 +525,11 @@ export async function buildPackage(input) {
     history: historyData,
   });
   zip.file('experience.html', experienceHTML);
+  onProgress({ percent: 82, stage: 'Building offline experience' });
 
-  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' }, (metadata) => {
+    onProgress({ percent: 82 + Math.round((metadata.percent / 100) * 18), stage: 'Compressing package' });
+  });
   const filename = `${safeFilename(release.title || 'untitled').toLowerCase()}_ultra-v2_noizes.nz`;
 
   if (input.download !== false && typeof document !== 'undefined') {
@@ -503,6 +541,7 @@ export async function buildPackage(input) {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
+  onProgress({ percent: 100, stage: 'Package ready' });
   return {
     filename,
     blob,
@@ -511,6 +550,7 @@ export async function buildPackage(input) {
     audioHash,
     manifest,
     project,
+    sizeReport: { ...sizeReport, actual_archive_bytes: blob.size },
   };
 }
 

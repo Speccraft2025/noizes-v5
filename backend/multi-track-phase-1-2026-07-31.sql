@@ -18,6 +18,11 @@ alter table public.releases add column if not exists disc_count integer not null
 alter table public.releases add column if not exists total_duration_ms bigint not null default 0;
 alter table public.releases add column if not exists explicit boolean not null default false;
 alter table public.releases add column if not exists package_size bigint not null default 0;
+alter table public.releases add column if not exists curator text;
+alter table public.releases add column if not exists compiler text;
+alter table public.releases add column if not exists venue text;
+alter table public.releases add column if not exists event_name text;
+alter table public.releases add column if not exists recording_date date;
 alter table public.releases add column if not exists release_metadata jsonb not null default '{}'::jsonb;
 
 do $$ begin
@@ -59,6 +64,9 @@ create table if not exists public.tracks (
   hidden boolean not null default false,
   description text,
   release_date date,
+  source_release text,
+  recording_date date,
+  recording_location text,
   artwork_ref text,
   primary_version_id uuid,
   primary_audio_asset_id uuid,
@@ -78,6 +86,11 @@ create table if not exists public.tracks (
   updated_at timestamptz not null default now(),
   unique (release_id, id)
 );
+
+alter table public.tracks add column if not exists release_date date;
+alter table public.tracks add column if not exists source_release text;
+alter table public.tracks add column if not exists recording_date date;
+alter table public.tracks add column if not exists recording_location text;
 
 create table if not exists public.audio_versions (
   id uuid default gen_random_uuid() primary key,

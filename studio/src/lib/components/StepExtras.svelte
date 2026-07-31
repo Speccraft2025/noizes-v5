@@ -1,5 +1,5 @@
 <script>
-  import { extras } from '$lib/stores/package.js';
+  import { extras, releaseProject } from '$lib/stores/package.js';
   import StepPlay from './StepPlay.svelte';
 
   function addLink() {
@@ -32,6 +32,13 @@
 
   function removePdf(id) {
     extras.update((value) => ({ ...value, pdfs: value.pdfs.filter((pdf) => pdf.id !== id) }));
+    releaseProject.update((project) => ({
+      ...project,
+      rights: {
+        ...project.rights,
+        asset_permissions: (project.rights.asset_permissions || []).filter((permission) => permission.asset_id !== id),
+      },
+    }));
   }
 </script>
 

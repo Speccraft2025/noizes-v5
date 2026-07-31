@@ -123,7 +123,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
     <div class="topbar-meta" id="topbar-meta"></div>
     <button class="topbar-close" id="close-btn">✕ Close</button>
   </div>
-  <iframe id="exp-iframe" title="Noizes Experience" allow="autoplay"></iframe>
+  <iframe id="exp-iframe" title="Noizes Experience" allow="autoplay" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>
 </div>
 
 <script>
@@ -169,6 +169,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   var topbarMeta = document.getElementById('topbar-meta');
   var closeBtn = document.getElementById('close-btn');
   var blobUrls = [];
+  var allowedStorageKeys = [];
 
   dropZone.addEventListener('dragover', function(e){ e.preventDefault(); dropZone.classList.add('drag'); });
   dropZone.addEventListener('dragleave', function(){ dropZone.classList.remove('drag'); });
@@ -196,12 +197,40 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     dropScreen.style.display = 'flex';
     fileInput.value = '';
     errorMsg.style.display = 'none';
+    allowedStorageKeys = [];
+  });
+
+  window.addEventListener('message', function(event){
+    if(event.source!==expIframe.contentWindow) return;
+    var message=event.data;
+    if(!message||['noizes:storage:set','noizes:storage:remove'].indexOf(message.type)===-1) return;
+    if(allowedStorageKeys.indexOf(message.key)===-1) return;
+    try{
+      if(message.type==='noizes:storage:remove') localStorage.removeItem(message.key);
+      else if(typeof message.value==='string') localStorage.setItem(message.key,message.value);
+    }catch(ignore){}
   });
 
   function showError(msg){
     loading.style.display = 'none';
     errorMsg.textContent = msg;
     errorMsg.style.display = 'block';
+  }
+
+  function mimeForPath(path, declared){
+    if(declared && declared.mime) return declared.mime;
+    var ext = path.split('.').pop().toLowerCase();
+    var types = {
+      mp3:'audio/mpeg',flac:'audio/flac',wav:'audio/wav',aac:'audio/aac',m4a:'audio/mp4',ogg:'audio/ogg',
+      jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',svg:'image/svg+xml',
+      mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',pdf:'application/pdf'
+    };
+    return types[ext] || 'application/octet-stream';
+  }
+
+  async function sha256Hex(buffer){
+    var digest = await crypto.subtle.digest('SHA-256', buffer);
+    return Array.from(new Uint8Array(digest)).map(function(byte){ return byte.toString(16).padStart(2,'0'); }).join('');
   }
 
   async function openFile(file){
@@ -217,69 +246,68 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       var mf = zip.file('manifest.json');
       if(mf){ try{ manifest = JSON.parse(await mf.async('string')); }catch(e){} }
 
-      var expFile = zip.file('experience.html');
-      if(!expFile){ showError('No experience.html found in this package.'); return; }
+      var entryPath = manifest && manifest.experience && manifest.experience.entry || 'experience.html';
+      var expFile = zip.file(entryPath);
+      if(!expFile){ showError('No '+entryPath+' found in this package.'); return; }
       var html = await expFile.async('string');
 
-      // Patch audio
-      var audioFolder = zip.folder('audio');
-      if(audioFolder){
-        var audioFiles = [];
-        audioFolder.forEach(function(rel, f){ if(!f.dir) audioFiles.push({rel:rel, f:f}); });
-        for(var i=0;i<audioFiles.length;i++){
-          var rel = audioFiles[i].rel, f = audioFiles[i].f;
-          var buf = await f.async('arraybuffer');
-          var ext = rel.split('.').pop().toLowerCase();
-          var mime = ext==='mp3'?'audio/mpeg':ext==='flac'?'audio/flac':ext==='wav'?'audio/wav':'audio/mpeg';
-          var blob = new Blob([buf],{type:mime});
-          var url = URL.createObjectURL(blob);
-          blobUrls.push(url);
-          html = html.split('src="audio/'+rel+'"').join('src="'+url+'"');
-        }
+      var editionRecord = {}, historyRecord = {};
+      if(zip.file('edition.json')){ try{ editionRecord=JSON.parse(await zip.file('edition.json').async('string')); }catch(ignore){} }
+      if(zip.file('history.json')){ try{ historyRecord=JSON.parse(await zip.file('history.json').async('string')); }catch(ignore){} }
+      var releaseId = manifest&&manifest.release&&manifest.release.release_id || manifest&&manifest.release_id || 'unknown';
+      var editionId = historyRecord.edition&&historyRecord.edition.edition_id || editionRecord.edition_id || editionRecord.edition_name || 'edition';
+      var copyId = historyRecord.copy&&historyRecord.copy.copy_id || manifest&&manifest.delivery&&manifest.delivery.copy_id || 'open-copy';
+      var resumeKey = 'nz-release-resume:'+releaseId+':'+editionId+':'+copyId;
+      var noteKey = 'nz-collector-note:'+releaseId+':'+editionId+':'+copyId;
+      allowedStorageKeys = [resumeKey,noteKey];
+      var resumeState = null, collectorNote = '';
+      try{ resumeState=JSON.parse(localStorage.getItem(resumeKey)||'null');collectorNote=localStorage.getItem(noteKey)||''; }catch(ignore){}
+      var stateScript = 'window.NZ_VIEWER_STATE = '+JSON.stringify({resume:resumeState,collector_note:collectorNote}).replace(/</g,'\\u003c')+';\n';
+      html = /window\.NZ_CONFIG\s*=/.test(html)
+        ? html.replace(/window\.NZ_CONFIG\s*=/,stateScript+'window.NZ_CONFIG =')
+        : html.replace('</head>','<script>'+stateScript+'<\/script></head>');
+
+      // Resolve every packaged component, including multi-track audio, track
+      // artwork, video, and PDF notes. Normalized packages are integrity
+      // checked before any experience script executes; old Singles retain the
+      // folder-based compatibility path.
+      var declared = manifest && Array.isArray(manifest.components) ? manifest.components : [];
+      var declaredByPath = {};
+      declared.forEach(function(component){ if(component.path) declaredByPath[component.path] = component; });
+      var paths = Object.keys(declaredByPath);
+      if(!paths.length){
+        Object.keys(zip.files).forEach(function(path){
+          var entry = zip.files[path];
+          if(!entry.dir && (path.indexOf('audio/')===0 || path.indexOf('release/')===0 || /^tracks\/[^/]+\//.test(path))) paths.push(path);
+        });
+      }
+      for(var i=0;i<paths.length;i++){
+        var path = paths[i], component = declaredByPath[path], entry = zip.file(path);
+        if(!entry) throw new Error('Declared component is missing: '+path);
+        var buf = await entry.async('arraybuffer');
+        if(component && component.size && Number(component.size)!==buf.byteLength) throw new Error('Component size mismatch: '+path);
+        if(component && component.sha256 && await sha256Hex(buf)!==component.sha256) throw new Error('Component checksum mismatch: '+path);
+        var blob = new Blob([buf],{type:mimeForPath(path,component)});
+        var url = URL.createObjectURL(blob);
+        blobUrls.push(url);
+        html = html.split('src="'+path+'"').join('src="'+url+'"');
+        html = html.split('href="'+path+'"').join('href="'+url+'"');
+        html = html.split('"'+path+'"').join('"'+url+'"');
       }
 
-      // DOM injection — works on iOS 26 file:// where document.write is blocked
-      var title = (manifest && manifest.title) ? manifest.title : file.name;
-      var artist = (manifest && manifest.artist) ? ' · ' + manifest.artist : '';
-
-      // Parse experience HTML
-      var parser = new DOMParser();
-      var expDoc = parser.parseFromString(html, 'text/html');
-
-      // Inject experience styles into current head
-      expDoc.querySelectorAll('style').forEach(function(s) {
-        var el = document.createElement('style');
-        el.textContent = s.textContent;
-        document.head.appendChild(el);
-      });
-
-      // Copy body attributes (background, etc.)
-      Array.from(expDoc.body.attributes).forEach(function(attr) {
-        document.body.setAttribute(attr.name, attr.value);
-      });
-
-      // Build return bar
-      var bar = document.createElement('div');
-      bar.id = 'nz-bar';
-      bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:rgba(3,3,3,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,0.08);font-family:-apple-system,BlinkMacSystemFont,sans-serif;box-sizing:border-box;';
-      bar.innerHTML = '<span style="font-weight:900;font-size:13px;color:#fff;letter-spacing:-.01em;">NOIZES</span>'
-        + '<span style="font-size:11px;color:#7B5CF0;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50%;margin:0 8px;">'+title+artist+'</span>'
-        + '<button onclick="location.reload()" style="font-size:11px;padding:4px 12px;border-radius:99px;border:1px solid rgba(255,255,255,0.12);background:none;color:#888;cursor:pointer;-webkit-tap-highlight-color:transparent;">✕ Back</button>';
-      var spacer = document.createElement('div');
-      spacer.style.height = '44px';
-
-      // Swap in experience body content
-      document.body.innerHTML = expDoc.body.innerHTML;
-      document.body.insertBefore(spacer, document.body.firstChild);
-      document.body.insertBefore(bar, document.body.firstChild);
-
-      // Re-execute inline scripts (innerHTML skips script execution)
-      Array.from(document.body.querySelectorAll('script')).forEach(function(old) {
-        var s = document.createElement('script');
-        Array.from(old.attributes).forEach(function(a){ s.setAttribute(a.name, a.value); });
-        s.textContent = old.textContent;
-        old.parentNode.replaceChild(s, old);
-      });
+      // Run the package in a sandboxed Blob frame. It can play packaged media
+      // and post narrowly scoped resume/note updates, but it never inherits the
+      // Noizes app's authenticated document privileges.
+      var title = manifest && manifest.release && manifest.release.title || manifest && manifest.title || file.name;
+      var artistName = manifest && manifest.release && manifest.release.primary_artist || manifest && manifest.artist || '';
+      var artist = artistName ? ' · ' + artistName : '';
+      var htmlUrl=URL.createObjectURL(new Blob([html],{type:'text/html'}));
+      blobUrls.push(htmlUrl);
+      topbarMeta.textContent=title+artist;
+      expIframe.src=htmlUrl;
+      loading.style.display='none';
+      dropScreen.style.display='none';
+      expScreen.style.display='flex';
 
     } catch(e){
       loading.style.display = 'none';

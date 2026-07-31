@@ -113,7 +113,8 @@ describe('buildPackage — experience.json (play pass-through)', () => {
     }]);
     expect(zip.file('release/documents/01-liner_notes.pdf')).toBeTruthy();
     const html = await zip.file('experience.html').async('string');
-    expect(html).toContain('data:application/pdf;base64,JVBERg==');
+    expect(html).toContain('release/documents/01-liner_notes.pdf');
+    expect(html).not.toContain('data:application/pdf;base64');
     expect(html).toContain('Note Wall');
   });
 
@@ -198,5 +199,18 @@ describe('buildPackage — experience.json (play pass-through)', () => {
     expect(history.ownership_policy).toContain('complete authenticated release copy');
     expect(manifest.archive.path).toBe('archive.json');
     expect(manifest.history).toEqual({ path: 'history.json', scope: 'release_copy' });
+    expect(zip.file('README-OFFLINE.txt')).toBeTruthy();
+    const readme = await zip.file('README-OFFLINE.txt').async('string');
+    expect(readme).toContain('Open experience.html from the extracted root');
+    for (const component of manifest.components) expect(zip.file(component.path), `Extracted component missing: ${component.path}`).toBeTruthy();
+  });
+
+  it('reports real compilation stages and a final package-size record', async () => {
+    const updates = [];
+    const result = await buildPackage({ ...base, download: false, onProgress: (update) => updates.push(update) });
+    expect(updates[0]).toMatchObject({ percent: 1, stage: 'Normalizing release' });
+    expect(updates.at(-1)).toMatchObject({ percent: 100, stage: 'Package ready' });
+    expect(result.sizeReport).toMatchObject({ actual_archive_bytes: result.blob.size });
+    expect(result.sizeReport.browser_memory_estimate_bytes).toBeGreaterThan(0);
   });
 });

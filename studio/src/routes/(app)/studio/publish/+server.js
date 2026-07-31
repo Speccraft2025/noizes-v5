@@ -5,6 +5,7 @@ import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 import nodeCrypto from 'node:crypto';
 import JSZip from 'jszip';
 import { signHash } from '$lib/server/signing.js';
+import { validateNzArchive } from '$lib/domain/package-validation.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -59,6 +60,11 @@ export async function POST({ request, locals }) {
   if (dlErr) throw error(500, `.nz download failed: ${dlErr.message}`);
 
   const zip = await JSZip.loadAsync(Buffer.from(await nzBlob.arrayBuffer()));
+  const packageValidation = await validateNzArchive(zip);
+  if (!packageValidation.valid) {
+    const failed = packageValidation.checks.find((check) => check.status === 'fail');
+    throw error(400, `Package validation failed${failed ? `: ${failed.label} — ${failed.note}` : ''}`);
+  }
   let packageManifest = null;
   let declaredComponents = [];
   const manifestEntry = zip.file('manifest.json');
@@ -147,6 +153,11 @@ export async function POST({ request, locals }) {
       genres: String(meta.genre || '').split(',').map((entry) => entry.trim()).filter(Boolean),
       catalogue_number: meta.catalogue_number || null,
       label: meta.label || null,
+      curator: meta.curator || null,
+      compiler: meta.compiler || null,
+      venue: meta.venue || null,
+      event_name: meta.event_name || null,
+      recording_date: meta.recording_date || null,
       track_count: Number(meta.track_count) || 0,
       disc_count: Number(meta.disc_count) || 1,
       total_duration_ms: Number(meta.total_duration_ms) || 0,
@@ -184,6 +195,11 @@ export async function POST({ request, locals }) {
       }
     }
 
+    // Clear release-scoped audio explicitly before replacing tracks. Track
+    // deletion cascades track versions/assets, but intentionally cannot remove
+    // a continuous release master. This also makes re-publish idempotent.
+    const { error: clearAssetsErr } = await sb.from('audio_assets').delete().eq('release_id', releaseId);
+    if (clearAssetsErr) throw error(500, `Could not replace published audio inventory: ${clearAssetsErr.message}`);
     const { error: clearErr } = await sb.from('tracks').delete().eq('release_id', releaseId);
     if (clearErr) throw error(500, `Could not replace published tracklist: ${clearErr.message}`);
 
@@ -205,11 +221,18 @@ export async function POST({ request, locals }) {
         bonus: Boolean(track.bonus),
         hidden: Boolean(track.hidden),
         description: track.description || null,
+        release_date: track.release_date || null,
+        source_release: track.source_release || null,
+        recording_date: track.recording_date || null,
+        recording_location: track.recording_location || null,
         artwork_ref: track.artwork_ref || null,
         primary_version_id: track.audio_versions?.find((version) => version.is_primary)?.version_id || null,
         primary_audio_asset_id: track.primary_audio_component || null,
         appears_in_journey: track.appears_in_journey !== false,
         appears_in_archive: track.appears_in_archive !== false,
+        inherit_release_artist: track.inherit_release_artist !== false,
+        inherit_release_credits: track.inherit_release_credits !== false,
+        inherit_release_rights: track.inherit_release_rights !== false,
         lyrics: track.lyrics || {},
         credits: track.credits || {},
         rights: track.rights || {},
@@ -230,28 +253,31 @@ export async function POST({ request, locals }) {
         if (versionErr) throw error(500, `Could not publish audio versions: ${versionErr.message}`);
       }
 
-      const audioAssets = declaredComponents.filter((component) => component.type === 'audio').map((component) => ({
-        id: component.component_id,
-        release_id: releaseId,
-        track_id: component.track_id || null,
-        version_id: component.version_id || null,
-        scope: component.scope,
-        role: component.role,
-        title: component.title || null,
-        filename: component.filename || null,
-        storage_path: `${nz_path}#${component.path}`,
-        mime: component.mime || null,
-        duration_ms: Number(component.duration_ms) || 0,
-        sample_rate: Number(component.sample_rate) || 0,
-        bit_depth: Number(component.bit_depth) || 0,
-        channels: Number(component.channels) || 0,
-        size_bytes: Number(component.size) || 0,
-        sha256: component.sha256 || null,
-      }));
-      if (audioAssets.length) {
-        const { error: assetErr } = await sb.from('audio_assets').insert(audioAssets);
-        if (assetErr) throw error(500, `Could not publish audio assets: ${assetErr.message}`);
-      }
+    }
+
+    // Release-level audio also exists for intentionally trackless DJ mixes, so
+    // component persistence cannot depend on a non-empty tracklist.
+    const audioAssets = declaredComponents.filter((component) => component.type === 'audio').map((component) => ({
+      id: component.component_id,
+      release_id: releaseId,
+      track_id: component.track_id || null,
+      version_id: component.version_id || null,
+      scope: component.scope,
+      role: component.role,
+      title: component.title || null,
+      filename: component.filename || null,
+      storage_path: `${nz_path}#${component.path}`,
+      mime: component.mime || null,
+      duration_ms: Number(component.duration_ms) || 0,
+      sample_rate: Number(component.sample_rate) || 0,
+      bit_depth: Number(component.bit_depth) || 0,
+      channels: Number(component.channels) || 0,
+      size_bytes: Number(component.size) || 0,
+      sha256: component.sha256 || null,
+    }));
+    if (audioAssets.length) {
+      const { error: assetErr } = await sb.from('audio_assets').insert(audioAssets);
+      if (assetErr) throw error(500, `Could not publish audio assets: ${assetErr.message}`);
     }
   }
 

@@ -69,4 +69,21 @@ describe('release playback state', () => {
     expect(restored).toMatchObject({ active_track_id: 'two', active_index: 1, complete_release_position_ms: 130_000, completed_tracks: ['one'] });
     expect(playbackResumeKey({ releaseId: 'r', editionId: 'e', copyId: 'c' })).toBe('nz-release-resume:r:e:c');
   });
+
+  it('honors creator permissions for shuffle and repeat controls', () => {
+    let state = createPlaybackState({ tracks, playback: { allow_shuffle: true, allow_repeat: true } });
+    state = reducePlayback(state, { type: 'set_shuffle', enabled: true });
+    state = reducePlayback(state, { type: 'set_repeat', enabled: true });
+    expect(state).toMatchObject({ shuffle_enabled: true, repeat_enabled: true });
+    const locked = reducePlayback(createPlaybackState({ tracks, playback: { allow_shuffle: false, allow_repeat: false } }), { type: 'set_shuffle', enabled: true });
+    expect(locked.shuffle_enabled).toBe(false);
+  });
+
+  it('marks the release complete before a permitted repeat begins again', () => {
+    let state = createPlaybackState({ tracks, playback: { allow_repeat: true } });
+    state = reducePlayback(state, { type: 'set_repeat', enabled: true });
+    state = { ...state, active_index: tracks.length - 1, active_track_id: tracks.at(-1).track_id, playing: true };
+    state = reducePlayback(state, { type: 'track_ended' });
+    expect(state).toMatchObject({ active_index: 0, release_completed: true, repeat_enabled: true, playing: true });
+  });
 });

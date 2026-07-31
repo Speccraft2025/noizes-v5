@@ -42,6 +42,8 @@ export function createPlaybackState(config = {}, restored = null) {
     transition: null,
     completed_tracks: Array.isArray(restored?.completed_tracks) ? [...new Set(restored.completed_tracks)] : [],
     release_completed: Boolean(restored?.release_completed),
+    shuffle_enabled: settings.allow_shuffle && Boolean(restored?.shuffle_enabled),
+    repeat_enabled: settings.allow_repeat && Boolean(restored?.repeat_enabled),
   };
 }
 
@@ -64,6 +66,10 @@ export function reducePlayback(state, event) {
       return { ...state, playing: true };
     case 'pause':
       return { ...state, playing: false, transition: null };
+    case 'set_shuffle':
+      return state.settings.allow_shuffle ? { ...state, shuffle_enabled: Boolean(event.enabled) } : state;
+    case 'set_repeat':
+      return state.settings.allow_repeat ? { ...state, repeat_enabled: Boolean(event.enabled) } : state;
     case 'time': {
       const position = Math.max(0, Number(event.position_ms) || 0);
       return {
@@ -103,6 +109,12 @@ export function reducePlayback(state, event) {
     case 'transition_complete': {
       const completed = [...new Set([...state.completed_tracks, state.active_track_id].filter(Boolean))];
       if (state.active_index >= state.tracks.length - 1) {
+        if (state.repeat_enabled && state.tracks.length) {
+          return {
+            ...atIndex({ ...state, completed_tracks: completed, release_completed: true }, 0),
+            playing: state.playing,
+          };
+        }
         return {
           ...state,
           playing: false,

@@ -1,5 +1,5 @@
 <script>
-  import { identity, releaseProject, rights, LICENSES } from '$lib/stores/package.js';
+  import { extras, identity, releaseProject, rights, LICENSES } from '$lib/stores/package.js';
   import { orderedTracks } from '$lib/domain/release.js';
 
   let selectedTrackId = '';
@@ -13,6 +13,34 @@
     licence: { type: '', notes: '' },
     authority_confirmed: false,
   };
+  $: permissionAssets = [
+    ...$releaseProject.release_assets,
+    ...$releaseProject.audio_assets,
+    ...$releaseProject.track_assets,
+    ...($extras.pdfs || []).map((pdf, index) => ({ asset_id: pdf.id || `extra-pdf-${index + 1}`, title: pdf.title, filename: pdf.name, role: 'notes', type: 'document' })),
+  ];
+
+  function updateReleaseAuthority(confirmed) {
+    rights.update((value) => ({ ...value, authority_confirmed: confirmed }));
+  }
+
+  function updateAssetPermission(assetId, patch) {
+    releaseProject.update((project) => {
+      const current = project.rights.asset_permissions?.find((entry) => entry.asset_id === assetId) ?? {
+        asset_id: assetId, confirmed: false, basis: '', notes: '',
+      };
+      return {
+        ...project,
+        rights: {
+          ...project.rights,
+          asset_permissions: [
+            ...(project.rights.asset_permissions || []).filter((entry) => entry.asset_id !== assetId),
+            { ...current, ...patch, asset_id: assetId },
+          ],
+        },
+      };
+    });
+  }
 
   function updateTrackRights(patch) {
     releaseProject.update((project) => {
@@ -74,6 +102,13 @@
       <textarea id="credits" class="input-dark resize-none font-mono text-xs" rows="5" bind:value={$rights.credits}
         placeholder="One credit per line&#10;Mastering — Studio X&#10;Artwork — Jane Doe"></textarea>
     </div>
+    <label class="flex items-start gap-3 rounded-xl p-3" style="background:rgba(123,92,240,.08);border:1px solid rgba(123,92,240,.2);">
+      <input class="mt-0.5" type="checkbox" checked={$rights.authority_confirmed === true} on:change={(event) => updateReleaseAuthority(event.currentTarget.checked)} />
+      <span>
+        <span class="block text-sm font-bold text-white">I confirm my authority to publish this complete release</span>
+        <span class="block text-xs mt-1" style="color:var(--ink-muted);">This records your declaration. Noizes does not make an automated legal conclusion.</span>
+      </span>
+    </label>
   </section>
 
   {#if tracks.length}
@@ -135,6 +170,37 @@
           {/if}
         </div>
       {/if}
+    </section>
+  {/if}
+
+  {#if permissionAssets.length}
+    <section class="space-y-4 border-t pt-6" style="border-color:var(--border-dim);">
+      <div>
+        <p class="t-caption">Asset permissions</p>
+        <p class="text-xs mt-1" style="color:var(--ink-muted);">Declare authority for every master, alternate, stem, image, video and document in the package.</p>
+      </div>
+      <div class="space-y-2">
+        {#each permissionAssets as asset (asset.asset_id)}
+          {@const permission = $releaseProject.rights.asset_permissions?.find((entry) => entry.asset_id === asset.asset_id)}
+          <div class="glass rounded-xl p-3 grid sm:grid-cols-[minmax(0,1fr)_150px] gap-3 items-center">
+            <label class="flex items-start gap-3 min-w-0">
+              <input class="mt-0.5" type="checkbox" checked={permission?.confirmed === true} on:change={(event) => updateAssetPermission(asset.asset_id, { confirmed: event.currentTarget.checked })} />
+              <span class="min-w-0">
+                <span class="block text-sm font-bold text-white truncate">{asset.title || asset.filename || asset.role}</span>
+                <span class="block text-[10px] uppercase tracking-wider mt-1" style="color:var(--ink-muted);">{asset.type || 'asset'} · {(asset.role || 'supporting').replaceAll('_', ' ')}</span>
+              </span>
+            </label>
+            <select class="input-dark text-xs" aria-label="Permission basis for {asset.title || asset.filename || asset.role}" value={permission?.basis || ''} on:change={(event) => updateAssetPermission(asset.asset_id, { basis: event.currentTarget.value })}>
+              <option value="">Permission basis</option>
+              <option value="owned">Owned / created</option>
+              <option value="licensed">Licensed</option>
+              <option value="commissioned">Commissioned</option>
+              <option value="public_domain">Public domain</option>
+              <option value="other">Other declaration</option>
+            </select>
+          </div>
+        {/each}
+      </div>
     </section>
   {/if}
 </div>

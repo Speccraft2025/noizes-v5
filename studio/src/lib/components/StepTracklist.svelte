@@ -1,6 +1,6 @@
 <script>
   import { releaseProject } from '$lib/stores/package.js';
-  import { createTrack, duplicateTrack as duplicateReleaseTrack, orderedTracks, reorderTrack } from '$lib/domain/release.js';
+  import { createTrack, duplicateTrack as duplicateReleaseTrack, orderedTracks, removeTrack, reorderTrack } from '$lib/domain/release.js';
 
   let selectedTrackId = '';
   $: tracks = orderedTracks($releaseProject.tracks);
@@ -57,24 +57,7 @@
 
   function removeSelected() {
     if (!selectedTrackId) return;
-    releaseProject.update((project) => {
-      const versionIds = new Set(project.audio_versions.filter((version) => version.track_id === selectedTrackId).map((version) => version.version_id));
-      const remaining = project.tracks.filter((track) => track.track_id !== selectedTrackId);
-      const orderedRemaining = remaining.map((track, index) => ({ ...track, position: index + 1 }));
-      return {
-        ...project,
-        tracks: orderedRemaining,
-        audio_versions: project.audio_versions.filter((version) => version.track_id !== selectedTrackId),
-        audio_assets: project.audio_assets.filter((asset) => asset.track_id !== selectedTrackId && !versionIds.has(asset.version_id)),
-        track_assets: project.track_assets.filter((asset) => asset.track_id !== selectedTrackId),
-        lyrics: project.lyrics.filter((entry) => entry.track_id !== selectedTrackId),
-        journey: {
-          ...project.journey,
-          track_journeys: project.journey.track_journeys.filter((entry) => entry.track_id !== selectedTrackId),
-          transitions: project.journey.transitions.filter((transition) => transition.from_track_id !== selectedTrackId && transition.to_track_id !== selectedTrackId),
-        },
-      };
-    });
+    releaseProject.update((project) => removeTrack(project, selectedTrackId));
   }
 
   function moveSelected(offset) {
@@ -190,6 +173,42 @@
           <label class="label-dark" for="track-description">Track notes</label>
           <textarea id="track-description" class="input-dark resize-none" rows="3" value={selected.description} on:input={(event) => updateTrack(selectedTrackId, { description: event.currentTarget.value })} placeholder="Context, recording notes, or movement description"></textarea>
         </div>
+
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-xs" style="color:var(--ink-muted);">
+            <input type="checkbox" checked={selected.inherit_release_credits}
+              on:change={(event) => updateTrack(selectedTrackId, { inherit_release_credits: event.currentTarget.checked })} />
+            Use release-level credits
+          </label>
+          {#if !selected.inherit_release_credits}
+            <label class="label-dark" for="track-credits">Track-specific credits</label>
+            <textarea id="track-credits" class="input-dark resize-none font-mono text-xs" rows="3"
+              value={selected.credits?.text || ''}
+              on:input={(event) => updateTrack(selectedTrackId, { credits: { ...selected.credits, text: event.currentTarget.value } })}
+              placeholder="Performance, arrangement, engineering, mastering…"></textarea>
+          {/if}
+        </div>
+
+        <div class="grid sm:grid-cols-3 gap-3">
+          <div>
+            <label class="label-dark" for="track-release-date">Track release date</label>
+            <input id="track-release-date" class="input-dark" type="date" value={selected.release_date} on:input={(event) => updateTrack(selectedTrackId, { release_date: event.currentTarget.value })} />
+          </div>
+          <div>
+            <label class="label-dark" for="track-recording-date">Recording date</label>
+            <input id="track-recording-date" class="input-dark" type="date" value={selected.recording_date} on:input={(event) => updateTrack(selectedTrackId, { recording_date: event.currentTarget.value })} />
+          </div>
+          <div>
+            <label class="label-dark" for="track-recording-location">Recording location</label>
+            <input id="track-recording-location" class="input-dark" type="text" value={selected.recording_location} on:input={(event) => updateTrack(selectedTrackId, { recording_location: event.currentTarget.value })} />
+          </div>
+        </div>
+        {#if $releaseProject.release.release_type === 'compilation'}
+          <div>
+            <label class="label-dark" for="source-release">Source release</label>
+            <input id="source-release" class="input-dark" type="text" value={selected.source_release} on:input={(event) => updateTrack(selectedTrackId, { source_release: event.currentTarget.value })} placeholder="Original release or archive source" />
+          </div>
+        {/if}
 
         <div class="grid grid-cols-2 gap-2 text-xs">
           {#each [

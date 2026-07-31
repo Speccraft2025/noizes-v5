@@ -1,3 +1,5 @@
+import { validateJourney } from './journey.js';
+
 export const STUDIO_PROJECT_SCHEMA_VERSION = 2;
 
 export const RELEASE_TYPES = Object.freeze([
@@ -134,12 +136,16 @@ export function createTrack(input = {}, options = {}) {
     hidden: Boolean(input.hidden),
     description: clean(input.description ?? input.notes),
     release_date: clean(input.release_date),
+    source_release: clean(input.source_release),
+    recording_date: clean(input.recording_date),
+    recording_location: clean(input.recording_location ?? input.location),
     artwork_ref: clean(input.artwork_ref),
     primary_version_id: clean(input.primary_version_id),
     primary_audio_ref: clean(input.primary_audio_ref),
     lyrics_ref: clean(input.lyrics_ref),
     credits_ref: clean(input.credits_ref),
     rights_ref: clean(input.rights_ref),
+    credits: input.credits && typeof input.credits === 'object' ? input.credits : {},
     appears_in_journey: input.appears_in_journey !== false,
     appears_in_archive: input.appears_in_archive !== false,
     inherit_release_artist: input.inherit_release_artist ?? !suppliedArtist,
@@ -281,6 +287,11 @@ export function normalizeReleaseProject(input = {}, options = {}) {
     description: clean(identity.description),
     catalogue_number: clean(identity.catalogue_number),
     label: clean(identity.label),
+    curator: clean(identity.curator),
+    compiler: clean(identity.compiler),
+    venue: clean(identity.venue),
+    event_name: clean(identity.event_name),
+    recording_date: clean(identity.recording_date),
   };
 
   const hasExplicitTracks = Array.isArray(input.tracks);
@@ -471,6 +482,16 @@ export function orderedTracks(tracks = []) {
   );
 }
 
+function resequenceTracks(tracks = []) {
+  const perDisc = new Map();
+  return tracks.map((track, index) => {
+    const disc = positiveInt(track.disc_number);
+    const nextTrackNumber = (perDisc.get(disc) || 0) + 1;
+    perDisc.set(disc, nextTrackNumber);
+    return { ...track, position: index + 1, track_number: nextTrackNumber };
+  });
+}
+
 /** Reorders public sequence numbers while retaining every stable track ID. */
 export function reorderTrack(tracks = [], trackId, toIndex) {
   const ordered = orderedTracks(tracks);
@@ -480,13 +501,35 @@ export function reorderTrack(tracks = [], trackId, toIndex) {
   const target = Math.max(0, Math.min(Number(toIndex) || 0, ordered.length));
   ordered.splice(target, 0, moved);
 
-  const perDisc = new Map();
-  return ordered.map((track, index) => {
-    const disc = positiveInt(track.disc_number);
-    const nextTrackNumber = (perDisc.get(disc) || 0) + 1;
-    perDisc.set(disc, nextTrackNumber);
-    return { ...track, position: index + 1, track_number: nextTrackNumber };
-  });
+  return resequenceTracks(ordered);
+}
+
+/** Removes a track and every relationship owned exclusively by that track. */
+export function removeTrack(project, trackId) {
+  if (!project.tracks.some((track) => track.track_id === trackId)) return project;
+  const versionIds = new Set(project.audio_versions.filter((version) => version.track_id === trackId).map((version) => version.version_id));
+  const removedAssetIds = new Set([
+    ...project.audio_assets.filter((asset) => asset.track_id === trackId || versionIds.has(asset.version_id)).map((asset) => asset.asset_id),
+    ...project.track_assets.filter((asset) => asset.track_id === trackId).map((asset) => asset.asset_id),
+  ]);
+  return {
+    ...project,
+    tracks: resequenceTracks(orderedTracks(project.tracks.filter((track) => track.track_id !== trackId))),
+    audio_versions: project.audio_versions.filter((version) => version.track_id !== trackId),
+    audio_assets: project.audio_assets.filter((asset) => asset.track_id !== trackId && !versionIds.has(asset.version_id)),
+    track_assets: project.track_assets.filter((asset) => asset.track_id !== trackId),
+    lyrics: project.lyrics.filter((entry) => entry.track_id !== trackId),
+    rights: {
+      ...project.rights,
+      track_rights: (project.rights.track_rights || []).filter((entry) => entry.track_id !== trackId),
+      asset_permissions: (project.rights.asset_permissions || []).filter((entry) => !removedAssetIds.has(entry.asset_id)),
+    },
+    journey: {
+      ...project.journey,
+      track_journeys: project.journey.track_journeys.filter((entry) => entry.track_id !== trackId),
+      transitions: project.journey.transitions.filter((transition) => transition.from_track_id !== trackId && transition.to_track_id !== trackId),
+    },
+  };
 }
 
 export function duplicateTrack(project, trackId, options = {}) {
@@ -605,6 +648,14 @@ export function validateReleaseProject(project, options = {}) {
     if (!trackIds.has(asset.track_id)) add('error', 'asset_track_missing', `${path}.track_id`, 'Track asset references an unknown track.');
   }
 
+  for (const [index, track] of tracks.entries()) {
+    if (!track.artwork_ref) continue;
+    const artwork = trackAssets.find((asset) => asset.asset_id === track.artwork_ref);
+    if (!artwork || artwork.track_id !== track.track_id) {
+      add('error', 'track_artwork_missing', `tracks[${index}].artwork_ref`, 'Track artwork must reference an asset owned by the same track.');
+    }
+  }
+
   const edition = project?.edition ?? {};
   if (edition.applies_to && edition.applies_to !== 'release') {
     add('error', 'edition_scope_invalid', 'edition.applies_to', 'An edition must apply to the complete release.');
@@ -612,6 +663,69 @@ export function validateReleaseProject(project, options = {}) {
   if (edition.release_id && edition.release_id !== release.release_id) {
     add('error', 'edition_release_mismatch', 'edition.release_id', 'Edition and release IDs do not match.');
   }
+
+  const releaseRights = project?.rights?.release_rights ?? {};
+  const hasReleaseDeclaration = Boolean(clean(releaseRights.copyright) || clean(releaseRights.license));
+  if (!hasReleaseDeclaration) {
+    add('warning', 'release_rights_missing', 'rights.release_rights', 'Add a release-level rights declaration; Noizes records your declaration but does not make a legal conclusion.');
+  }
+  if (releaseRights.authority_confirmed !== true) {
+    add('warning', 'release_authority_unconfirmed', 'rights.release_rights.authority_confirmed', 'Confirm your authority to include and publish the complete release.');
+  }
+  const trackRights = Array.isArray(project?.rights?.track_rights) ? project.rights.track_rights : [];
+  for (const [index, declaration] of trackRights.entries()) {
+    if (!trackIds.has(declaration.track_id)) {
+      add('error', 'rights_track_missing', `rights.track_rights[${index}].track_id`, 'Track rights reference an unknown track.');
+    }
+  }
+  for (const [index, track] of tracks.entries()) {
+    const declaration = trackRights.find((entry) => entry.track_id === track.track_id);
+    if (track.inherit_release_rights) {
+      if (!hasReleaseDeclaration) add('warning', 'inherited_rights_missing', `tracks[${index}].inherit_release_rights`, `“${track.title || `Track ${index + 1}`}” inherits a release declaration that is incomplete.`);
+      if (declaration && Object.values(declaration).some((value) => value && typeof value === 'object' && Object.values(value).some(Boolean))) {
+        add('warning', 'rights_inheritance_conflict', `rights.track_rights[${index}]`, `“${track.title || `Track ${index + 1}`}” has an override while release-level inheritance is enabled.`);
+      }
+    } else if (!declaration || (!clean(declaration.master?.rights_holder) && !clean(declaration.composition?.rights_holder) && !clean(declaration.licence?.notes))) {
+      add('warning', 'track_rights_missing', `rights.track_rights[${index}]`, `“${track.title || `Track ${index + 1}`}” needs its own master, composition, or licence declaration.`);
+    } else if (declaration.authority_confirmed !== true) {
+      add('warning', 'track_authority_unconfirmed', `rights.track_rights[${index}].authority_confirmed`, `Confirm authority for “${track.title || `Track ${index + 1}`}” and its declared assets.`);
+    }
+    if (release.release_type === 'compilation' && track.inherit_release_rights && !hasReleaseDeclaration) {
+      add('warning', 'compilation_rights_missing', `tracks[${index}].inherit_release_rights`, `Compilation track “${track.title || index + 1}” has neither a valid inherited release declaration nor a track override.`);
+    }
+  }
+
+  const permissionByAsset = new Map((project?.rights?.asset_permissions || []).map((permission) => [permission.asset_id, permission]));
+  const permissionAssets = [
+    ...(project?.audio_assets || []),
+    ...(project?.release_assets || []),
+    ...(project?.track_assets || []),
+    ...(project?.extras?.pdfs || []).map((pdf, index) => ({
+      asset_id: pdf.id || `extra-pdf-${index + 1}`,
+      title: pdf.title,
+      filename: pdf.name,
+      role: 'notes',
+      type: 'document',
+      file: pdf.file,
+    })),
+  ];
+  for (const [index, asset] of permissionAssets.entries()) {
+    if (!asset.file && !asset.path) continue;
+    const permission = permissionByAsset.get(asset.asset_id);
+    if (permission?.confirmed !== true) {
+      add('warning', 'asset_permission_unconfirmed', `rights.asset_permissions[${index}]`, `Confirm permission for “${asset.title || asset.filename || asset.role || `Asset ${index + 1}`}”.`);
+    }
+  }
+  const knownPermissionAssets = new Set(permissionAssets.map((asset) => asset.asset_id));
+  for (const [index, permission] of (project?.rights?.asset_permissions || []).entries()) {
+    if (!knownPermissionAssets.has(permission.asset_id)) {
+      add('error', 'permission_asset_missing', `rights.asset_permissions[${index}].asset_id`, 'Asset permission references an unknown package asset.');
+    }
+  }
+
+  const journeyValidation = validateJourney(project?.journey ?? {}, tracks);
+  errors.push(...journeyValidation.errors);
+  warnings.push(...journeyValidation.warnings);
 
   return { valid: errors.length === 0, errors, warnings };
 }

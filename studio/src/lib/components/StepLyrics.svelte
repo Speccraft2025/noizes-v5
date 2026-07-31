@@ -95,6 +95,30 @@
     });
   }
 
+  function textLines(value) {
+    return String(value || '').split(/\r?\n/).map((text) => text.trim()).filter(Boolean);
+  }
+
+  function addLanguageVersion(field) {
+    updateLyricRecord({
+      [field]: [...(lyricRecord[field] || []), { language: '', plain_text: '', lines: [] }],
+    });
+  }
+
+  function updateLanguageVersion(field, index, patch) {
+    updateLyricRecord({
+      [field]: (lyricRecord[field] || []).map((entry, entryIndex) => entryIndex === index
+        ? { ...entry, ...patch }
+        : entry),
+    });
+  }
+
+  function removeLanguageVersion(field, index) {
+    updateLyricRecord({
+      [field]: (lyricRecord[field] || []).filter((_, entryIndex) => entryIndex !== index),
+    });
+  }
+
   async function importLrc(event) {
     const file = event.currentTarget.files?.[0];
     if (!file) return;
@@ -424,6 +448,59 @@
     <div class="glass rounded-xl px-4 py-3 flex items-center gap-3">
       <span class="text-green-400 text-lg">✓</span>
       <p class="text-sm text-white">{lines.length} lines synced — ready to compile</p>
+    </div>
+  {/if}
+
+  {#if selectedTrack}
+    <div class="glass rounded-xl p-4 space-y-4">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="text-sm font-bold text-white">Translations</p>
+          <p class="text-xs mt-1" style="color:var(--ink-muted);">Attach alternate-language lyric text to this track.</p>
+        </div>
+        <button type="button" class="btn-ghost text-xs py-1.5 px-3" on:click={() => addLanguageVersion('translations')}>+ Translation</button>
+      </div>
+      {#each lyricRecord.translations || [] as translation, index}
+        <div class="rounded-xl p-3 space-y-2" style="background:rgba(255,255,255,.025);border:1px solid var(--border-dim);">
+          <div class="flex gap-2">
+            <input class="input-dark flex-1" type="text" value={translation.language || ''} placeholder="Language code or name"
+              on:input={(event) => updateLanguageVersion('translations', index, { language: event.currentTarget.value })} />
+            <button type="button" class="btn-ghost text-xs px-3" on:click={() => removeLanguageVersion('translations', index)}>Remove</button>
+          </div>
+          <textarea class="input-dark resize-none font-mono text-xs" rows="4" value={translation.plain_text || (translation.lines || []).map((line) => typeof line === 'string' ? line : line.text).join('\n')}
+            placeholder="Translated lyrics — one line per line"
+            on:input={(event) => updateLanguageVersion('translations', index, { plain_text: event.currentTarget.value, lines: textLines(event.currentTarget.value).map((text) => ({ text })) })}></textarea>
+        </div>
+      {/each}
+    </div>
+
+    <div class="glass rounded-xl p-4 space-y-4">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="text-sm font-bold text-white">Transliterations</p>
+          <p class="text-xs mt-1" style="color:var(--ink-muted);">Add a readable-script version without replacing the original lyric.</p>
+        </div>
+        <button type="button" class="btn-ghost text-xs py-1.5 px-3" on:click={() => addLanguageVersion('transliterations')}>+ Transliteration</button>
+      </div>
+      {#each lyricRecord.transliterations || [] as transliteration, index}
+        <div class="rounded-xl p-3 space-y-2" style="background:rgba(255,255,255,.025);border:1px solid var(--border-dim);">
+          <div class="flex gap-2">
+            <input class="input-dark flex-1" type="text" value={transliteration.language || ''} placeholder="Script or language"
+              on:input={(event) => updateLanguageVersion('transliterations', index, { language: event.currentTarget.value })} />
+            <button type="button" class="btn-ghost text-xs px-3" on:click={() => removeLanguageVersion('transliterations', index)}>Remove</button>
+          </div>
+          <textarea class="input-dark resize-none font-mono text-xs" rows="4" value={transliteration.plain_text || (transliteration.lines || []).map((line) => typeof line === 'string' ? line : line.text).join('\n')}
+            placeholder="Transliterated lyrics — one line per line"
+            on:input={(event) => updateLanguageVersion('transliterations', index, { plain_text: event.currentTarget.value, lines: textLines(event.currentTarget.value).map((text) => ({ text })) })}></textarea>
+        </div>
+      {/each}
+    </div>
+
+    <div class="glass rounded-xl p-4">
+      <label class="label-dark" for="lyric-credits">Lyric and translation credits</label>
+      <textarea id="lyric-credits" class="input-dark resize-none" rows="3" value={lyricRecord.credits?.text || ''}
+        placeholder="Lyricist, translator, transliterator, synchronization credit…"
+        on:input={(event) => updateLyricRecord({ credits: { ...lyricRecord.credits, text: event.currentTarget.value } })}></textarea>
     </div>
   {/if}
 </div>

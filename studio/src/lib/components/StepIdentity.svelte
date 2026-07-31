@@ -56,6 +56,21 @@
     {/if}
   </div>
 
+  {#if $identity.release_type === 'compilation'}
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="label-dark" for="curator">Curator</label><input id="curator" class="input-dark" type="text" bind:value={$identity.curator} /></div>
+      <div><label class="label-dark" for="compiler">Compiler</label><input id="compiler" class="input-dark" type="text" bind:value={$identity.compiler} /></div>
+    </div>
+  {/if}
+
+  {#if $identity.release_type === 'live_release'}
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="label-dark" for="event_name">Event name</label><input id="event_name" class="input-dark" type="text" bind:value={$identity.event_name} placeholder="Concert or session" /></div>
+      <div><label class="label-dark" for="venue">Venue</label><input id="venue" class="input-dark" type="text" bind:value={$identity.venue} placeholder="Venue and city" /></div>
+      <div><label class="label-dark" for="recording_date">Recording date</label><input id="recording_date" class="input-dark" type="date" bind:value={$identity.recording_date} /></div>
+    </div>
+  {/if}
+
   <div class="grid grid-cols-2 gap-3">
     <div>
       <label class="label-dark" for="year">Year *</label>

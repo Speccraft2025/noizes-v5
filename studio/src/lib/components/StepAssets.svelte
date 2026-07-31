@@ -11,6 +11,8 @@
 
   let selectedTrackId = '';
   let alternateRole = 'instrumental';
+  let releaseSupplementRole = 'back_cover';
+  let trackSupplementRole = 'track_image';
   $: tracks = orderedTracks($releaseProject.tracks);
   $: if (!selectedTrackId || !tracks.some((track) => track.track_id === selectedTrackId)) selectedTrackId = tracks[0]?.track_id || '';
   $: selectedTrack = tracks.find((track) => track.track_id === selectedTrackId);
@@ -21,6 +23,46 @@
 
   const roleLabel = (role) => role.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
   const sizeLabel = (size) => size ? `${(size / 1024 / 1024).toFixed(size > 10 * 1024 * 1024 ? 0 : 1)} MB` : '';
+  const RELEASE_SUPPORT = {
+    back_cover: { label: 'Back cover', type: 'image', accept: 'image/*' },
+    booklet_artwork: { label: 'Booklet artwork', type: 'image', accept: 'image/*' },
+    release_trailer: { label: 'Release trailer', type: 'video', accept: 'video/*' },
+    photograph: { label: 'Release photograph', type: 'image', accept: 'image/*' },
+    document: { label: 'Release PDF / document', type: 'document', accept: '.pdf,application/pdf' },
+    commentary: { label: 'Release commentary', type: 'audio', accept: 'audio/*,.wav,.flac,.mp3,.m4a' },
+    promotional_material: { label: 'Promotional material', type: 'document', accept: 'image/*,.pdf,application/pdf' },
+    typography: { label: 'Typography / design asset', type: 'image', accept: 'image/*' },
+  };
+  const TRACK_SUPPORT = {
+    track_image: { label: 'Track image', type: 'image', accept: 'image/*' },
+    music_video: { label: 'Music video', type: 'video', accept: 'video/*' },
+    visualiser: { label: 'Visualiser', type: 'video', accept: 'video/*' },
+    track_document: { label: 'Track note / PDF', type: 'document', accept: '.pdf,application/pdf' },
+  };
+
+  function dropPermissions(project, assetIds) {
+    const removed = assetIds instanceof Set ? assetIds : new Set(assetIds);
+    return {
+      ...project,
+      rights: {
+        ...project.rights,
+        asset_permissions: (project.rights.asset_permissions || []).filter((permission) => !removed.has(permission.asset_id)),
+      },
+    };
+  }
+
+  async function audioDuration(file) {
+    if (typeof document === 'undefined' || !file) return 0;
+    return new Promise((resolve) => {
+      const element = document.createElement('audio');
+      const url = URL.createObjectURL(file);
+      const done = (value) => { URL.revokeObjectURL(url); resolve(Number.isFinite(value) ? Math.round(value * 1000) : 0); };
+      element.preload = 'metadata';
+      element.onloadedmetadata = () => done(element.duration);
+      element.onerror = () => done(0);
+      element.src = url;
+    });
+  }
 
   function setReleaseFile(role, type, file) {
     if (!file) return;
@@ -37,23 +79,47 @@
   }
 
   function removeReleaseFile(assetId) {
-    releaseProject.update((project) => ({
+    releaseProject.update((project) => dropPermissions({
       ...project,
       release_assets: project.release_assets.filter((asset) => asset.asset_id !== assetId),
-    }));
+      audio_assets: project.audio_assets.filter((asset) => asset.asset_id !== assetId),
+    }, new Set([assetId])));
   }
 
-  function setContinuousMaster(file) {
+  function removeTrackFile(assetId) {
+    releaseProject.update((project) => dropPermissions({
+      ...project,
+      track_assets: project.track_assets.filter((asset) => asset.asset_id !== assetId),
+      tracks: project.tracks.map((track) => track.artwork_ref === assetId ? { ...track, artwork_ref: '' } : track),
+    }, new Set([assetId])));
+  }
+
+  async function setContinuousMaster(file) {
     if (!file) return;
+    const duration_ms = await audioDuration(file);
     releaseProject.update((project) => {
       const existing = project.audio_assets.find((asset) => asset.scope === 'release' && asset.role === 'continuous_master');
       const asset = existing
-        ? { ...existing, file, filename: file.name, mime: file.type, size: file.size }
-        : createAudioAsset({ scope: 'release', role: 'continuous_master', file }, { releaseId: project.release.release_id });
+        ? { ...existing, file, filename: file.name, mime: file.type, size: file.size, duration_ms }
+        : createAudioAsset({ scope: 'release', role: 'continuous_master', file, duration_ms }, { releaseId: project.release.release_id });
       return {
         ...project,
         audio_assets: [...project.audio_assets.filter((item) => item.asset_id !== asset.asset_id), asset],
       };
+    });
+  }
+
+  async function addReleaseSupplement(file) {
+    if (!file) return;
+    const definition = RELEASE_SUPPORT[releaseSupplementRole];
+    const duration_ms = definition.type === 'audio' ? await audioDuration(file) : 0;
+    releaseProject.update((project) => {
+      if (definition.type === 'audio') {
+        const asset = createAudioAsset({ scope: 'release', role: releaseSupplementRole, type: 'audio', file, duration_ms }, { releaseId: project.release.release_id });
+        return { ...project, audio_assets: [...project.audio_assets, asset] };
+      }
+      const asset = createReleaseAsset({ role: releaseSupplementRole, type: definition.type, file }, { releaseId: project.release.release_id });
+      return { ...project, release_assets: [...project.release_assets, asset] };
     });
   }
 
@@ -75,8 +141,9 @@
     });
   }
 
-  function attachAudio(file, role = 'primary_master') {
+  async function attachAudio(file, role = 'primary_master') {
     if (!file || !selectedTrackId) return;
+    const duration_ms = await audioDuration(file);
     releaseProject.update((project) => {
       const primary = role === 'primary_master';
       const existingVersion = primary
@@ -92,7 +159,7 @@
         title: roleLabel(role),
       });
       const asset = existingAsset
-        ? { ...existingAsset, file, filename: file.name, mime: file.type, size: file.size }
+        ? { ...existingAsset, file, filename: file.name, mime: file.type, size: file.size, duration_ms }
         : createAudioAsset({
             track_id: selectedTrackId,
             version_id: version.version_id,
@@ -100,6 +167,7 @@
             role,
             title: roleLabel(role),
             file,
+            duration_ms,
           }, { releaseId: project.release.release_id });
       version = { ...version, audio_asset_id: asset.asset_id };
       return {
@@ -113,11 +181,23 @@
     });
   }
 
+  function addTrackSupplement(file) {
+    if (!file || !selectedTrackId) return;
+    const definition = TRACK_SUPPORT[trackSupplementRole];
+    releaseProject.update((project) => {
+      const asset = createTrackAsset({ track_id: selectedTrackId, role: trackSupplementRole, type: definition.type, file }, {
+        releaseId: project.release.release_id,
+        trackId: selectedTrackId,
+      });
+      return { ...project, track_assets: [...project.track_assets, asset] };
+    });
+  }
+
   function removeVersion(versionId) {
     releaseProject.update((project) => {
       const removedAssets = new Set(project.audio_assets.filter((asset) => asset.version_id === versionId).map((asset) => asset.asset_id));
       return {
-        ...project,
+        ...dropPermissions(project, removedAssets),
         audio_versions: project.audio_versions.filter((version) => version.version_id !== versionId),
         audio_assets: project.audio_assets.filter((asset) => !removedAssets.has(asset.asset_id)),
         tracks: project.tracks.map((track) => track.primary_version_id === versionId
@@ -164,7 +244,7 @@
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-violet">♫</span>
             <span class="text-xs text-white truncate flex-1">{continuousMaster.filename}</span>
-            <button type="button" class="text-[10px]" style="color:var(--ink-muted);" on:click={() => releaseProject.update((project) => ({ ...project, audio_assets: project.audio_assets.filter((asset) => asset.asset_id !== continuousMaster.asset_id) }))}>remove</button>
+            <button type="button" class="text-[10px]" style="color:var(--ink-muted);" on:click={() => removeReleaseFile(continuousMaster.asset_id)}>remove</button>
           </div>
         {:else}
           <label class="block rounded-lg py-5 text-center cursor-pointer" style="border:1px dashed var(--border-dim);">
@@ -173,6 +253,26 @@
           </label>
         {/if}
       </div>
+    </div>
+
+    <div class="glass rounded-xl p-3 space-y-3">
+      <div class="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2">
+        <select class="input-dark" bind:value={releaseSupplementRole}>
+          {#each Object.entries(RELEASE_SUPPORT) as [role, definition]}<option value={role}>{definition.label}</option>{/each}
+        </select>
+        <label class="btn-ghost flex items-center justify-center cursor-pointer shrink-0">
+          ＋ Add release asset
+          <input class="hidden" type="file" accept={RELEASE_SUPPORT[releaseSupplementRole].accept} on:change={(event) => { addReleaseSupplement(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
+        </label>
+      </div>
+      {#each [...$releaseProject.release_assets.filter((asset) => asset.role !== 'main_cover'), ...$releaseProject.audio_assets.filter((asset) => asset.scope === 'release' && asset.role !== 'continuous_master')] as asset (asset.asset_id)}
+        <div class="flex items-center gap-2 rounded-lg px-3 py-2" style="background:rgba(255,255,255,.03);">
+          <span style="color:#7B5CF0;">{asset.type === 'video' ? '▶' : asset.type === 'audio' ? '♫' : asset.type === 'document' ? '▤' : '◼'}</span>
+          <span class="text-xs text-white truncate flex-1">{asset.filename}</span>
+          <span class="text-[10px]" style="color:var(--ink-muted);">{roleLabel(asset.role)} · {sizeLabel(asset.size)}</span>
+          <button type="button" class="text-[10px]" style="color:var(--ink-muted);" on:click={() => removeReleaseFile(asset.asset_id)}>remove</button>
+        </div>
+      {/each}
     </div>
   </section>
 
@@ -210,11 +310,7 @@
             <div class="flex items-center gap-2 rounded-lg px-3 py-2" style="background:rgba(255,255,255,.03);">
               <span class="text-violet">◼</span>
               <span class="text-xs text-white truncate flex-1">{trackArtwork.filename}</span>
-              <button type="button" class="text-[10px]" style="color:var(--ink-muted);" on:click={() => releaseProject.update((project) => ({
-                ...project,
-                track_assets: project.track_assets.filter((asset) => asset.asset_id !== trackArtwork.asset_id),
-                tracks: project.tracks.map((track) => track.track_id === selectedTrackId ? { ...track, artwork_ref: '' } : track),
-              }))}>remove</button>
+              <button type="button" class="text-[10px]" style="color:var(--ink-muted);" on:click={() => removeTrackFile(trackArtwork.asset_id)}>remove</button>
             </div>
           {/if}
 
@@ -250,6 +346,27 @@
               ＋ Add version
               <input class="hidden" type="file" accept="audio/*,.wav,.flac,.mp3,.m4a" on:change={(event) => { attachAudio(event.currentTarget.files?.[0], alternateRole); event.currentTarget.value = ''; }} />
             </label>
+          </div>
+
+          <div class="pt-3 space-y-2" style="border-top:1px solid var(--border-dim);">
+            <p class="text-[10px] uppercase tracking-widest" style="color:var(--ink-muted);">Track media &amp; documents</p>
+            {#each $releaseProject.track_assets.filter((asset) => asset.track_id === selectedTrackId && asset.role !== 'track_artwork') as asset (asset.asset_id)}
+              <div class="flex items-center gap-2 rounded-lg px-3 py-2" style="background:rgba(255,255,255,.03);">
+                <span style="color:#7B5CF0;">{asset.type === 'video' ? '▶' : asset.type === 'document' ? '▤' : '◼'}</span>
+                <span class="text-xs text-white truncate flex-1">{asset.filename}</span>
+                <span class="text-[10px]" style="color:var(--ink-muted);">{roleLabel(asset.role)} · {sizeLabel(asset.size)}</span>
+                <button type="button" class="text-[10px]" style="color:var(--ink-muted);" on:click={() => removeTrackFile(asset.asset_id)}>remove</button>
+              </div>
+            {/each}
+            <div class="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <select class="input-dark" bind:value={trackSupplementRole}>
+                {#each Object.entries(TRACK_SUPPORT) as [role, definition]}<option value={role}>{definition.label}</option>{/each}
+              </select>
+              <label class="btn-ghost flex items-center justify-center cursor-pointer shrink-0">
+                ＋ Add track asset
+                <input class="hidden" type="file" accept={TRACK_SUPPORT[trackSupplementRole].accept} on:change={(event) => { addTrackSupplement(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
+              </label>
+            </div>
           </div>
         </div>
       {/if}

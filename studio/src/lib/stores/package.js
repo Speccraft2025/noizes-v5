@@ -66,6 +66,11 @@ export const identity = lens(
     description: project.release.description,
     catalogue_number: project.release.catalogue_number,
     label: project.release.label,
+    curator: project.release.curator,
+    compiler: project.release.compiler,
+    venue: project.release.venue,
+    event_name: project.release.event_name,
+    recording_date: project.release.recording_date,
   }),
   (project, value) => {
     const oldRelease = project.release;
@@ -91,6 +96,11 @@ export const identity = lens(
       description: value.description ?? oldRelease.description,
       catalogue_number: value.catalogue_number ?? oldRelease.catalogue_number,
       label: value.label ?? oldRelease.label,
+      curator: value.curator ?? oldRelease.curator,
+      compiler: value.compiler ?? oldRelease.compiler,
+      venue: value.venue ?? oldRelease.venue,
+      event_name: value.event_name ?? oldRelease.event_name,
+      recording_date: value.recording_date ?? oldRelease.recording_date,
     };
     const linkSingleTitle = project.tracks.length === 1
       && oldRelease.release_type === 'single'

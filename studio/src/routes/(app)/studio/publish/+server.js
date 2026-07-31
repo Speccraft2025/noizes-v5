@@ -8,6 +8,15 @@ import { signHash } from '$lib/server/signing.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function updateExperienceAuthenticity(html, authenticity) {
+  const match = html.match(/window\.NZ_CONFIG = (\{[\s\S]*?\});\n<\/script>/);
+  if (!match) return html;
+  const config = JSON.parse(match[1]);
+  if (config.archive) config.archive.authenticity = authenticity;
+  const encoded = JSON.stringify(config, null, 2).replace(/</g, '\\u003c');
+  return html.replace(match[1], encoded);
+}
+
 // Finalizes a publish after the browser has uploaded the .nz (and optional
 // audio/cover) directly to Supabase Storage via /studio/publish/upload-urls.
 // The request body is metadata only — file bytes never pass through this
@@ -95,7 +104,7 @@ export async function POST({ request, locals }) {
     const hash = nodeCrypto.createHash('sha256').update(inventory).digest('hex');
     const { signature, publicKey } = await signHash(sb, locals.user.id, Buffer.from(hash, 'hex'));
 
-    zip.file('authenticity.json', JSON.stringify({
+    const signedAuthenticity = {
       method: 'sha256-component-inventory',
       hash,
       components,
@@ -105,7 +114,16 @@ export async function POST({ request, locals }) {
       signature,
       signed_at: new Date().toISOString(),
       release_id: releaseId,
-    }, null, 2));
+    };
+    zip.file('authenticity.json', JSON.stringify(signedAuthenticity, null, 2));
+    if (zip.file('archive.json')) {
+      const archive = JSON.parse(await zip.file('archive.json').async('string'));
+      archive.authenticity = signedAuthenticity;
+      zip.file('archive.json', JSON.stringify(archive, null, 2));
+    }
+    if (zip.file('experience.html')) {
+      zip.file('experience.html', updateExperienceAuthenticity(await zip.file('experience.html').async('string'), signedAuthenticity));
+    }
     const nzBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
     const { error: upErr } = await sb.storage.from('releases').upload(nz_path, nzBuffer, {
@@ -131,6 +149,9 @@ export async function POST({ request, locals }) {
       label: meta.label || null,
       track_count: Number(meta.track_count) || 0,
       disc_count: Number(meta.disc_count) || 1,
+      total_duration_ms: Number(meta.total_duration_ms) || 0,
+      explicit: Boolean(meta.explicit),
+      package_size: Number(meta.package_size) || nzBlob.size || 0,
       genre: meta.genre,
       year: meta.year,
       location: meta.location,

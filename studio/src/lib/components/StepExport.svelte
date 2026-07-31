@@ -107,6 +107,12 @@
             label: $releaseProject.release.label,
             track_count: $releaseProject.tracks.length,
             disc_count: Math.max(1, ...$releaseProject.tracks.map((track) => Number(track.disc_number) || 1)),
+            total_duration_ms: $releaseProject.tracks.reduce((total, track) => {
+              const asset = $releaseProject.audio_assets.find((item) => item.asset_id === track.primary_audio_ref);
+              return total + (Number(asset?.duration_ms) || 0);
+            }, 0),
+            explicit: $releaseProject.tracks.some((track) => track.explicit),
+            package_size: result.blob.size,
             genre: $identity.genre,
             year: $identity.year,
             location: $identity.location,
@@ -140,6 +146,8 @@
     ['credits.json', 'Release and per-track production credits'],
     ['authenticity.json', 'Per-component sha256 inventory'],
     ['technical.json', 'Packager & timestamp'],
+    ['archive.json', 'Release and track object records'],
+    ['history.json', 'Release-copy provenance and work history'],
     ['experience.html', 'Self-contained offline player'],
   ];
 </script>

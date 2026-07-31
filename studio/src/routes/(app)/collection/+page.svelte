@@ -18,6 +18,10 @@
     verified: 'Verified',
   };
 
+  function formatType(value) {
+    return String(value || 'release').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
   let expanded = {};        // acquisition_id -> bool (Living Record open)
   let noteDrafts = {};      // acquisition_id -> string
   let transferring = null;  // acquisition_id currently in the transfer form
@@ -146,7 +150,8 @@
               <p class="text-xs font-bold uppercase tracking-widest mb-0.5" style="color: {color};">{item.artist}</p>
               <h3 class="text-xl font-black text-white mb-2">{item.title}</h3>
               <div class="flex gap-3 mt-1 flex-wrap items-center">
-                <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(255,255,255,0.05); color: var(--ink-muted);">{item.edition_type}{item.edition_number ? ` #${item.edition_number}` : ''}{item.edition_size ? ` / ${item.edition_size}` : ''}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(123,92,240,.12); color:#9a82ff;">{formatType(item.release_type)} · {item.track_count || 1} track{item.track_count === 1 ? '' : 's'}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(255,255,255,0.05); color: var(--ink-muted);">{item.edition_name || item.edition_type}{item.edition_number ? ` #${item.edition_number}` : ''}{item.edition_size ? ` / ${item.edition_size}` : ''}</span>
                 <span class="text-xs" style="color: var(--ink-muted);">Custodian since {item.acquired}</span>
                 {#if item.accepting_offers}
                   <span class="text-xs px-2 py-0.5 rounded-full" style="background: {color}22; color: {color};">Accepting offers</span>
@@ -164,6 +169,17 @@
 
           {#if expanded[item.id]}
             <div class="mt-5 pt-5 border-t" style="border-color: var(--border-dim);">
+              {#if item.tracklist?.length}
+                <p class="t-caption mb-3">Tracklist snapshot</p>
+                <ol class="grid sm:grid-cols-2 gap-x-6 gap-y-1 mb-6">
+                  {#each item.tracklist as track}
+                    <li class="flex gap-3 py-1 text-xs" style="color:{track.hidden ? 'var(--ink-muted)' : '#fff'};">
+                      <span class="font-mono" style="color:#7B5CF0;">{track.disc_number}.{String(track.track_number).padStart(2, '0')}</span>
+                      <span>{track.title}{track.primary_artist && track.primary_artist !== item.artist ? ` — ${track.primary_artist}` : ''}{track.hidden ? ' · hidden' : ''}</span>
+                    </li>
+                  {/each}
+                </ol>
+              {/if}
               <!-- Living Record -->
               <p class="t-caption mb-3">Living Record</p>
               <ol class="space-y-2 mb-6">

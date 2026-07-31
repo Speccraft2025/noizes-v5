@@ -4,6 +4,7 @@ import { CANONICAL_TEMPLATE, normalizeEdition } from './project.js';
 import { normalizeReleaseProject, orderedTracks } from '../domain/release.js';
 import { normalizePlaybackSettings } from '../domain/playback.js';
 import { materializeJourney } from '../domain/journey.js';
+import { buildReleaseArchive, buildReleaseHistory } from '../domain/archive.js';
 
 const safeFilename = (value, fallback = 'asset') => {
   const cleaned = String(value || fallback).replace(/[^a-z0-9._-]/gi, '_').replace(/_+/g, '_');
@@ -240,15 +241,16 @@ export async function buildPackage(input) {
       })),
     })),
   };
-  zip.file('edition.json', JSON.stringify({
+  const editionData = {
     ...stripFiles(fixedEdition),
     edition_id: project.edition.edition_id,
     release_id: releaseId,
     applies_to: 'release',
     edition_size: Number(fixedEdition.edition_size),
-  }, null, 2));
+  };
+  zip.file('edition.json', JSON.stringify(editionData, null, 2));
   zip.file('rights.json', JSON.stringify(stripFiles(project.rights), null, 2));
-  zip.file('credits.json', JSON.stringify({
+  const creditsData = {
     release: releaseRights.credits
       ? String(releaseRights.credits).split('\n').map((line) => line.trim()).filter(Boolean)
       : [],
@@ -257,14 +259,16 @@ export async function buildPackage(input) {
       producers: track.producers,
       writers: track.writers,
     })),
-  }, null, 2));
-  zip.file('provenance.json', JSON.stringify({
+  };
+  zip.file('credits.json', JSON.stringify(creditsData, null, 2));
+  const provenanceData = {
     scope: 'release_copy',
     release_id: release.release_id,
     edition_id: project.edition.edition_id,
     copy_id: null,
     events: [],
-  }, null, 2));
+  };
+  zip.file('provenance.json', JSON.stringify(provenanceData, null, 2));
 
   const guideBlock = buildGuide({
     hasLyrics: project.lyrics.some((entry) => entry.timed_lines?.length),
@@ -300,7 +304,8 @@ export async function buildPackage(input) {
   const safeLinks = (extras.links || []).filter((link) =>
     link.label?.trim() && /^https:\/\//i.test(link.url || '')
   ).map(({ label, url, kind }) => ({ label: label.trim(), url, kind: kind || 'artist', requires_internet: true }));
-  zip.file('resources.json', JSON.stringify({ groups: safeLinks.length ? [{ label: 'Online', links: safeLinks }] : [] }, null, 2));
+  const resourcesData = { groups: safeLinks.length ? [{ label: 'Online', links: safeLinks }] : [] };
+  zip.file('resources.json', JSON.stringify(resourcesData, null, 2));
 
   const primaryTrack = tracks.find((track) => !track.hidden) ?? tracks[0];
   const primaryAudioAsset = project.audio_assets.find((asset) => asset.asset_id === primaryTrack?.primary_audio_ref)
@@ -326,14 +331,15 @@ export async function buildPackage(input) {
     components: components.map(({ component_id, path, sha256, size }) => ({ component_id, path, sha256, size })),
   };
   zip.file('authenticity.json', JSON.stringify(authenticity, null, 2));
-  zip.file('technical.json', JSON.stringify({
+  const technicalData = {
     packaged_at: now,
     packager: 'Noizes Studio v2.0.0',
     noizes_version: '1.0.0',
     track_count: tracks.length,
     component_count: components.length,
     package_source: 'normalized_release_project',
-  }, null, 2));
+  };
+  zip.file('technical.json', JSON.stringify(technicalData, null, 2));
 
   const manifest = {
     noizes_version: '1.0.0',
@@ -363,6 +369,8 @@ export async function buildPackage(input) {
     edition: { path: 'edition.json', edition_id: project.edition.edition_id, applies_to: 'release' },
     authenticity: { path: 'authenticity.json', method: authenticity.method },
     rights: { path: 'rights.json' },
+    archive: { path: 'archive.json', schema: '1.0.0' },
+    history: { path: 'history.json', scope: 'release_copy' },
     created_at: now,
     // Read-only compatibility projection for v1 viewers and current Exchange.
     artist: release.primary_artist,
@@ -373,6 +381,28 @@ export async function buildPackage(input) {
     location: release.location,
     description: release.description,
   };
+  const archiveData = buildReleaseArchive({
+    release: manifest.release,
+    tracks: trackRecords,
+    components,
+    notes: notes.map(({ id, title, path, mime }) => ({ id, title, path, src: path, mime })),
+    credits: creditsData,
+    rights: stripFiles(project.rights),
+    edition: editionData,
+    authenticity,
+    technical: technicalData,
+    resources: resourcesData,
+    games: play.games || [],
+  });
+  const historyData = buildReleaseHistory({
+    release: manifest.release,
+    edition: editionData,
+    provenance: provenanceData,
+    tracks: trackRecords,
+    packaged_at: now,
+  });
+  zip.file('archive.json', JSON.stringify(archiveData, null, 2));
+  zip.file('history.json', JSON.stringify(historyData, null, 2));
   zip.file('manifest.json', JSON.stringify(manifest, null, 2));
 
   const legacyIdentity = {
@@ -456,6 +486,8 @@ export async function buildPackage(input) {
     notes,
     releasePlayback,
     journey: runtimeJourney,
+    archive: archiveData,
+    history: historyData,
   });
   zip.file('experience.html', experienceHTML);
 

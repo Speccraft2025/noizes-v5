@@ -84,6 +84,15 @@
     if (!r.edition_size) return null;
     return r.edition_size - (r.acquired_count ?? 0);
   }
+
+  function formatType(value) {
+    return String(value || 'release').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  function duration(ms) {
+    const minutes = Math.round((Number(ms) || 0) / 60000);
+    return minutes ? `${minutes} min` : '';
+  }
 </script>
 
 <div class="max-w-7xl mx-auto px-6 py-8">
@@ -114,7 +123,7 @@
             <p class="text-xs font-bold uppercase tracking-widest" style="color: {color};">{item.artist_name}</p>
             <h3 class="text-lg font-black text-white">{item.title}</h3>
             <p class="text-xs mt-1 mb-4" style="color: var(--ink-muted);">
-              {item.edition_type}{item.edition_number ? ` #${item.edition_number}` : ''}{item.edition_size ? ` / ${item.edition_size}` : ''}
+              {formatType(item.release_type)} · {item.track_count || 1} track{item.track_count === 1 ? '' : 's'} · {item.edition_name || item.edition_type}{item.edition_number ? ` #${item.edition_number}` : ''}{item.edition_size ? ` / ${item.edition_size}` : ''}
             </p>
             <div class="flex gap-2">
               <label class="sr-only" for={`offer-${item.acquisition_id}`}>Offer amount in {item.currency}</label>
@@ -158,7 +167,10 @@
               <div class="p-4 flex items-center justify-between">
                 <div>
                   <p class="text-xs font-semibold" style="color: var(--ink-muted);">
-                    {ed.edition_type} · {available(ed) !== null ? `${available(ed)} left` : '∞'}
+                    {formatType(ed.release_type)} · {ed.track_count || 1} track{ed.track_count === 1 ? '' : 's'}{duration(ed.total_duration_ms) ? ` · ${duration(ed.total_duration_ms)}` : ''}
+                  </p>
+                  <p class="text-[10px] mt-1" style="color: var(--ink-muted);">
+                    {ed.edition_name || ed.edition_type} · {available(ed) !== null ? `${available(ed)} left` : 'Open edition'}
                   </p>
                 </div>
                 <div class="flex items-center gap-3">
@@ -200,7 +212,10 @@
               <div class="flex-1 min-w-0">
                 <p class="text-xs font-bold uppercase tracking-widest truncate" style="color: {color};">{ed.artist_name}</p>
                 <h3 class="text-sm font-black text-white leading-snug truncate">{ed.title}</h3>
-                <p class="text-xs mt-0.5 truncate" style="color: var(--ink-muted);">{ed.genre ?? ''}{ed.location ? ` · ${ed.location}` : ''}</p>
+                <p class="text-xs mt-0.5 truncate" style="color: var(--ink-muted);">{formatType(ed.release_type)} · {ed.track_count || 1} track{ed.track_count === 1 ? '' : 's'}{ed.disc_count > 1 ? ` · ${ed.disc_count} discs` : ''}{ed.explicit ? ' · Explicit' : ''}</p>
+                {#if ed.tracks?.length}
+                  <p class="text-[10px] mt-1 truncate" style="color:var(--ink-muted);">{ed.tracks.filter((track) => !track.hidden).slice(0, 3).map((track) => track.title).join(' · ')}</p>
+                {/if}
               </div>
 
               <div class="shrink-0 text-right">
@@ -215,7 +230,7 @@
             </div>
 
             <div class="flex items-center gap-3 mt-2.5 ml-11 pl-3" style="border-left: 1px solid var(--border-dim);">
-              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(255,255,255,0.04); color: var(--ink-muted);">{ed.edition_type}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(255,255,255,0.04); color: var(--ink-muted);">{ed.edition_name || ed.edition_type}</span>
               {#if avail !== null}
                 <span class="text-xs" style="color: var(--ink-muted);">{avail}/{ed.edition_size} left</span>
               {:else}

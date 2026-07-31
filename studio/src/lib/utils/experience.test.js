@@ -136,6 +136,14 @@ describe('template ↔ catalog contract', () => {
     expect(ULTRA_HTML).toContain('synchronizeTrackJourney');
   });
 
+  it('ships distinct Archive and release-copy History object spaces', () => {
+    expect(ULTRA_HTML).toContain('id="view-archive"');
+    expect(ULTRA_HTML).toContain('id="view-history"');
+    expect(ULTRA_HTML).toContain('window.NZ_ARCHIVE=');
+    expect(ULTRA_HTML).toContain('window.NZ_HISTORY=');
+    expect(ULTRA_HTML).toContain('never become separate ownership chains');
+  });
+
   it('keeps every generated inline script syntactically valid', () => {
     const html = buildExperienceHTML({ ...base, play: { games: ['pulse'] } });
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);

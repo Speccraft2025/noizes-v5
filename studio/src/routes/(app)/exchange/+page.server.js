@@ -7,7 +7,14 @@ export async function load({ locals }) {
 
   const { data: releases } = await sb
     .from('releases')
-    .select('id, artist_name, title, genre, year, location, edition_type, edition_size, price, currency, acquired_count, votes, cover_path, status')
+    .select(`
+      id, artist_name, title, genre, year, location,
+      release_type, track_count, disc_count, total_duration_ms,
+      featured_artists, compilation_artists, explicit, package_size,
+      edition_type, edition_name, edition_size, price, currency,
+      acquired_count, votes, cover_path, status,
+      tracks (id, position, disc_number, track_number, title, primary_artist, featured_artists, explicit, hidden)
+    `)
     .eq('status', 'published')
     .order('votes', { ascending: false });
 
@@ -22,7 +29,7 @@ export async function load({ locals }) {
   });
   const { data: resaleRows } = await admin
     .from('acquisitions')
-    .select('id, edition_number, currency, releases(id, artist_name, title, edition_type, edition_size, cover_path)')
+    .select('id, edition_number, currency, releases(id, artist_name, title, release_type, track_count, disc_count, edition_type, edition_name, edition_size, cover_path)')
     .eq('accepting_offers', true)
     .order('acquired_at', { ascending: false })
     .limit(50);
@@ -33,7 +40,11 @@ export async function load({ locals }) {
     release_id: row.releases?.id,
     artist_name: row.releases?.artist_name ?? '',
     title: row.releases?.title ?? '',
+    release_type: row.releases?.release_type ?? 'single',
+    track_count: row.releases?.track_count ?? 0,
+    disc_count: row.releases?.disc_count ?? 1,
     edition_type: row.releases?.edition_type ?? '',
+    edition_name: row.releases?.edition_name ?? '',
     edition_size: row.releases?.edition_size ?? null,
   }));
 

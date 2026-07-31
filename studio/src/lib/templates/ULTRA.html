@@ -336,6 +336,44 @@ html,body{
 .release-track .state{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.15em;}
 .release-track.active{background:linear-gradient(90deg,color-mix(in srgb,var(--primary) 13%,transparent),transparent);}
 .release-track.active .state{color:var(--primary);}
+
+/* ═══════════════════════════════
+   ARCHIVE + RELEASE-COPY HISTORY
+   ═══════════════════════════════ */
+#view-archive,#view-history{padding:calc(var(--safe-t) + 78px) clamp(20px,5vw,64px) 90px;}
+.object-space{max-width:1060px;margin:0 auto;}.object-space-head{margin-bottom:28px;}
+.object-space-head .eyebrow{font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--primary);}
+.object-space-head h2{font-size:clamp(42px,9vw,86px);font-weight:300;letter-spacing:-.045em;line-height:.95;margin-top:7px;}
+.object-space-head p{font-size:13px;color:var(--muted);line-height:1.6;max-width:68ch;margin-top:12px;}
+.archive-nav{display:flex;gap:7px;overflow-x:auto;padding:2px 0 14px;margin-bottom:18px;scrollbar-width:none;}
+.archive-nav::-webkit-scrollbar{display:none}.archive-nav button{border:1px solid var(--border);background:rgba(255,255,255,.035);color:var(--muted);
+  border-radius:99px;padding:9px 13px;font:600 10px/1 inherit;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;cursor:pointer;}
+.archive-nav button.active{color:#fff;border-color:var(--primary);background:color-mix(in srgb,var(--primary) 16%,transparent);}
+.archive-panel{border-top:1px solid var(--border);padding-top:22px;min-height:260px;}
+.archive-title{font-size:clamp(26px,5vw,44px);font-weight:400;letter-spacing:-.03em;margin-bottom:8px;}.archive-copy{font-size:13px;color:var(--muted);line-height:1.65;max-width:72ch;}
+.archive-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:20px;}
+.archive-card{border:1px solid var(--border);background:rgba(255,255,255,.025);border-radius:15px;padding:15px;min-width:0;}
+.archive-card .label{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--primary);margin-bottom:6px;}
+.archive-card .value{font-size:14px;color:#fff;line-height:1.45;word-break:break-word;}.archive-card .sub{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.45;}
+.archive-track{width:100%;display:grid;grid-template-columns:50px minmax(0,1fr) auto;gap:12px;align-items:center;padding:15px 3px;border:0;border-bottom:1px solid var(--border);background:transparent;color:#fff;text-align:left;font-family:inherit;cursor:pointer;}
+.archive-track .num{font:10px/1 monospace;color:var(--primary)}.archive-track .name{font-size:18px}.archive-track .artist{font-size:10px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.1em;}
+.archive-track .tags{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;}.archive-back{border:0;background:transparent;color:var(--primary);font:600 11px/1 inherit;padding:0 0 18px;cursor:pointer;}
+.archive-group{margin-top:22px}.archive-group h4{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:9px;}
+.archive-record{display:grid;grid-template-columns:minmax(120px,.35fr) 1fr;gap:16px;border-bottom:1px solid var(--border);padding:11px 0;font-size:12px;}
+.archive-record .key{color:var(--muted);text-transform:capitalize}.archive-record .data{color:#fff;word-break:break-word;white-space:pre-wrap;}
+.asset-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);}
+.asset-row .asset-name{font-size:13px;color:#fff}.asset-row .asset-meta{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;}
+.asset-row a{color:var(--primary);text-decoration:none;border:1px solid color-mix(in srgb,var(--primary) 45%,transparent);padding:7px 11px;border-radius:99px;font-size:10px;}
+.json-record{font:11px/1.6 monospace;color:rgba(255,255,255,.7);white-space:pre-wrap;word-break:break-word;border:1px solid var(--border);background:rgba(0,0,0,.22);border-radius:14px;padding:16px;margin-top:14px;}
+.history-identity{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;padding:22px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.history-work{font-size:clamp(27px,6vw,54px);font-weight:400;letter-spacing:-.035em}.history-edition{text-align:right;font-size:11px;color:var(--muted);line-height:1.8;text-transform:uppercase;letter-spacing:.12em;}
+.history-policy{margin:18px 0 26px;border-left:2px solid var(--primary);padding:4px 0 4px 15px;color:var(--muted);font-size:12px;line-height:1.6;max-width:72ch;}
+.history-section{margin-top:30px}.history-section h3{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--primary);margin-bottom:13px;}
+.history-event{display:grid;grid-template-columns:22px minmax(0,1fr);gap:13px;position:relative;padding:0 0 20px;}.history-event:before{content:'';position:absolute;left:6px;top:13px;bottom:-2px;width:1px;background:var(--border);}.history-event:last-child:before{display:none;}
+.history-dot{width:13px;height:13px;border:2px solid var(--primary);border-radius:50%;margin-top:2px;background:var(--bg);z-index:1;}.history-event-title{font-size:14px;color:#fff;text-transform:capitalize}.history-event-meta{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.5;}
+.collector-note{width:100%;min-height:100px;resize:vertical;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.025);color:#fff;padding:14px;font:13px/1.6 inherit;outline:none;}.collector-note:focus{border-color:var(--primary);}
+.note-status{font-size:10px;color:var(--muted);margin-top:8px;}
+@media(max-width:600px){.history-identity{grid-template-columns:1fr}.history-edition{text-align:left}.archive-record{grid-template-columns:1fr;gap:4px}.archive-track{grid-template-columns:42px minmax(0,1fr)}.archive-track .tags{grid-column:2}}
 .games-header h2{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--text);}
 .games-header p{font-size:11px;color:var(--muted);margin:2px 0 18px;}
 .games-grid{display:grid;grid-template-columns:1fr;gap:10px;max-width:520px;}
@@ -479,6 +517,31 @@ html,body{
   <div class="notes-wall" id="notes-wall"></div>
 </div>
 
+<!-- ── ARCHIVE ── -->
+<div class="view" id="view-archive">
+  <div class="object-space">
+    <header class="object-space-head">
+      <div class="eyebrow">The package preserves</div>
+      <h2>Archive</h2>
+      <p>Release context, track records, alternate versions, artwork, documents, rights and technical evidence—kept as distinct parts of the object.</p>
+    </header>
+    <nav class="archive-nav" id="archive-nav" aria-label="Archive sections"></nav>
+    <main class="archive-panel" id="archive-panel"></main>
+  </div>
+</div>
+
+<!-- ── HISTORY ── -->
+<div class="view" id="view-history">
+  <div class="object-space" id="history-space">
+    <header class="object-space-head">
+      <div class="eyebrow">The authenticated copy accumulates</div>
+      <h2>History</h2>
+      <p>Ownership and transfer provenance belongs to this complete release copy. Track creation records remain informational and never become separate ownership chains.</p>
+    </header>
+    <div id="history-content"></div>
+  </div>
+</div>
+
 <!-- ── GUIDE (authored journey) ── -->
 <style>
 .entry-gate{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;
@@ -546,6 +609,7 @@ html,body{
 .journey-moment{position:fixed;z-index:58;left:50%;bottom:clamp(34px,9vh,92px);width:min(680px,calc(100% - 36px));
   transform:translate(-50%,24px);opacity:0;pointer-events:none;transition:opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1);}
 .journey-moment.show{opacity:1;transform:translate(-50%,0);}
+.journey-moment.show.actionable{pointer-events:auto;}
 .journey-moment-card{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;padding:18px 20px;border-radius:20px;
   background:linear-gradient(120deg,rgba(6,5,12,.88),rgba(20,13,38,.72));border:1px solid rgba(255,255,255,.15);
   box-shadow:0 26px 90px rgba(0,0,0,.55);backdrop-filter:blur(26px) saturate(1.3);-webkit-backdrop-filter:blur(26px) saturate(1.3);}
@@ -553,6 +617,7 @@ html,body{
 .journey-moment-copy{min-width:0}.journey-moment-kicker{font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--primary);margin-bottom:5px;}
 .journey-moment-title{font-size:clamp(20px,4vw,30px);line-height:1.05;font-weight:500;letter-spacing:-.025em;}
 .journey-moment-body{font-size:12px;line-height:1.55;color:var(--muted);margin-top:7px;max-width:58ch;}
+.journey-moment-action{display:none;margin-top:11px;border:1px solid var(--primary);background:transparent;color:var(--primary);border-radius:99px;padding:7px 12px;font:600 10px/1 inherit;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;}
 .journey-moment[data-effect="soft_glow"] .journey-moment-card{box-shadow:0 0 80px color-mix(in srgb,var(--primary) 26%,transparent);}
 .journey-moment[data-effect="cover_bloom"] .journey-moment-card{animation:momentBloom 3s ease both;}
 .journey-moment[data-effect="slow_drift"] .journey-moment-card{animation:momentDrift 5s ease-in-out both;}
@@ -586,6 +651,8 @@ html,body{
     <button class="world-link" id="menu-guide"><span class="index">04</span>Guided tour</button>
     <button class="world-link" id="menu-games" data-menu-view="view-games" hidden><span class="index">05</span>Games</button>
     <button class="world-link" id="menu-notes" data-menu-view="view-notes" hidden><span class="index">06</span>Note wall</button>
+    <button class="world-link" id="menu-archive" data-menu-view="view-archive" hidden><span class="index">07</span>Archive</button>
+    <button class="world-link" id="menu-history" data-menu-view="view-history" hidden><span class="index">08</span>History</button>
   </div>
   <div class="guide-route" id="guide-route">
     <div class="guide-route-title">Artist-authored route</div>
@@ -606,6 +673,7 @@ html,body{
       <div class="journey-moment-kicker" id="journey-moment-kicker"></div>
       <div class="journey-moment-title" id="journey-moment-title"></div>
       <div class="journey-moment-body" id="journey-moment-body"></div>
+      <button class="journey-moment-action" id="journey-moment-action" type="button"></button>
     </div>
   </div>
 </aside>
@@ -706,6 +774,91 @@ if(Array.isArray(C.tracks) && C.tracks.length > 1){
     actions.appendChild(open); actions.appendChild(save);
     paper.appendChild(num); paper.appendChild(title); paper.appendChild(actions); wall.appendChild(paper);
   });
+})();
+
+// Archive is a structured record, not a flat downloads drawer.
+(function(){
+  var archive=C.archive;if(!archive)return;
+  document.getElementById('menu-archive').hidden=false;
+  var nav=document.getElementById('archive-nav');var panel=document.getElementById('archive-panel');
+  var LABELS={overview:'Overview',tracklist:'Tracklist',artwork:'Artwork',booklet:'Booklet',images:'Images',video:'Video',notes:'Notes',credits:'Credits',rights:'Rights',edition:'Edition',authenticity:'Authenticity',technical:'Technical',package_contents:'Package contents',online_resources:'Online resources',games:'Games'};
+  function node(tag,className,text){var element=document.createElement(tag);if(className)element.className=className;if(text!==undefined&&text!==null)element.textContent=String(text);return element;}
+  function title(text,copy){var heading=node('h3','archive-title',text);panel.appendChild(heading);if(copy)panel.appendChild(node('p','archive-copy',copy));}
+  function human(value){return String(value||'').replace(/_/g,' ');}
+  function bytes(value){var size=Number(value)||0;if(size<1024)return size+' B';if(size<1048576)return(size/1024).toFixed(1)+' KB';if(size<1073741824)return(size/1048576).toFixed(1)+' MB';return(size/1073741824).toFixed(2)+' GB';}
+  function display(value){if(value===null||value===undefined||value==='')return '—';if(Array.isArray(value))return value.length?value.join(', '):'—';if(typeof value==='object')return JSON.stringify(value,null,2);return String(value);}
+  function record(key,value,parent){
+    var row=node('div','archive-record');row.appendChild(node('div','key',human(key)));row.appendChild(node('div','data',display(value)));(parent||panel).appendChild(row);
+  }
+  function card(label,value,sub){var item=node('article','archive-card');item.appendChild(node('div','label',label));item.appendChild(node('div','value',display(value)));if(sub)item.appendChild(node('div','sub',sub));return item;}
+  function assetRows(items,parent){
+    if(!items||!items.length){parent.appendChild(node('p','archive-copy','Nothing was included in this section.'));return;}
+    items.forEach(function(asset){
+      var row=node('div','asset-row');var info=node('div');info.appendChild(node('div','asset-name',asset.title||asset.filename||human(asset.role)||'Component'));
+      info.appendChild(node('div','asset-meta',[human(asset.role),asset.mime,bytes(asset.size)].filter(Boolean).join(' · ')));row.appendChild(info);
+      if(asset.path){var link=node('a','',asset.type==='audio'?'Open audio':'Open');link.href=asset.path;link.target='_blank';link.rel='noopener';row.appendChild(link);}parent.appendChild(row);
+    });
+  }
+  function renderTrack(track){
+    panel.innerHTML='';var back=node('button','archive-back','← Tracklist');back.addEventListener('click',function(){render('tracklist');});panel.appendChild(back);
+    title(track.title||'Untitled track',[track.primary_artist,(track.featured_artists||[]).length?'feat. '+track.featured_artists.join(', '):''].filter(Boolean).join(' · '));
+    var identity=node('div','archive-grid');identity.appendChild(card('Sequence','Disc '+track.disc_number+' · Track '+track.track_number));identity.appendChild(card('ISRC',track.isrc||'Not supplied'));
+    identity.appendChild(card('Status',[track.explicit?'Explicit':'',track.bonus?'Bonus':'',track.hidden?'Hidden track':''].filter(Boolean).join(' · ')||'Standard track'));
+    identity.appendChild(card('Writers',(track.writers||[]).join(', ')||'Not supplied'));panel.appendChild(identity);
+    if(track.description){var group=node('section','archive-group');group.appendChild(node('h4','', 'Track notes'));group.appendChild(node('p','archive-copy',track.description));panel.appendChild(group);}
+    var audioGroup=node('section','archive-group');audioGroup.appendChild(node('h4','','Audio records'));
+    if(track.primary_audio)assetRows([track.primary_audio],audioGroup);
+    var groups={};(track.audio_versions||[]).filter(function(version){return!version.is_primary;}).forEach(function(version){(groups[version.group]||(groups[version.group]=[])).push(version);});
+    Object.keys(groups).forEach(function(groupName){audioGroup.appendChild(node('h4','',groupName));groups[groupName].forEach(function(version){if(version.component)assetRows([version.component],audioGroup);else record(version.title,version.notes||version.role,audioGroup);});});
+    panel.appendChild(audioGroup);
+    var lyric=track.lyrics||{};var lyricGroup=node('section','archive-group');lyricGroup.appendChild(node('h4','','Lyrics'));
+    lyricGroup.appendChild(node('p','archive-copy',lyric.instrumental?'Explicitly marked instrumental':lyric.spoken_word?'Spoken word':lyric.plain_text||((lyric.timed_lines||[]).length+' synchronized lines')));panel.appendChild(lyricGroup);
+    [['Artwork',track.artwork],['Images',track.images],['Video',track.video],['Related documents',track.documents]].forEach(function(pair){if(pair[1]&&pair[1].length){var group=node('section','archive-group');group.appendChild(node('h4','',pair[0]));assetRows(pair[1],group);panel.appendChild(group);}});
+    [['Credits',track.credits],['Rights',track.rights],['Technical data',track.technical]].forEach(function(pair){var group=node('section','archive-group');group.appendChild(node('h4','',pair[0]));group.appendChild(node('pre','json-record',JSON.stringify(pair[1]||{},null,2)));panel.appendChild(group);});
+  }
+  function releaseAssetsFor(section){var assets=archive.release_assets||{};if(section==='artwork')return assets.artwork||[];if(section==='booklet')return(assets.artwork||[]).filter(function(asset){return asset.role==='booklet_artwork';});if(section==='images')return assets.images||[];if(section==='video')return assets.video||[];return[];}
+  function render(section){
+    panel.innerHTML='';Array.prototype.forEach.call(nav.children,function(button){button.classList.toggle('active',button.dataset.section===section);});
+    if(section==='overview'){
+      var overview=archive.overview||{};title(overview.title||C.title,overview.description||'The complete release record.');var grid=node('div','archive-grid');
+      grid.appendChild(card('Primary artist',overview.primary_artist||C.artist));grid.appendChild(card('Format',human(overview.release_type||'release')));grid.appendChild(card('Structure',(overview.track_count||0)+' tracks · '+(overview.disc_count||1)+' disc'+((overview.disc_count||1)===1?'':'s')));grid.appendChild(card('Date',overview.release_date||overview.year||C.year));grid.appendChild(card('Label',overview.label||'Independent'));grid.appendChild(card('Catalogue',overview.catalogue_number||'Not supplied'));panel.appendChild(grid);return;
+    }
+    if(section==='tracklist'){
+      title('Tracklist','Select a track to inspect its object record, alternate audio, lyrics, rights and technical data.');
+      (archive.tracks||[]).forEach(function(track){var row=node('button','archive-track');row.appendChild(node('span','num',track.disc_number+'.'+String(track.track_number).padStart(2,'0')));var identity=node('span');identity.appendChild(node('span','name',track.title||'Untitled'));identity.appendChild(node('span','artist',track.primary_artist||''));row.appendChild(identity);row.appendChild(node('span','tags',[track.hidden?'Hidden':'',track.bonus?'Bonus':'',track.explicit?'Explicit':''].filter(Boolean).join(' · ')||'Track record'));row.addEventListener('click',function(){renderTrack(track);});panel.appendChild(row);});return;
+    }
+    if(['artwork','booklet','images','video'].indexOf(section)!==-1){title(LABELS[section],'Release-level material. Track-specific media remains inside each track record.');assetRows(releaseAssetsFor(section),panel);return;}
+    if(section==='notes'){title('Notes','Release notes and documents affixed to this package.');assetRows((archive.notes||[]).map(function(note){return{title:note.title,path:note.path||note.src,type:'document',role:'notes',mime:note.mime};}),panel);return;}
+    if(section==='package_contents'){title('Package contents','The authoritative component inventory with size and checksum evidence.');assetRows(archive.package_contents||[],panel);return;}
+    if(section==='online_resources'){title('Online resources','Optional links require an internet connection; the package itself does not.');var groups=(archive.online_resources&&archive.online_resources.groups)||[];groups.forEach(function(group){var wrap=node('section','archive-group');wrap.appendChild(node('h4','',group.label||'Links'));(group.links||[]).forEach(function(item){var row=node('div','asset-row');row.appendChild(node('div','asset-name',item.label));var link=node('a','', 'Visit');link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';row.appendChild(link);wrap.appendChild(row);});panel.appendChild(wrap);});if(!groups.length)panel.appendChild(node('p','archive-copy','No online resources supplied.'));return;}
+    if(section==='games'){title('Games','Interactive works included by the artist.');var gameGrid=node('div','archive-grid');(archive.games||[]).forEach(function(game){gameGrid.appendChild(card('Interactive',human(game)));});panel.appendChild(gameGrid);return;}
+    var records={credits:archive.credits,rights:archive.rights,edition:archive.edition,authenticity:archive.authenticity,technical:archive.technical};
+    title(LABELS[section]||human(section),section==='authenticity'?'Checksums describe the packaged bytes; signature status is stated exactly as recorded.':'Structured release-level documentation.');panel.appendChild(node('pre','json-record',JSON.stringify(records[section]||{},null,2)));
+  }
+  var available=(archive.sections||[]).filter(function(section){
+    if(['artwork','booklet','images','video'].indexOf(section)!==-1)return releaseAssetsFor(section).length>0;
+    if(section==='notes')return(archive.notes||[]).length>0;if(section==='online_resources')return !!(archive.online_resources&&archive.online_resources.groups&&archive.online_resources.groups.length);if(section==='games')return(archive.games||[]).length>0;return true;
+  });
+  available.forEach(function(section){var button=node('button','',LABELS[section]||human(section));button.dataset.section=section;button.addEventListener('click',function(){render(section);});nav.appendChild(button);});render('overview');
+  window.NZ_ARCHIVE={open:function(section){render(section||'overview');switchView('view-archive');},openTrack:function(trackId){var track=(archive.tracks||[]).find(function(item){return item.track_id===trackId;});if(track){renderTrack(track);switchView('view-archive');}},data:archive};
+})();
+
+// History belongs to the authenticated release edition copy. Track events are
+// shown as production context and never as miniature ownership ledgers.
+(function(){
+  var history=C.history;if(!history)return;
+  document.getElementById('menu-history').hidden=false;var root=document.getElementById('history-content');
+  function node(tag,className,text){var element=document.createElement(tag);if(className)element.className=className;if(text!==undefined&&text!==null)element.textContent=String(text);return element;}
+  var identity=node('section','history-identity');var work=node('div');work.appendChild(node('div','history-work',(history.release&&history.release.title)||C.title));work.appendChild(node('div','archive-copy',(history.release&&history.release.primary_artist)||C.artist));identity.appendChild(work);
+  var edition=history.edition||{};var copy=history.copy||{};var editionCopy=node('div','history-edition');editionCopy.appendChild(node('div','',edition.edition_name||'Edition'));editionCopy.appendChild(node('div','',copy.copy_number?'Copy '+copy.copy_number+(edition.edition_size?' of '+edition.edition_size:''):(copy.current_identity||'Open copy')));identity.appendChild(editionCopy);root.appendChild(identity);
+  root.appendChild(node('p','history-policy',history.ownership_policy||'Ownership provenance applies to the complete release copy.'));
+  function section(label){var wrap=node('section','history-section');wrap.appendChild(node('h3','',label));root.appendChild(wrap);return wrap;}
+  function eventRow(event,fallback){var row=node('div','history-event');row.appendChild(node('span','history-dot'));var copyWrap=node('div');copyWrap.appendChild(node('div','history-event-title',event.kind||fallback));copyWrap.appendChild(node('div','history-event-meta',[event.occurred_at||event.at||event.date,event.note,event.price&&((event.currency||'')+' '+event.price)].filter(Boolean).join(' · ')||'Recorded in the offline package snapshot.'));row.appendChild(copyWrap);return row;}
+  var ownership=section('Release-copy provenance');var events=history.ownership_history||[];if(events.length)events.forEach(function(event){ownership.appendChild(eventRow(event,'Provenance event'));});else ownership.appendChild(eventRow({kind:'Package created',occurred_at:history.offline_snapshot&&history.offline_snapshot.packaged_at},'Package created'));
+  var creation=section('Track creation history');(history.track_creation_history||[]).forEach(function(track){var card=node('article','archive-card');card.appendChild(node('div','label','Informational work history'));card.appendChild(node('div','value',track.title||'Untitled track'));if((track.events||[]).length)(track.events||[]).forEach(function(event){card.appendChild(node('div','sub',[event.kind,event.date||event.at,event.note].filter(Boolean).join(' · ')));});else card.appendChild(node('div','sub','No production events supplied. This does not affect release-copy ownership.'));creation.appendChild(card);});
+  var noteSection=section('Collector note in this offline viewer');var textarea=node('textarea','collector-note');textarea.maxLength=1000;textarea.placeholder='What did this complete release object mean to you?';var noteKey='nz-collector-note:'+((history.release&&history.release.release_id)||C.releaseId)+':'+(edition.edition_id||edition.edition_name||'edition')+':'+(copy.copy_id||'open-copy');try{textarea.value=localStorage.getItem(noteKey)||(history.collector_note&&history.collector_note.body)||'';}catch(ignore){}noteSection.appendChild(textarea);var status=node('div','note-status','Saved only in this browser until a platform stewardship note is recorded.');noteSection.appendChild(status);textarea.addEventListener('input',function(){try{localStorage.setItem(noteKey,textarea.value);status.textContent='Saved locally · '+new Date().toLocaleTimeString();}catch(ignore){status.textContent='Local storage is unavailable; the note will last for this session only.';}});
+  var snapshot=section('Offline snapshot');var snapshotGrid=node('div','archive-grid');snapshotGrid.appendChild((function(){var c=node('article','archive-card');c.appendChild(node('div','label','Packaged'));c.appendChild(node('div','value',(history.offline_snapshot&&history.offline_snapshot.packaged_at)||'Not supplied'));return c;})());snapshotGrid.appendChild((function(){var c=node('article','archive-card');c.appendChild(node('div','label','Provenance events'));c.appendChild(node('div','value',(history.offline_snapshot&&history.offline_snapshot.provenance_event_count)||0));return c;})());snapshot.appendChild(snapshotGrid);
+  window.NZ_HISTORY={open:function(){switchView('view-history');},data:history,noteKey:noteKey};
 })();
 
 // ── COVER ART ──
@@ -925,6 +1078,9 @@ function showNextJourneyMoment(){
   var body=document.getElementById('journey-moment-body');body.textContent=moment.body||'';body.style.display=moment.body?'':'none';
   var image=document.getElementById('journey-moment-image');var imageSrc=moment.asset_src||'';
   if(imageSrc){image.src=imageSrc;image.style.display='block';}else{image.removeAttribute('src');image.style.display='none';}
+  var action=document.getElementById('journey-moment-action');var destination=moment.type==='archive_invitation'?'archive':moment.type==='history_invitation'?'history':'';
+  action.style.display=destination?'inline-block':'none';action.textContent=destination==='archive'?'Explore Archive':'View History';host.classList.toggle('actionable',!!destination);
+  action.onclick=function(){if(destination==='archive'&&window.NZ_ARCHIVE)window.NZ_ARCHIVE.open();if(destination==='history'&&window.NZ_HISTORY)window.NZ_HISTORY.open();host.classList.remove('show');};
   host.dataset.effect=moment.effect||'none';host.classList.add('show');journeyMomentShowing=true;
   window.clearTimeout(journeyMomentTimer);
   journeyMomentTimer=window.setTimeout(function(){

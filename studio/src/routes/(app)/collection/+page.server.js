@@ -14,7 +14,10 @@ export async function load({ locals }) {
       accepting_offers,
       releases (
         id, artist_name, title, genre, year, location,
-        edition_type, edition_size, cover_path
+        release_type, track_count, disc_count, total_duration_ms,
+        compilation_artists, explicit, package_size,
+        edition_type, edition_name, edition_size, cover_path,
+        tracks (id, position, disc_number, track_number, title, primary_artist, hidden)
       )
     `)
     .eq('owner_id', userId)
@@ -58,7 +61,16 @@ export async function load({ locals }) {
       genre: a.releases?.genre ?? '',
       year: a.releases?.year ?? '',
       location: a.releases?.location ?? '',
+      release_type: a.releases?.release_type ?? 'single',
+      track_count: a.releases?.track_count ?? 0,
+      disc_count: a.releases?.disc_count ?? 1,
+      total_duration_ms: a.releases?.total_duration_ms ?? 0,
+      compilation_artists: a.releases?.compilation_artists ?? [],
+      explicit: Boolean(a.releases?.explicit),
+      package_size: a.releases?.package_size ?? 0,
+      tracklist: (a.releases?.tracks ?? []).sort((left, right) => left.position - right.position),
       edition_type: a.releases?.edition_type ?? '',
+      edition_name: a.releases?.edition_name ?? '',
       edition_size: a.releases?.edition_size ?? null,
       edition_number: a.edition_number,
       release_id: a.releases?.id,

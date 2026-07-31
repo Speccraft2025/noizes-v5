@@ -1,6 +1,6 @@
 <script>
-  import JSZip from 'jszip';
   import { onMount } from 'svelte';
+  import { prepareNzForViewer } from '$lib/utils/viewer.js';
 
   let dragging = false;
   let loading = false;
@@ -9,7 +9,10 @@
   let manifest = null;
   let filename = '';
   let iframeSrc = '';
+  let iframeEl;
   let blobUrls = [];
+  let validationResult = null;
+  let storageKeys = null;
 
   let showInstallBanner = false;
   let showInstallTip = false;
@@ -19,6 +22,20 @@
     const standalone = window.matchMedia('(display-mode: standalone)').matches
       || window.navigator.standalone === true;
     if (iOS && !standalone) showInstallBanner = true;
+    const handleStorageMessage = (event) => {
+      if (!iframeEl || event.source !== iframeEl.contentWindow) return;
+      const message = event.data;
+      if (!message || !['noizes:storage:set', 'noizes:storage:remove'].includes(message.type)) return;
+      if (![storageKeys?.resumeKey, storageKeys?.noteKey].includes(message.key)) return;
+      try {
+        if (message.type === 'noizes:storage:remove') localStorage.removeItem(message.key);
+        else if (typeof message.value === 'string') localStorage.setItem(message.key, message.value);
+      } catch {
+        // Playback remains functional when browser storage is unavailable.
+      }
+    };
+    window.addEventListener('message', handleStorageMessage);
+    return () => window.removeEventListener('message', handleStorageMessage);
   });
 
   function reset() {
@@ -29,6 +46,8 @@
     filename = '';
     error = '';
     iframeSrc = '';
+    validationResult = null;
+    storageKeys = null;
   }
 
   async function loadNZ(file) {
@@ -38,44 +57,12 @@
     filename = file.name;
 
     try {
-      const zip = await JSZip.loadAsync(file);
-
-      const manifestFile = zip.file('manifest.json');
-      if (manifestFile) {
-        try { manifest = JSON.parse(await manifestFile.async('string')); } catch {}
-      }
-
-      const expFile = zip.file('experience.html');
-      if (!expFile) {
-        error = 'No experience.html found. Is this a valid .nz file?';
-        loading = false;
-        return;
-      }
-      let html = await expFile.async('string');
-
-      // Patch audio to blob URLs so iOS can play them
-      const audioFiles = [];
-      zip.forEach((path, f) => {
-        if (path.startsWith('audio/') && !f.dir) audioFiles.push({ path, f });
-      });
-      for (const { path, f } of audioFiles) {
-        const buf = await f.async('arraybuffer');
-        const ext = path.split('.').pop().toLowerCase();
-        const mime = { mp3: 'audio/mpeg', flac: 'audio/flac', wav: 'audio/wav', aac: 'audio/aac', m4a: 'audio/mp4' }[ext] || 'audio/mpeg';
-        const blob = new Blob([buf], { type: mime });
-        const url = URL.createObjectURL(blob);
-        blobUrls.push(url);
-        const rel = path.replace('audio/', '');
-        // Patch HTML src attributes AND JSON string values in NZ_CONFIG
-        html = html.split(`src="audio/${rel}"`).join(`src="${url}"`);
-        html = html.split(`"audio/${rel}"`).join(`"${url}"`);
-      }
-
-      // Use blob URL for iframe — more compatible than srcdoc on iOS Safari
-      const htmlBlob = new Blob([html], { type: 'text/html' });
-      const htmlUrl = URL.createObjectURL(htmlBlob);
-      blobUrls.push(htmlUrl);
-      iframeSrc = htmlUrl;
+      const prepared = await prepareNzForViewer(file);
+      validationResult = prepared.validation;
+      manifest = prepared.manifest;
+      blobUrls = prepared.blobUrls;
+      iframeSrc = prepared.htmlUrl;
+      storageKeys = prepared.storageKeys;
       ready = true;
 
     } catch (e) {
@@ -110,13 +97,16 @@
         <span class="font-black text-sm tracking-tight text-white">NOIZES</span>
         <span class="text-xs font-mono px-2 py-0.5 rounded"
           style="background: rgba(123,92,240,0.12); color: #7B5CF0;">
-          {manifest?.title || filename}
+          {manifest?.release?.title || manifest?.title || filename}
+        </span>
+        <span class="text-[10px] font-mono px-2 py-0.5 rounded" style="background:rgba(74,222,128,.1);color:#4ade80;">
+          ✓ {validationResult?.format === 'legacy_single' ? 'Legacy Single normalized' : 'Components verified'}
         </span>
       </div>
       <div class="flex items-center gap-3">
-        {#if manifest?.artist}
+        {#if manifest?.release?.primary_artist || manifest?.artist}
           <span class="text-xs font-mono" style="color: #555;">
-            {manifest.artist}{manifest.year ? ' · ' + manifest.year : ''}
+            {manifest?.release?.primary_artist || manifest.artist}{(manifest?.release?.year || manifest?.year) ? ' · ' + (manifest?.release?.year || manifest.year) : ''}
           </span>
         {/if}
         <button on:click={reset}
@@ -127,10 +117,12 @@
       </div>
     </div>
     <iframe
+      bind:this={iframeEl}
       title="Noizes Experience"
       src={iframeSrc}
       class="flex-1 border-0 w-full"
       allow="autoplay"
+      sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
     ></iframe>
   </div>
 

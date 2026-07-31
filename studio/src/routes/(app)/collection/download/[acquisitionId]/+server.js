@@ -18,7 +18,7 @@ export async function GET({ params, locals }) {
   const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: acq } = await sb
     .from('acquisitions')
-    .select('id, owner_id, edition_number, releases ( title, artist_name, nz_path )')
+    .select('id, owner_id, edition_number, acquired_at, releases ( id, title, artist_name, release_type, nz_path, edition_name, edition_size )')
     .eq('id', acquisitionId)
     .maybeSingle();
 
@@ -35,5 +35,42 @@ export async function GET({ params, locals }) {
   const { data } = sb.storage.from('releases').getPublicUrl(nzPath, { download: filename });
   if (!data?.publicUrl) throw error(500, 'Could not resolve download URL');
 
-  return json({ url: data.publicUrl, filename });
+  let eventQuery = sb.from('provenance_events')
+    .select('seq, kind, price, currency, note, occurred_at')
+    .eq('release_id', acq.releases.id)
+    .order('seq', { ascending: true });
+  eventQuery = acq.edition_number == null
+    ? eventQuery.is('edition_number', null)
+    : eventQuery.eq('edition_number', acq.edition_number);
+
+  const [{ data: events }, { data: note }] = await Promise.all([
+    eventQuery,
+    sb.from('collector_notes')
+      .select('body, status')
+      .eq('acquisition_id', acq.id)
+      .maybeSingle(),
+  ]);
+
+  return json({
+    url: data.publicUrl,
+    filename,
+    snapshot: {
+      copy_id: acq.id,
+      copy_number: acq.edition_number,
+      acquired_at: acq.acquired_at,
+      release: {
+        release_id: acq.releases.id,
+        title: acq.releases.title,
+        primary_artist: acq.releases.artist_name,
+        release_type: acq.releases.release_type || 'single',
+      },
+      edition: {
+        edition_name: acq.releases.edition_name || 'First Edition',
+        edition_size: acq.releases.edition_size,
+      },
+      events: events || [],
+      collector_note: note?.body || '',
+      generated_at: new Date().toISOString(),
+    },
+  });
 }

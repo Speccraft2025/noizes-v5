@@ -8,11 +8,12 @@ const ULTRA_THEME = { primary: '#7B5CF0', accent: '#F04BD8', bg: '#030303' };
 // from what the package actually contains, not a separate node-graph format.
 // The viewer shows it as a drawer; collectors may still explore freely.
 // `authored` lets a creator override the order and labels in Studio.
-export function buildGuide({ hasLyrics, hasPlay, story, authored }) {
+export function buildGuide({ hasLyrics, hasPlay, hasNotes, story, authored }) {
   if (authored && Array.isArray(authored.nodes) && authored.nodes.length) {
     const nodes = authored.nodes.filter((node) =>
       (node.id !== 'lyrics' || hasLyrics) &&
       (node.id !== 'play' || hasPlay) &&
+      (node.id !== 'notes' || hasNotes) &&
       (node.id !== 'story' || !!story)
     ).map((node) => node.id === 'story' ? { ...node, introduction: story } : node);
     if (nodes.length) {
@@ -26,13 +27,14 @@ export function buildGuide({ hasLyrics, hasPlay, story, authored }) {
   ];
   if (hasLyrics) nodes.push({ id: 'lyrics', type: 'lyrics', label: 'Lyrics', view: 'view-lyrics' });
   if (story) nodes.push({ id: 'story', type: 'narrative', label: 'Artist Statement', view: 'intro', introduction: story });
+  if (hasNotes) nodes.push({ id: 'notes', type: 'notes', label: 'Note Wall', view: 'view-notes' });
   if (hasPlay) nodes.push({ id: 'play', type: 'interactive', label: 'Play', view: 'view-games' });
   nodes.push({ id: 'record', type: 'record', label: 'Collector Record', view: 'intro' });
   nodes.push({ id: 'end', type: 'ending', label: 'End', view: 'view-player' });
   return { version: 1, allowFreeExplore: true, nodes };
 }
 
-export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template, play, guide, extras }) {
+export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template, play, guide, extras, notes = [], releasePlayback = null, journey = null, archive = null, history = null }) {
   // Template variants are archived; ULTRA is the single immersive player.
   const themeId = CANONICAL_TEMPLATE;
   const theme   = ULTRA_THEME;
@@ -46,13 +48,15 @@ export function buildExperienceHTML({ identity, edition, rights, audioBase64, au
       }
     : null;
 
-  const audioSrc = (audioBase64 && audioMime)
+  const audioSrc = releasePlayback?.tracks?.[0]?.src || ((audioBase64 && audioMime)
     ? `data:${audioMime};base64,${audioBase64}`
-    : null;
+    : null);
   const coverSrc = (coverBase64 && coverMime)
     ? `data:${coverMime};base64,${coverBase64}`
     : null;
 
+  const playbackTracks = Array.isArray(releasePlayback?.tracks) ? releasePlayback.tracks : [];
+  const hasReleaseLyrics = playbackTracks.some((track) => track.lyrics?.timed_lines?.length);
   const cfg = {
     artist:      identity.artist      || '',
     title:       identity.title       || '',
@@ -66,13 +70,31 @@ export function buildExperienceHTML({ identity, edition, rights, audioBase64, au
     template:    themeId,
     theme,
     features:    [
-      ...(lyrics && lyrics.length ? ['lyrics'] : []),
+      ...((lyrics && lyrics.length) || hasReleaseLyrics ? ['lyrics'] : []),
+      ...(playbackTracks.length > 1 ? ['tracklist'] : []),
       ...(playCfg ? ['play'] : []),
+      ...(notes.length ? ['notes'] : []),
     ],
     lyricOffset: 0,
     lyrics:      lyrics || [],
+    release:     releasePlayback?.release || null,
+    tracks:      playbackTracks,
+    playback:    releasePlayback?.playback || {
+      mode: 'sequential',
+      crossfade_ms: 1500,
+      allow_track_skip: true,
+      allow_seek: true,
+      allow_shuffle: false,
+      allow_repeat: true,
+      allow_archive_during_journey: true,
+      resume_enabled: true,
+    },
+    journey:     journey || { version: 1, release_moments: [], track_journeys: [], transitions: [] },
+    archive:     archive || null,
+    history:     history || null,
     play:        playCfg,
-    guide:       buildGuide({ hasLyrics: !!(lyrics && lyrics.length), hasPlay: !!playCfg, story: extras?.story?.trim(), authored: guide }),
+    notes,
+    guide:       buildGuide({ hasLyrics: !!(lyrics && lyrics.length) || hasReleaseLyrics, hasPlay: !!playCfg, hasNotes: !!notes.length, story: extras?.story?.trim(), authored: guide }),
     edition: {
       type:         edition.edition_type || 'Open Edition',
       name:         edition.edition_name || '',

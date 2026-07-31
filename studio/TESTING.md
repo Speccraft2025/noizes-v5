@@ -20,13 +20,15 @@ npx vitest        # watch mode
 ## Layers
 
 - **Unit (logic)** — `src/**/*.test.js` next to the module under test.
-  Current coverage: `experience.test.js` — play-block injection, config
-  replacement, theme application, and the template↔catalog contract (every
-  game the Studio offers must exist in the ULTRA template engine).
+  Current coverage includes release/track normalization and validation,
+  playback, Journey synchronization, Archive/History projections, package
+  sizing and integrity, viewer Blob resolution, package compilation, and the
+  template↔catalog contract.
 - **Component** — not set up yet; add `@testing-library/svelte` when a
   Svelte component needs behavioral tests.
-- **E2E** — manual for now (auth-gated app). Candidate: Playwright against
-  a seeded local Supabase.
+- **E2E** — browser smoke coverage is manual for the auth-gated Studio. `/open`
+  and the installed offline viewer should both be exercised with a normalized
+  `.nz`; publishing requires a seeded local Supabase.
 
 ## Conventions
 

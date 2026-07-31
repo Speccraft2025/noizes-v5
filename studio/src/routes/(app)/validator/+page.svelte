@@ -1,17 +1,14 @@
 <script>
   import JSZip from 'jszip';
+  import { sha256Hex, validateNzArchive } from '$lib/domain/package-validation.js';
 
   let dragging = false;
   let result = null;
   let filename = '';
 
-  const REQUIRED = ['manifest.json', 'edition.json', 'experience.html'];
-  const OPTIONAL = ['rights.json', 'credits.json', 'authenticity.json', 'technical.json'];
-
   async function validate(file) {
     filename = file.name;
     result = null;
-    const checks = [];
 
     try {
       if (file.name.toLowerCase().endsWith('.json')) {
@@ -19,78 +16,24 @@
         return;
       }
       const zip = await JSZip.loadAsync(file);
-      const files = Object.keys(zip.files);
-
-      for (const req of REQUIRED) {
-        const found = files.some(f => f === req || f.endsWith('/' + req));
-        checks.push({ label: req, status: found ? 'pass' : 'fail', note: found ? 'Present' : 'Missing — required' });
-      }
-      for (const opt of OPTIONAL) {
-        const found = files.some(f => f === opt || f.endsWith('/' + opt));
-        checks.push({ label: opt, status: found ? 'pass' : 'warn', note: found ? 'Present' : 'Missing — optional' });
-      }
-
-      const hasAudio = files.some(f => f.startsWith('audio/') && !zip.files[f].dir);
-      checks.push({ label: 'audio/ folder', status: hasAudio ? 'pass' : 'warn', note: hasAudio ? 'Audio file present' : 'No audio files' });
-
-      let manifest = null;
-      const mf = zip.file('manifest.json');
-      if (mf) {
-        try {
-          manifest = JSON.parse(await mf.async('string'));
-          const hasV = !!manifest.noizes_version;
-          checks.push({ label: 'noizes_version field', status: hasV ? 'pass' : 'fail', note: hasV ? manifest.noizes_version : 'Missing' });
-        } catch {
-          checks.push({ label: 'noizes_version field', status: 'fail', note: 'Invalid JSON' });
-        }
-      } else {
-        checks.push({ label: 'noizes_version field', status: 'fail', note: 'No manifest.json' });
-      }
-
-      // Authenticity: recompute the audio hash and verify the platform signature.
-      const af = zip.file('authenticity.json');
-      if (af) {
-        try {
-          const authenticity = JSON.parse(await af.async('string'));
-          const audioEntry = files.find(f => f.startsWith('audio/') && !zip.files[f].dir);
-
-          if (audioEntry && authenticity.hash) {
-            const audioBuf = await zip.files[audioEntry].async('arraybuffer');
-            const computedHash = await sha256Hex(audioBuf);
-            const match = computedHash === authenticity.hash;
-            checks.push({ label: 'audio hash matches authenticity.json', status: match ? 'pass' : 'fail', note: match ? 'sha256 verified' : 'Hash mismatch — audio may have been altered' });
-          } else if (authenticity.hash) {
-            checks.push({ label: 'audio hash matches authenticity.json', status: 'warn', note: 'No audio file to verify against' });
+      result = await validateNzArchive(zip, {
+        verifySignature: async (authenticity) => {
+          try {
+            const response = await fetch('/validator/verify', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                hash: authenticity.hash,
+                signature: authenticity.signature,
+                publicKey: authenticity.signer_public_key,
+              }),
+            });
+            return response.ok && (await response.json()).valid === true;
+          } catch {
+            return false;
           }
-
-          if (authenticity.signed) {
-            try {
-              const res = await fetch('/validator/verify', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({
-                  hash: authenticity.hash,
-                  signature: authenticity.signature,
-                  publicKey: authenticity.signer_public_key,
-                }),
-              });
-              const { valid } = await res.json();
-              checks.push({ label: 'platform signature', status: valid ? 'pass' : 'fail', note: valid ? 'Signature valid' : 'Signature invalid' });
-            } catch {
-              checks.push({ label: 'platform signature', status: 'warn', note: 'Could not reach verification service' });
-            }
-          } else {
-            checks.push({ label: 'platform signature', status: 'warn', note: 'Not signed (unpublished export)' });
-          }
-        } catch {
-          checks.push({ label: 'authenticity.json', status: 'fail', note: 'Invalid JSON' });
-        }
-      }
-
-      const passed = checks.filter(c => c.status === 'pass').length;
-      const failed = checks.filter(c => c.status === 'fail').length;
-      const warned = checks.filter(c => c.status === 'warn').length;
-      result = { valid: failed === 0, checks, manifest, summary: { passed, failed, warned } };
+        },
+      });
     } catch (e) {
       result = { valid: false, error: e.message, checks: [], manifest: null, summary: { passed: 0, failed: 1, warned: 0 } };
     }
@@ -145,11 +88,6 @@
     dragging = false;
     const file = e.dataTransfer?.files?.[0];
     if (file) validate(file);
-  }
-
-  async function sha256Hex(buffer) {
-    const digest = await crypto.subtle.digest('SHA-256', buffer);
-    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
   const statusStyle = {

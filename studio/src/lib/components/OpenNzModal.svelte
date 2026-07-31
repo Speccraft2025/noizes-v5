@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import JSZip from 'jszip';
 
   export let open = false;
   export let item = null;        // the collection item being opened
@@ -11,6 +12,40 @@
   let downloadState = 'idle';    // idle | downloading | done | error
   let downloadName = '';
   let downloadError = '';
+
+  function personalizedHistory(existing, snapshot) {
+    return {
+      ...(existing || {}),
+      scope: 'release_copy',
+      release: { ...(existing?.release || {}), ...snapshot.release },
+      edition: { ...(existing?.edition || {}), ...snapshot.edition, applies_to: 'release' },
+      copy: {
+        copy_id: snapshot.copy_id,
+        copy_number: snapshot.copy_number,
+        current_identity: snapshot.copy_number
+          ? `Copy ${snapshot.copy_number}${snapshot.edition.edition_size ? ` of ${snapshot.edition.edition_size}` : ''}`
+          : `Authenticated copy ${snapshot.copy_id}`,
+      },
+      ownership_history: snapshot.events,
+      collector_note: { storage: 'package_snapshot', body: snapshot.collector_note },
+      offline_snapshot: {
+        ...(existing?.offline_snapshot || {}),
+        generated_at: snapshot.generated_at,
+        provenance_event_count: snapshot.events.length,
+        latest_event: snapshot.events.at(-1) || null,
+      },
+      ownership_policy: 'Ownership and transfer provenance applies to the complete authenticated release copy. Tracks do not have independent ownership chains.',
+    };
+  }
+
+  function injectHistory(html, history) {
+    const match = html.match(/window\.NZ_CONFIG = (\{[\s\S]*?\});\n<\/script>/);
+    if (!match) return html;
+    const config = JSON.parse(match[1]);
+    config.history = history;
+    const encoded = JSON.stringify(config, null, 2).replace(/</g, '\\u003c');
+    return html.replace(match[1], encoded);
+  }
 
   onMount(() => {
     const ua = navigator.userAgent || '';
@@ -37,14 +72,47 @@
       const j = await res.json();
       if (!res.ok) throw new Error(j.message || 'Download failed');
       downloadName = j.filename;
-      // Trigger the browser save without navigating away from the modal.
+
+      // Personalize only ownership metadata in-browser. Media components and
+      // their signed checksum inventory stay byte-for-byte unchanged, while
+      // the delivered .nz receives this acquisition's copy identity and
+      // offline provenance snapshot.
+      const packageResponse = await fetch(j.url);
+      if (!packageResponse.ok) throw new Error('Could not retrieve package bytes');
+      const zip = await JSZip.loadAsync(await packageResponse.arrayBuffer());
+      const existingHistory = zip.file('history.json')
+        ? JSON.parse(await zip.file('history.json').async('string'))
+        : {};
+      const history = personalizedHistory(existingHistory, j.snapshot);
+      const provenance = {
+        scope: 'release_copy',
+        release_id: j.snapshot.release.release_id,
+        edition_id: history.edition.edition_id || null,
+        copy_id: j.snapshot.copy_id,
+        copy_number: j.snapshot.copy_number,
+        events: j.snapshot.events,
+        snapshot_at: j.snapshot.generated_at,
+      };
+      zip.file('history.json', JSON.stringify(history, null, 2));
+      zip.file('provenance.json', JSON.stringify(provenance, null, 2));
+      if (zip.file('experience.html')) {
+        zip.file('experience.html', injectHistory(await zip.file('experience.html').async('string'), history));
+      }
+      if (zip.file('manifest.json')) {
+        const manifest = JSON.parse(await zip.file('manifest.json').async('string'));
+        manifest.delivery = { scope: 'release_copy', copy_id: j.snapshot.copy_id, copy_number: j.snapshot.copy_number, snapshot_at: j.snapshot.generated_at };
+        zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+      }
+      const personalized = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const url = URL.createObjectURL(personalized);
       const a = document.createElement('a');
-      a.href = j.url;
+      a.href = url;
       a.download = j.filename;
       a.rel = 'noopener';
       document.body.appendChild(a);
       a.click();
       a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
       downloadState = 'done';
     } catch (e) {
       downloadState = 'error';

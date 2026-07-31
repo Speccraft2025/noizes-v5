@@ -6,7 +6,7 @@
 
 <div class="space-y-5">
   <div>
-    <p class="t-caption mb-2">Step 6</p>
+    <p class="t-caption mb-2">Step 7</p>
     <h2 class="text-2xl font-black tracking-tight text-white">Edition</h2>
     <p class="text-sm mt-1" style="color: var(--ink-muted);">Define the release format and availability.</p>
   </div>

@@ -1,4 +1,4 @@
-const CACHE = 'noizes-v3';
+const CACHE = 'noizes-v4';
 
 // Precache everything the standalone viewer needs to launch and run with no
 // network: the viewer itself (inlines JSZip + all CSS/JS, uses system fonts),

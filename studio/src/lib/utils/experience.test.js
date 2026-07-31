@@ -111,6 +111,45 @@ describe('template ↔ catalog contract', () => {
   it('template gates the Games tab on the play block', () => {
     expect(ULTRA_HTML).toContain("if(!PLAY || !PLAY.games || !PLAY.games.length) return;");
   });
+
+  it('uses an immersive entry, spatial menu, and shared Note Wall view instead of visible tabs', () => {
+    expect(ULTRA_HTML).toContain('id="enter-object"');
+    expect(ULTRA_HTML).toContain('id="guide-drawer" aria-label="Experience menu"');
+    expect(ULTRA_HTML).toContain('data-menu-view="view-player"');
+    expect(ULTRA_HTML).toContain('id="view-notes"');
+    expect(ULTRA_HTML).toMatch(/\.tabs\{[\s\S]*?display:none/);
+  });
+
+  it('ships the release playback engine, tracklist, standby handoff, and resume state', () => {
+    expect(ULTRA_HTML).toContain('id="view-tracklist"');
+    expect(ULTRA_HTML).toContain('id="audio-next"');
+    expect(ULTRA_HTML).toContain('window.NZ_PLAYBACK=');
+    expect(ULTRA_HTML).toContain("playbackSettings.mode==='crossfade'");
+    expect(ULTRA_HTML).toContain("playbackSettings.mode==='gapless'");
+    expect(ULTRA_HTML).toContain("'nz-release-resume:'");
+  });
+
+  it('ships synchronized Journey Moments and persists their visited state', () => {
+    expect(ULTRA_HTML).toContain('id="journey-moment"');
+    expect(ULTRA_HTML).toContain('window.NZ_JOURNEY=');
+    expect(ULTRA_HTML).toContain('journey_moments_visited');
+    expect(ULTRA_HTML).toContain('synchronizeTrackJourney');
+  });
+
+  it('ships distinct Archive and release-copy History object spaces', () => {
+    expect(ULTRA_HTML).toContain('id="view-archive"');
+    expect(ULTRA_HTML).toContain('id="view-history"');
+    expect(ULTRA_HTML).toContain('window.NZ_ARCHIVE=');
+    expect(ULTRA_HTML).toContain('window.NZ_HISTORY=');
+    expect(ULTRA_HTML).toContain('never become separate ownership chains');
+  });
+
+  it('keeps every generated inline script syntactically valid', () => {
+    const html = buildExperienceHTML({ ...base, play: { games: ['pulse'] } });
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    expect(scripts.length).toBeGreaterThan(1);
+    for (const source of scripts) expect(() => new Function(source)).not.toThrow();
+  });
 });
 
 describe('buildExperienceHTML — script-breakout escaping (XSS regression)', () => {

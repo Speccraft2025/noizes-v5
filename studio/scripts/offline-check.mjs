@@ -17,6 +17,7 @@ function silentWav() {
   return buffer;
 }
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+const pdf = file('liner-notes.pdf', 'application/pdf', [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
 const result = await buildPackage({
   identity: { artist: 'Offline Artist', title: 'Known Good', release_id: 'nz-offline-check', year: '2026', description: 'Offline verification fixture' },
   edition: { edition_type: 'fixed', edition_name: 'First Edition', edition_size: '10', price: '1000', currency: 'KES', transferable: true },
@@ -24,7 +25,7 @@ const result = await buildPackage({
   assets: { audioFile: file('main.wav', 'audio/wav', silentWav()), coverFile: file('cover.png', 'image/png', png), lyrics: [], guide: null },
   template: 'legacy-theme',
   play: { games: [], difficulty: 'standard', intensity: 1 },
-  extras: { story: 'A self-contained object.', links: [] },
+  extras: { story: 'A self-contained object.', links: [], pdfs: [{ id: 'liner-notes', title: 'Liner Notes', name: pdf.name, file: pdf }] },
 });
 
 const out = '/tmp/noizes-known-good';

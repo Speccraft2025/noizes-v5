@@ -1,7 +1,10 @@
 <script>
-  import { identity, edition, assets, rights, template, play, extras } from '$lib/stores/package.js';
+  import { identity, edition, releaseProject, template, play, extras } from '$lib/stores/package.js';
   import { buildPackage } from '$lib/utils/packager.js';
   import { editionErrors } from '$lib/utils/project.js';
+  import { validateReleaseProject } from '$lib/domain/release.js';
+  import { estimatePackageSize, formatBytes } from '$lib/domain/package-size.js';
+  import { prepareNzForViewer } from '$lib/utils/viewer.js';
 
   let exporting = false;
   let exported = false;
@@ -11,9 +14,50 @@
   let error = '';
   let progress = 0;
   let statusLabel = 'Compiling package…';
+  let previewBusy = false;
+  let previewSrc = '';
+  let previewUrls = [];
 
-  $: validationErrors = editionErrors($edition);
-  $: canExport = $identity.artist && $identity.title && $identity.year && $assets.audioFile && $assets.coverFile && !validationErrors.length;
+  $: projectValidation = validateReleaseProject({ ...$releaseProject, extras: $extras });
+  $: validationErrors = [...editionErrors($edition), ...projectValidation.errors.map((issue) => issue.message)];
+  $: validationWarnings = projectValidation.warnings;
+  $: mainCover = $releaseProject.release_assets.find((asset) => asset.role === 'main_cover');
+  $: canExport = Boolean($identity.title && $identity.year && mainCover?.file && !validationErrors.length);
+  $: sizeReport = estimatePackageSize($releaseProject, $extras);
+
+  function progressUpdate(update) {
+    progress = Math.max(progress, Math.round(Number(update.percent) || 0));
+    statusLabel = update.stage || statusLabel;
+  }
+
+  async function previewExperience() {
+    previewBusy = true;
+    error = '';
+    progress = 0;
+    try {
+      const result = await buildPackage({
+        project: $releaseProject,
+        template: $template,
+        play: $play,
+        extras: $extras,
+        download: false,
+        onProgress: progressUpdate,
+      });
+      const prepared = await prepareNzForViewer(result.blob);
+      previewUrls = prepared.blobUrls;
+      previewSrc = prepared.htmlUrl;
+    } catch (e) {
+      error = `${e.message || 'Preview failed.'} Your Studio draft is unchanged; correct the reported item and try again.`;
+    } finally {
+      previewBusy = false;
+    }
+  }
+
+  function closePreview() {
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls = [];
+    previewSrc = '';
+  }
 
   async function doExport() {
     exporting = true;
@@ -24,28 +68,20 @@
     progress = 0;
     statusLabel = 'Compiling package…';
 
-    const steps = [10, 25, 45, 65, 80];
-    for (const p of steps) {
-      await new Promise(r => setTimeout(r, 180));
-      progress = p;
-    }
-
     let result;
     try {
       result = await buildPackage({
-        identity: $identity,
-        edition:  $edition,
-        assets:   $assets,
-        rights:   $rights,
+        project:  $releaseProject,
         template: $template,
         play:     $play,
         extras:   $extras,
+        onProgress: progressUpdate,
       });
       exportedFilename = result.filename;
       progress = 90;
       exported = true;
     } catch (e) {
-      error = e.message || 'Export failed.';
+      error = `${e.message || 'Export failed.'} No draft data was removed; adjust the failing asset or metadata and compile again.`;
       exporting = false;
       return;
     }
@@ -99,6 +135,25 @@
           meta: {
             artist: $identity.artist,
             title: $identity.title,
+            release_type: $releaseProject.release.release_type,
+            featured_artists: $releaseProject.release.featured_artists,
+            compilation_artists: $releaseProject.release.compilation_artists,
+            release_date: $releaseProject.release.release_date,
+            catalogue_number: $releaseProject.release.catalogue_number,
+            label: $releaseProject.release.label,
+            curator: $releaseProject.release.curator,
+            compiler: $releaseProject.release.compiler,
+            venue: $releaseProject.release.venue,
+            event_name: $releaseProject.release.event_name,
+            recording_date: $releaseProject.release.recording_date,
+            track_count: $releaseProject.tracks.length,
+            disc_count: Math.max(1, ...$releaseProject.tracks.map((track) => Number(track.disc_number) || 1)),
+            total_duration_ms: $releaseProject.tracks.reduce((total, track) => {
+              const asset = $releaseProject.audio_assets.find((item) => item.asset_id === track.primary_audio_ref);
+              return total + (Number(asset?.duration_ms) || 0);
+            }, 0),
+            explicit: $releaseProject.tracks.some((track) => track.explicit),
+            package_size: result.blob.size,
             genre: $identity.genre,
             year: $identity.year,
             location: $identity.location,
@@ -126,13 +181,15 @@
   }
 
   const files = [
-    ['manifest.json', 'Work identity & metadata'],
+    ['manifest.json', 'Release, tracklist & complete component inventory'],
     ['edition.json', 'Edition type, size & pricing'],
-    ['rights.json', 'Copyright & license'],
-    ['credits.json', 'Production credits'],
-    ['authenticity.json', 'sha256 integrity record'],
+    ['rights.json', 'Release and track rights declarations'],
+    ['credits.json', 'Release and per-track production credits'],
+    ['authenticity.json', 'Per-component sha256 inventory'],
     ['technical.json', 'Packager & timestamp'],
-    ['experience.html', 'Self-contained offline player'],
+    ['archive.json', 'Release and track object records'],
+    ['history.json', 'Release-copy provenance and work history'],
+    ['experience.html', 'Offline experience entry for packaged assets'],
   ];
 </script>
 
@@ -152,27 +209,67 @@
         <span class="text-xs" style="color: var(--ink-muted);">{desc}</span>
       </div>
     {/each}
-    {#if $assets.audioName}
+    {#if $releaseProject.audio_assets.length}
       <div class="flex items-center gap-3 py-1.5 border-b" style="border-color: var(--border-dim);">
-        <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">audio/</span>
-        <span class="text-xs" style="color: var(--ink-muted);">{$assets.audioName}</span>
+        <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">tracks/*/audio/</span>
+        <span class="text-xs" style="color: var(--ink-muted);">{$releaseProject.audio_assets.length} audio component{$releaseProject.audio_assets.length === 1 ? '' : 's'}</span>
       </div>
     {/if}
-    {#if $assets.coverName}
+    {#if mainCover}
       <div class="flex items-center gap-3 py-1.5 border-b" style="border-color: var(--border-dim);">
-        <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">cover/</span>
-        <span class="text-xs" style="color: var(--ink-muted);">{$assets.coverName}</span>
+        <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">release/cover/</span>
+        <span class="text-xs" style="color: var(--ink-muted);">{mainCover.filename}</span>
       </div>
     {/if}
     <div class="flex items-center gap-3 py-1.5">
       <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">guided experience</span>
-      <span class="text-xs" style="color: var(--ink-muted);">ULTRA · {$assets.guide?.nodes?.length ?? 0} moments · {$assets.lyrics?.length ?? 0} lyric lines</span>
+      <span class="text-xs" style="color: var(--ink-muted);">ULTRA · {($releaseProject.journey.release_moments?.length || 0) + ($releaseProject.journey.track_journeys || []).reduce((total, entry) => total + (entry.moments?.length || 0), 0)} moments · {$releaseProject.lyrics.reduce((total, entry) => total + (entry.timed_lines?.length || 0), 0)} timed lyric lines</span>
     </div>
+  </div>
+
+  <div class="glass rounded-xl p-4 space-y-3">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <p class="t-caption">Package size &amp; browser load</p>
+        <p class="text-xs mt-1" style="color:var(--ink-muted);">Original packaged assets stay as files; they are not duplicated inside experience.html.</p>
+      </div>
+      <div class="text-right shrink-0">
+        <p class="text-lg font-black text-white">{formatBytes(sizeReport.original_bytes)}</p>
+        <p class="text-[10px]" style="color:var(--ink-muted);">est. {formatBytes(sizeReport.browser_memory_estimate_bytes)} compile memory</p>
+      </div>
+    </div>
+    <div class="grid sm:grid-cols-3 gap-2">
+      <div class="rounded-lg p-3" style="background:rgba(255,255,255,.025);"><p class="text-[10px] uppercase tracking-wider" style="color:var(--ink-muted);">Release assets</p><p class="text-sm text-white mt-1">{formatBytes(sizeReport.release_bytes)}</p></div>
+      <div class="rounded-lg p-3" style="background:rgba(255,255,255,.025);"><p class="text-[10px] uppercase tracking-wider" style="color:var(--ink-muted);">All assets as data URIs</p><p class="text-sm text-white mt-1">{formatBytes(sizeReport.all_assets_data_uri_bytes)}</p></div>
+      <div class="rounded-lg p-3" style="background:rgba(255,255,255,.025);"><p class="text-[10px] uppercase tracking-wider" style="color:var(--ink-muted);">Avoided expansion</p><p class="text-sm text-white mt-1">{formatBytes(sizeReport.data_uri_expansion_bytes)}</p></div>
+    </div>
+    {#if sizeReport.per_track.length > 1}
+      <div class="space-y-1">
+        {#each sizeReport.per_track as track, index}
+          <div class="flex justify-between gap-4 text-xs py-1"><span class="truncate" style="color:var(--ink-muted);">{String(index + 1).padStart(2, '0')} · {track.title || 'Untitled track'}</span><span class="font-mono text-white shrink-0">{formatBytes(track.size)}</span></div>
+        {/each}
+      </div>
+    {/if}
+    {#each sizeReport.warnings as warning}
+      <div class="rounded-lg px-3 py-2 text-xs" style="background:{warning.severity === 'critical' || warning.severity === 'high' ? 'rgba(240,75,107,.08)' : 'rgba(240,176,107,.08)'};color:{warning.severity === 'critical' || warning.severity === 'high' ? '#F08A9D' : '#F0B06B'};">{warning.message}</div>
+    {/each}
   </div>
 
   {#if !canExport}
     <div class="glass rounded-lg px-4 py-3 text-sm" style="color: var(--ink-muted); border-color: rgba(123,92,240,0.2);">
-      Complete Identity, upload primary audio and cover art, then provide a valid fixed-supply edition before compiling.
+      Complete release identity and tracklist, attach every visible track’s primary audio and a main cover, then provide a valid fixed-supply edition.
+      {#if validationErrors.length}
+        <span class="block mt-2" style="color:#F08A9D;">{validationErrors[0]}{validationErrors.length > 1 ? ` (+${validationErrors.length - 1} more)` : ''}</span>
+      {/if}
+    </div>
+  {/if}
+
+  {#if validationWarnings.length}
+    <div class="rounded-xl p-4 space-y-2" style="background:rgba(240,176,107,.06);border:1px solid rgba(240,176,107,.18);">
+      <p class="t-caption" style="color:#F0B06B;">Declarations &amp; package warnings · {validationWarnings.length}</p>
+      {#each validationWarnings as warning}
+        <div class="text-xs flex gap-2" style="color:var(--ink-muted);"><span style="color:#F0B06B;">○</span><span>{warning.message}</span></div>
+      {/each}
     </div>
   {/if}
 
@@ -219,15 +316,30 @@
     </div>
   {/if}
 
-  <button
-    class="btn-spectral w-full justify-center py-3.5 text-base rounded-xl"
-    disabled={!canExport || exporting}
-    on:click={doExport}
-  >
-    {#if exporting}
-      {progress < 90 ? 'Compiling…' : 'Publishing…'}
-    {:else}
-      ⬡ Compile & Publish .nz
-    {/if}
-  </button>
+  <div class="grid sm:grid-cols-[.42fr_.58fr] gap-3">
+    <button class="btn-ghost w-full justify-center py-3.5 text-base rounded-xl" disabled={!canExport || exporting || previewBusy} on:click={previewExperience}>
+      {previewBusy ? 'Preparing preview…' : 'Preview exact package'}
+    </button>
+    <button
+      class="btn-spectral w-full justify-center py-3.5 text-base rounded-xl"
+      disabled={!canExport || exporting || previewBusy}
+      on:click={doExport}
+    >
+      {#if exporting}
+        {progress < 90 ? 'Compiling…' : 'Publishing…'}
+      {:else}
+        ⬡ Compile & Publish .nz
+      {/if}
+    </button>
+  </div>
 </div>
+
+{#if previewSrc}
+  <div class="fixed inset-0 z-[200] flex flex-col" style="background:#030303;">
+    <div class="h-12 px-4 flex items-center justify-between border-b" style="border-color:rgba(255,255,255,.08);background:#080808;">
+      <div><span class="text-xs font-black text-white">STUDIO PREVIEW</span><span class="text-[10px] ml-3" style="color:var(--ink-muted);">Generated .nz · real multi-track playback and Journey timing</span></div>
+      <button class="btn-ghost rounded-full px-4 py-1.5 text-xs" on:click={closePreview}>Close preview</button>
+    </div>
+    <iframe title="Studio package preview" src={previewSrc} allow="autoplay" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads" class="flex-1 w-full border-0"></iframe>
+  </div>
+{/if}

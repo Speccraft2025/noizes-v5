@@ -1,7 +1,8 @@
 <script>
   import { onMount } from 'svelte';
-  import { identity, edition, assets, rights, template, play, extras } from '$lib/stores/package.js';
+  import { identity, edition, assets, rights, releaseProject, template, play, extras } from '$lib/stores/package.js';
   import StepIdentity    from '$lib/components/StepIdentity.svelte';
+  import StepTracklist   from '$lib/components/StepTracklist.svelte';
   import StepAssets      from '$lib/components/StepAssets.svelte';
   import StepLyrics      from '$lib/components/StepLyrics.svelte';
   import StepGuide       from '$lib/components/StepGuide.svelte';
@@ -12,12 +13,13 @@
 
   const steps = [
     { id: 1, label: 'Identity', icon: '◈' },
-    { id: 2, label: 'Assets',   icon: '◉' },
-    { id: 3, label: 'Lyrics',   icon: '≡' },
-    { id: 4, label: 'Extras',     icon: '▦' },
-    { id: 5, label: 'Experience', icon: '⬡' },
-    { id: 6, label: 'Edition',    icon: '◎' },
-    { id: 7, label: 'Publish',    icon: '⬟' },
+    { id: 2, label: 'Tracklist', icon: '☷' },
+    { id: 3, label: 'Assets',   icon: '◉' },
+    { id: 4, label: 'Lyrics',   icon: '≡' },
+    { id: 5, label: 'Extras',     icon: '▦' },
+    { id: 6, label: 'Experience', icon: '⬡' },
+    { id: 7, label: 'Edition',    icon: '◎' },
+    { id: 8, label: 'Publish',    icon: '⬟' },
   ];
 
   let currentStep = 1;
@@ -119,20 +121,22 @@
       {/each}
     </div>
 
-    <div class="flex-1 px-8 py-8 max-w-xl">
+    <div class="flex-1 px-8 py-8 max-w-3xl">
       {#if currentStep === 1}
         <StepIdentity />
       {:else if currentStep === 2}
-        <StepAssets />
+        <StepTracklist />
       {:else if currentStep === 3}
-        <StepLyrics />
+        <StepAssets />
       {:else if currentStep === 4}
-        <StepExtras />
+        <StepLyrics />
       {:else if currentStep === 5}
-        <StepGuide />
+        <StepExtras />
       {:else if currentStep === 6}
-        <StepEdition />
+        <StepGuide />
       {:else if currentStep === 7}
+        <StepEdition />
+      {:else if currentStep === 8}
         <div class="space-y-8"><StepRights /><div class="border-t pt-8" style="border-color: var(--border-dim);"><StepExport /></div></div>
       {/if}
     </div>
@@ -162,20 +166,28 @@
           <span class="text-white truncate ml-4 text-right">{$identity.title || '—'}</span>
         </div>
         <div class="flex justify-between">
+          <span style="color: var(--ink-muted);">Format</span>
+          <span class="text-white truncate ml-4 text-right">{$releaseProject.release.release_type.replaceAll('_', ' ')}</span>
+        </div>
+        <div class="flex justify-between">
+          <span style="color: var(--ink-muted);">Tracklist</span>
+          <span class="text-white">{$releaseProject.tracks.length} track{$releaseProject.tracks.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Experience</span>
           <span class="truncate ml-4" style="color: #7B5CF0;">ULTRA V2 · {$assets.guide?.nodes?.length ?? 0} moments</span>
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Audio</span>
-          <span class="text-white truncate ml-4 text-right">{$assets.audioName || '—'}</span>
+          <span class="text-white truncate ml-4 text-right">{$releaseProject.audio_assets.length} asset{$releaseProject.audio_assets.length === 1 ? '' : 's'}</span>
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Lyrics</span>
-          <span class="text-white">{$assets.lyrics?.length ?? 0} lines</span>
+          <span class="text-white">{$releaseProject.lyrics.reduce((total, entry) => total + (entry.timed_lines?.length || 0), 0)} lines</span>
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Extras</span>
-          <span class="text-white">{$play.games.length + ($extras.story ? 1 : 0) + $extras.links.length}</span>
+          <span class="text-white">{$play.games.length + ($extras.story ? 1 : 0) + $extras.links.length + $extras.pdfs.length}</span>
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Edition</span>

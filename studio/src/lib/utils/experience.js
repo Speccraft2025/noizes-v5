@@ -34,7 +34,7 @@ export function buildGuide({ hasLyrics, hasPlay, hasNotes, story, authored }) {
   return { version: 1, allowFreeExplore: true, nodes };
 }
 
-export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template, play, guide, extras, notes = [], releasePlayback = null }) {
+export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template, play, guide, extras, notes = [], releasePlayback = null, journey = null }) {
   // Template variants are archived; ULTRA is the single immersive player.
   const themeId = CANONICAL_TEMPLATE;
   const theme   = ULTRA_THEME;
@@ -89,6 +89,7 @@ export function buildExperienceHTML({ identity, edition, rights, audioBase64, au
       allow_archive_during_journey: true,
       resume_enabled: true,
     },
+    journey:     journey || { version: 1, release_moments: [], track_journeys: [], transitions: [] },
     play:        playCfg,
     notes,
     guide:       buildGuide({ hasLyrics: !!(lyrics && lyrics.length) || hasReleaseLyrics, hasPlay: !!playCfg, hasNotes: !!notes.length, story: extras?.story?.trim(), authored: guide }),

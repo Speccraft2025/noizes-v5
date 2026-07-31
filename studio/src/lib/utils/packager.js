@@ -3,6 +3,7 @@ import { buildExperienceHTML, buildGuide } from './experience.js';
 import { CANONICAL_TEMPLATE, normalizeEdition } from './project.js';
 import { normalizeReleaseProject, orderedTracks } from '../domain/release.js';
 import { normalizePlaybackSettings } from '../domain/playback.js';
+import { materializeJourney } from '../domain/journey.js';
 
 const safeFilename = (value, fallback = 'asset') => {
   const cleaned = String(value || fallback).replace(/[^a-z0-9._-]/gi, '_').replace(/_+/g, '_');
@@ -224,6 +225,21 @@ export async function buildPackage(input) {
   }
 
   const releaseRights = project.rights.release_rights ?? project.rights;
+  const authoredJourney = materializeJourney(project.journey, tracks);
+  const runtimeJourney = {
+    ...stripFiles(authoredJourney),
+    release_moments: authoredJourney.release_moments.map((moment) => ({
+      ...stripFiles(moment),
+      asset_src: componentById.get(moment.asset_ref)?.path || '',
+    })),
+    track_journeys: authoredJourney.track_journeys.map((entry) => ({
+      track_id: entry.track_id,
+      moments: entry.moments.map((moment) => ({
+        ...stripFiles(moment),
+        asset_src: componentById.get(moment.asset_ref)?.path || '',
+      })),
+    })),
+  };
   zip.file('edition.json', JSON.stringify({
     ...stripFiles(fixedEdition),
     edition_id: project.edition.edition_id,
@@ -260,7 +276,7 @@ export async function buildPackage(input) {
   const experienceJson = {
     schema_version: '3.0.0',
     release_id: releaseId,
-    journey: stripFiles(project.journey),
+    journey: stripFiles(authoredJourney),
     guide: guideBlock,
     tracks: trackRecords.map((track) => ({
       track_id: track.track_id,
@@ -407,7 +423,7 @@ export async function buildPackage(input) {
       lyrics: { timed_lines: [], instrumental: true },
     });
   }
-  const crossfadeOverride = project.journey.transitions.find((transition) => transition.type === 'crossfade' && transition.duration_ms);
+  const crossfadeOverride = project.journey.transitions.find((transition) => transition.type === 'crossfade' && transition.duration_ms && !transition.from_track_id && !transition.to_track_id);
   const releasePlayback = {
     release: {
       release_id: release.release_id,
@@ -439,6 +455,7 @@ export async function buildPackage(input) {
     extras,
     notes,
     releasePlayback,
+    journey: runtimeJourney,
   });
   zip.file('experience.html', experienceHTML);
 

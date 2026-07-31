@@ -1,213 +1,393 @@
 <script>
-  import { assets, extras, play, releaseProject, template } from '$lib/stores/package.js';
+  import { assets, play, releaseProject, template } from '$lib/stores/package.js';
+  import { createUuid, orderedTracks } from '$lib/domain/release.js';
+  import {
+    MOMENT_EFFECTS,
+    RELEASE_MOMENT_TYPES,
+    RELEASE_PLACEMENTS,
+    TRACK_MOMENT_TYPES,
+    createReleaseMoment,
+    createTrackMoment,
+    materializeJourney,
+    releaseTimeline,
+  } from '$lib/domain/journey.js';
 
-  const NODE_DEFS = {
-    arrival: { type: 'arrival', label: 'Arrival', view: 'intro', hint: 'A cinematic welcome into the release.' },
-    object:  { type: 'object', label: 'The Object', view: 'intro', hint: 'Edition, ownership and object context.' },
-    listen:  { type: 'listen', label: 'Listen', view: 'view-player', hint: 'The heart of the experience: the music.' },
-    lyrics:  { type: 'lyrics', label: 'Lyrics', view: 'view-lyrics', hint: 'Time-synced words alongside the track.' },
-    play:    { type: 'interactive', label: 'Play', view: 'view-games', hint: 'Beat-synced interactive moments.' },
-    story:   { type: 'narrative', label: 'Artist Statement', view: 'intro', hint: 'The story or liner note behind the work.' },
-    notes:   { type: 'notes', label: 'Note Wall', view: 'view-notes', hint: 'A wall of embedded PDF notes and booklets.' },
-    record:  { type: 'record', label: 'Collector Record', view: 'intro', hint: 'Provenance and the life of the object.' },
-    end:     { type: 'ending', label: 'End', view: 'view-player', hint: 'A closing moment that returns to the music.' }
+  const LABELS = {
+    opening: 'Opening encounter', release_identity: 'Release identity', release_introduction: 'Release introduction',
+    tracklist_reveal: 'Tracklist reveal', interlude: 'Interlude', chapter_card: 'Chapter card', disc_change: 'Disc change',
+    story: 'Story', artwork: 'Artwork', gallery: 'Gallery', credits: 'Credits', closing_reflection: 'Closing reflection',
+    collector_message: 'Collector message', archive_invitation: 'Archive invitation', history_invitation: 'History invitation',
+    title_reveal: 'Track title reveal', lyrics: 'Lyrics', image: 'Image', video: 'Video', note: 'Note', effect: 'Effect',
+    track_ending: 'Track ending', transition: 'Transition', before_first_track: 'Before the first track',
+    before_track: 'Before a track', after_track: 'After a track', disc_start: 'At the start of a disc',
+    disc_end: 'At the end of a disc', during_transition: 'During a transition', after_final_track: 'After the final track',
   };
 
-  const DEFAULT_ORDER = ['arrival', 'object', 'listen', 'lyrics', 'story', 'notes', 'play', 'record', 'end'];
-  const REQUIRED = new Set(['listen']);
+  let activeScope = 'release';
+  let initialized = false;
 
-  function isAvailable(id) {
-    if (id === 'lyrics') return $releaseProject.lyrics.some((entry) => entry.timed_lines?.length);
-    if (id === 'play') return !!($play.games && $play.games.length);
-    if (id === 'story') return !!$extras.story?.trim();
-    if (id === 'notes') return !!$extras.pdfs?.length;
-    return true;
-  }
+  $: tracks = orderedTracks($releaseProject.tracks);
+  $: journey = $releaseProject.journey;
+  $: timeline = releaseTimeline(journey, tracks);
+  $: activeTrack = tracks.find((track) => track.track_id === activeScope);
+  $: activeTrackJourney = journey.track_journeys.find((entry) => entry.track_id === activeScope);
+  $: activeMoments = activeScope === 'release' ? journey.release_moments : (activeTrackJourney?.moments || []);
+  $: scopedAssets = activeScope === 'release'
+    ? $releaseProject.release_assets
+    : [...$releaseProject.release_assets, ...$releaseProject.track_assets.filter((asset) => asset.track_id === activeScope)];
 
-  $: availableIds = DEFAULT_ORDER.filter(isAvailable);
-  $: nodes = $assets.guide?.nodes || [];
-  $: enabledIds = new Set(nodes.map((node) => node.id));
-
-  // Theme variants are archived for now; every newly authored experience uses ULTRA.
+  // Theme variants are archived for now; the Journey always authors the ULTRA experience.
   $: if ($template !== 'ultra-v2') template.set('ultra-v2');
-
-  function updateGuide(nodes, allowFreeExplore = $assets.guide?.allowFreeExplore !== false) {
-    assets.update((value) => ({
-      ...value,
-      guide: { version: 1, allowFreeExplore, nodes }
+  $: if (!initialized && tracks.length) {
+    initialized = true;
+    releaseProject.update((project) => ({
+      ...project,
+      journey: materializeJourney(project.journey, orderedTracks(project.tracks), { idFactory: createUuid }),
     }));
   }
+  $: if (activeScope !== 'release' && !tracks.some((track) => track.track_id === activeScope)) activeScope = 'release';
 
-  function toggle(id) {
-    if (REQUIRED.has(id)) return;
-    if (enabledIds.has(id)) {
-      updateGuide(nodes.filter((node) => node.id !== id));
-      return;
-    }
-    const def = NODE_DEFS[id];
-    const next = [...nodes, { id, type: def.type, label: def.label, view: def.view }];
-    next.sort((a, b) => DEFAULT_ORDER.indexOf(a.id) - DEFAULT_ORDER.indexOf(b.id));
-    updateGuide(next);
-  }
-
-  function rename(id, label) {
-    updateGuide(nodes.map((node) => node.id === id ? { ...node, label } : node));
-  }
-
-  function move(index, direction) {
-    const target = index + direction;
-    if (target < 0 || target >= nodes.length) return;
-    const next = [...nodes];
-    [next[index], next[target]] = [next[target], next[index]];
-    updateGuide(next);
-  }
-
-  function setFreeExplore(allowFreeExplore) {
-    updateGuide(nodes, allowFreeExplore);
+  function setJourney(updater) {
+    releaseProject.update((project) => ({ ...project, journey: updater(project.journey, project) }));
   }
 
   function setPlayback(patch) {
-    releaseProject.update((project) => ({
-      ...project,
-      journey: { ...project.journey, ...patch },
-    }));
+    setJourney((value) => ({ ...value, ...patch }));
   }
 
   function setNavigation(field, value) {
-    releaseProject.update((project) => ({
-      ...project,
-      journey: {
-        ...project.journey,
-        navigation: { ...project.journey.navigation, [field]: value },
-      },
+    setJourney((journeyValue) => ({
+      ...journeyValue,
+      navigation: { ...journeyValue.navigation, [field]: value },
     }));
+  }
+
+  function setCrossfadeDuration(duration) {
+    setJourney((value) => {
+      const existing = value.transitions.find((transition) => !transition.from_track_id && !transition.to_track_id);
+      const globalTransition = { ...existing, type: 'crossfade', duration_ms: Math.max(250, Number(duration) || 1500) };
+      return {
+        ...value,
+        transitions: [globalTransition, ...value.transitions.filter((transition) => transition !== existing && (transition.from_track_id || transition.to_track_id))],
+      };
+    });
+  }
+
+  function addMoment() {
+    setJourney((value) => {
+      if (activeScope === 'release') {
+        const moment = createReleaseMoment({ type: 'story', title: 'New release Moment', order: value.release_moments.length + 1 }, { idFactory: createUuid });
+        return { ...value, release_moments: [...value.release_moments, moment] };
+      }
+      const moment = createTrackMoment({ track_id: activeScope, type: 'story', title: 'New track Moment', at_ms: 0 }, { trackId: activeScope, idFactory: createUuid });
+      return {
+        ...value,
+        track_journeys: value.track_journeys.map((entry) => entry.track_id === activeScope
+          ? { ...entry, moments: [...entry.moments, moment].sort((left, right) => left.at_ms - right.at_ms) }
+          : entry),
+      };
+    });
+  }
+
+  function updateMoment(momentId, patch) {
+    setJourney((value) => {
+      if (activeScope === 'release') {
+        return { ...value, release_moments: value.release_moments.map((moment) => moment.moment_id === momentId ? { ...moment, ...patch } : moment) };
+      }
+      return {
+        ...value,
+        track_journeys: value.track_journeys.map((entry) => entry.track_id === activeScope
+          ? { ...entry, moments: entry.moments.map((moment) => moment.moment_id === momentId ? { ...moment, ...patch } : moment).sort((left, right) => left.at_ms - right.at_ms) }
+          : entry),
+      };
+    });
+  }
+
+  function removeMoment(momentId) {
+    setJourney((value) => activeScope === 'release'
+      ? { ...value, release_moments: value.release_moments.filter((moment) => moment.moment_id !== momentId).map((moment, index) => ({ ...moment, order: index + 1 })) }
+      : {
+          ...value,
+          track_journeys: value.track_journeys.map((entry) => entry.track_id === activeScope
+            ? { ...entry, moments: entry.moments.filter((moment) => moment.moment_id !== momentId) }
+            : entry),
+        });
+  }
+
+  function moveReleaseMoment(index, direction) {
+    const target = index + direction;
+    if (target < 0 || target >= activeMoments.length) return;
+    setJourney((value) => {
+      const moments = [...value.release_moments];
+      [moments[index], moments[target]] = [moments[target], moments[index]];
+      return { ...value, release_moments: moments.map((moment, itemIndex) => ({ ...moment, order: itemIndex + 1 })) };
+    });
+  }
+
+  function addTransitionOverride(fromTrackId, toTrackId) {
+    setJourney((value) => ({
+      ...value,
+      transitions: [
+        ...value.transitions.filter((transition) => !(transition.from_track_id === fromTrackId && transition.to_track_id === toTrackId)),
+        { from_track_id: fromTrackId, to_track_id: toTrackId, type: value.playback_mode, duration_ms: value.playback_mode === 'crossfade' ? 1500 : 0 },
+      ],
+    }));
+  }
+
+  function setTransitionDuration(fromTrackId, toTrackId, duration) {
+    setJourney((value) => ({
+      ...value,
+      transitions: [
+        ...value.transitions.filter((transition) => !(transition.from_track_id === fromTrackId && transition.to_track_id === toTrackId)),
+        { from_track_id: fromTrackId, to_track_id: toTrackId, type: 'crossfade', duration_ms: Math.max(250, Number(duration) || 1500) },
+      ],
+    }));
+  }
+
+  function formatTime(ms) {
+    const seconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   }
 </script>
 
-<div class="space-y-5">
+<div class="space-y-6">
   <div>
     <p class="t-caption mb-2">Step 6</p>
-    <h2 class="text-2xl font-black tracking-tight text-white">Guided experience</h2>
-    <p class="text-sm mt-1" style="color: var(--ink-muted);">
-      Shape the journey listeners take through your music. Rename, reorder and choose each moment.
+    <h2 class="text-2xl font-black tracking-tight text-white">Journey</h2>
+    <p class="text-sm mt-1 max-w-2xl" style="color: var(--ink-muted);">
+      Direct the complete release encounter, then place track Moments against the music. The overview keeps the album visible as one authored work.
     </p>
   </div>
 
-  <div class="glass rounded-2xl p-4 space-y-4">
+  <section class="glass rounded-2xl p-4 space-y-4" aria-labelledby="playback-heading">
     <div>
-      <p class="t-caption">Release playback</p>
-      <p class="text-xs mt-1" style="color:var(--ink-muted);">One engine carries the collector across the complete work.</p>
+      <p class="t-caption" id="playback-heading">Release playback</p>
+      <p class="text-xs mt-1" style="color:var(--ink-muted);">One playback engine carries the collector across every track and Journey timeline.</p>
     </div>
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid sm:grid-cols-2 gap-3">
       <div>
         <label class="label-dark" for="playback-mode">Transition mode</label>
-        <select id="playback-mode" class="input-dark" value={$releaseProject.journey.playback_mode}
+        <select id="playback-mode" class="input-dark" value={journey.playback_mode}
           on:change={(event) => setPlayback({ playback_mode: event.currentTarget.value })}>
           <option value="sequential">Sequential</option>
           <option value="gapless">Gapless</option>
           <option value="crossfade">Crossfade</option>
         </select>
       </div>
-      {#if $releaseProject.journey.playback_mode === 'crossfade'}
+      {#if journey.playback_mode === 'crossfade'}
         <div>
-          <label class="label-dark" for="crossfade-duration">Crossfade (ms)</label>
+          <label class="label-dark" for="crossfade-duration">Global crossfade (ms)</label>
           <input id="crossfade-duration" class="input-dark" type="number" min="250" max="12000" step="250"
-            value={$releaseProject.journey.transitions.find((transition) => transition.type === 'crossfade')?.duration_ms || 1500}
-            on:input={(event) => setPlayback({ transitions: [{ type: 'crossfade', duration_ms: Number(event.currentTarget.value) || 1500 }] })} />
+            value={journey.transitions.find((transition) => !transition.from_track_id && transition.type === 'crossfade')?.duration_ms || 1500}
+            on:input={(event) => setCrossfadeDuration(event.currentTarget.value)} />
         </div>
       {:else}
         <div class="rounded-xl px-3 py-2 flex items-center" style="background:rgba(255,255,255,.03);">
-          <p class="text-xs" style="color:var(--ink-muted);">{ $releaseProject.journey.playback_mode === 'gapless' ? 'The next master is preloaded for continuous handoff.' : 'Each track completes before the next begins.'}</p>
+          <p class="text-xs" style="color:var(--ink-muted);">{journey.playback_mode === 'gapless' ? 'The next master is preloaded for a continuous handoff.' : 'Each track completes before the next begins.'}</p>
         </div>
       {/if}
     </div>
-    <div class="grid grid-cols-2 gap-2 text-xs">
+    <div class="grid sm:grid-cols-2 gap-2 text-xs">
       {#each [
-        ['allow_track_skip', 'Allow track selection'],
-        ['allow_seek', 'Allow seeking'],
-        ['allow_shuffle', 'Allow shuffle'],
-        ['allow_repeat', 'Allow repeat'],
-        ['resume_enabled', 'Remember listening position'],
+        ['allow_track_skip', 'Allow track selection'], ['allow_seek', 'Allow seeking'], ['allow_shuffle', 'Allow shuffle'],
+        ['allow_repeat', 'Allow repeat'], ['resume_enabled', 'Remember listening position'],
         ['allow_archive_during_journey', 'Archive during Journey'],
       ] as [field, label]}
         <label class="flex items-center gap-2 rounded-lg px-3 py-2" style="background:rgba(255,255,255,.03);color:var(--ink-muted);">
-          <input type="checkbox" checked={$releaseProject.journey.navigation[field]} on:change={(event) => setNavigation(field, event.currentTarget.checked)} />
+          <input type="checkbox" checked={journey.navigation[field]} on:change={(event) => setNavigation(field, event.currentTarget.checked)} />
           {label}
         </label>
       {/each}
     </div>
-    {#if $releaseProject.journey.navigation.allow_shuffle}
+    {#if journey.navigation.allow_shuffle}
       <p class="text-xs" style="color:#F0B06B;">Shuffle can break an authored Journey. It remains off by default.</p>
     {/if}
-  </div>
-
-  <div class="rounded-2xl p-4" style="background: rgba(123,92,240,.08); border: 1px solid rgba(123,92,240,.25);">
-    <div class="flex items-center justify-between gap-4">
-      <div>
-        <p class="text-sm font-bold text-white">Let listeners wander</p>
-        <p class="text-xs mt-1" style="color: var(--ink-muted);">They can leave your path and explore any available section.</p>
-      </div>
-      <button type="button" role="switch" aria-label="Let listeners wander" aria-checked={$assets.guide?.allowFreeExplore !== false}
-        class="w-11 h-6 rounded-full p-1 transition-colors shrink-0"
-        style="background: {$assets.guide?.allowFreeExplore !== false ? '#7B5CF0' : 'rgba(255,255,255,.12)'};"
-        on:click={() => setFreeExplore($assets.guide?.allowFreeExplore === false)}>
-        <span class="block w-4 h-4 rounded-full bg-white transition-transform"
-          style="transform: translateX({$assets.guide?.allowFreeExplore !== false ? '20px' : '0'});"></span>
-      </button>
-    </div>
-  </div>
-
-  <div>
-    <div class="flex items-center justify-between mb-3">
-      <p class="t-caption">Journey · {nodes.length} moments</p>
-      <span class="text-xs font-mono" style="color: var(--ink-muted);">ULTRA immersive player</span>
-    </div>
-
-    <div class="space-y-2">
-      {#each nodes as node, index (node.id)}
-        <div class="rounded-xl p-3" style="background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08);">
-          <div class="flex items-center gap-3">
-            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0"
-              style="background: rgba(123,92,240,.18); color: #9a82ff;">{index + 1}</span>
-            <div class="flex-1 min-w-0">
-              <input class="w-full bg-transparent text-sm font-bold text-white outline-none border-b border-transparent focus:border-violet-500 py-0.5"
-                value={node.label} aria-label="{NODE_DEFS[node.id].label} label"
-                on:input={(event) => rename(node.id, event.currentTarget.value)} />
-              <p class="text-xs mt-1" style="color: var(--ink-muted);">{NODE_DEFS[node.id].hint}</p>
+    {#if journey.playback_mode === 'crossfade' && tracks.length > 1}
+      <div class="pt-3" style="border-top:1px solid rgba(255,255,255,.07);">
+        <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-muted);">Optional transition overrides</p>
+        <div class="space-y-2">
+          {#each tracks.slice(0, -1) as track, index (track.track_id)}
+            {@const nextTrack = tracks[index + 1]}
+            {@const override = journey.transitions.find((transition) => transition.from_track_id === track.track_id && transition.to_track_id === nextTrack.track_id)}
+            <div class="grid grid-cols-[minmax(0,1fr)_110px] gap-3 items-center">
+              <p class="text-xs truncate" style="color:var(--ink-muted);">{track.title || `Track ${index + 1}`} → {nextTrack.title || `Track ${index + 2}`}</p>
+              <input class="input-dark" aria-label="Crossfade from {track.title} to {nextTrack.title}" type="number" min="250" max="12000" step="250"
+                value={override?.duration_ms || journey.transitions.find((transition) => !transition.from_track_id && transition.type === 'crossfade')?.duration_ms || 1500}
+                on:change={(event) => setTransitionDuration(track.track_id, nextTrack.track_id, event.currentTarget.value)} />
             </div>
-            <div class="flex gap-1 shrink-0">
-              <button type="button" class="w-7 h-7 rounded-lg text-xs disabled:opacity-20"
-                style="background: rgba(255,255,255,.06); color: #fff;" disabled={index === 0}
-                aria-label="Move {node.label} up" on:click={() => move(index, -1)}>↑</button>
-              <button type="button" class="w-7 h-7 rounded-lg text-xs disabled:opacity-20"
-                style="background: rgba(255,255,255,.06); color: #fff;" disabled={index === nodes.length - 1}
-                aria-label="Move {node.label} down" on:click={() => move(index, 1)}>↓</button>
-              <button type="button" class="w-7 h-7 rounded-lg text-xs disabled:opacity-20"
-                style="background: rgba(240,75,107,.1); color: #F06B82;" disabled={REQUIRED.has(node.id)}
-                aria-label="Remove {node.label}" on:click={() => toggle(node.id)}>×</button>
-            </div>
-          </div>
+          {/each}
         </div>
-      {/each}
-    </div>
-  </div>
+      </div>
+    {/if}
+  </section>
 
-  {#if availableIds.some((id) => !enabledIds.has(id))}
-    <div>
-      <p class="t-caption mb-3">Add a moment</p>
-      <div class="flex flex-wrap gap-2">
-        {#each availableIds.filter((id) => !enabledIds.has(id)) as id}
-          <button type="button" class="px-3 py-2 rounded-lg text-xs font-bold"
-            style="background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); color: #fff;"
-            on:click={() => toggle(id)}>＋ {NODE_DEFS[id].label}</button>
+  <section aria-labelledby="overview-heading">
+    <div class="flex items-end justify-between gap-3 mb-3">
+      <div>
+        <p class="t-caption" id="overview-heading">Release timeline overview</p>
+        <p class="text-xs mt-1" style="color:var(--ink-muted);">Select a track to direct its synchronized timeline.</p>
+      </div>
+      <span class="text-xs font-mono" style="color:var(--ink-muted);">{tracks.length} track{tracks.length === 1 ? '' : 's'}</span>
+    </div>
+    <div class="overflow-x-auto pb-2">
+      <div class="flex items-stretch gap-2 min-w-max">
+        {#each timeline as item}
+          {#if item.kind === 'track'}
+            <button type="button" class="w-36 text-left rounded-xl p-3 transition-colors"
+              style="background:{activeScope === item.track.track_id ? 'rgba(123,92,240,.2)' : 'rgba(255,255,255,.045)'};border:1px solid {activeScope === item.track.track_id ? '#7B5CF0' : 'rgba(255,255,255,.09)'};"
+              on:click={() => activeScope = item.track.track_id}>
+              <span class="text-[10px] font-mono" style="color:#9a82ff;">D{item.track.disc_number} · T{String(item.track.track_number).padStart(2, '0')}</span>
+              <span class="block text-sm text-white font-bold mt-1 truncate">{item.track.title || 'Untitled track'}</span>
+              <span class="block text-[10px] mt-1" style="color:var(--ink-muted);">{journey.track_journeys.find((entry) => entry.track_id === item.track.track_id)?.moments.length || 0} Moments</span>
+            </button>
+          {:else if item.kind === 'transition'}
+            <button type="button" class="w-20 rounded-xl px-2 flex flex-col items-center justify-center" title="Create or replace a transition override"
+              style="background:rgba(255,255,255,.025);border:1px dashed rgba(255,255,255,.1);color:var(--ink-muted);"
+              on:click={() => addTransitionOverride(item.from_track_id, item.to_track_id)}>
+              <span class="text-lg">→</span><span class="text-[9px] uppercase tracking-wider">Transition</span>
+            </button>
+          {:else}
+            <button type="button" class="w-28 text-left rounded-xl p-3" style="background:rgba(240,75,216,.07);border:1px solid rgba(240,75,216,.18);"
+              on:click={() => activeScope = 'release'}>
+              <span class="text-[9px] uppercase tracking-wider" style="color:#F04BD8;">{LABELS[item.moment.placement]}</span>
+              <span class="block text-xs text-white font-bold mt-1 line-clamp-2">{item.moment.title}</span>
+            </button>
+          {/if}
         {/each}
       </div>
     </div>
-  {/if}
+  </section>
 
-  {#if !$releaseProject.lyrics.some((entry) => entry.timed_lines?.length) || !$play.games?.length}
-    <p class="text-xs leading-relaxed" style="color: var(--ink-muted);">
-      Add lyrics, an artist statement, or games in earlier steps to unlock more moments for this journey.
+  <section class="grid lg:grid-cols-[220px_minmax(0,1fr)] gap-4" aria-labelledby="direction-heading">
+    <aside class="rounded-2xl p-3 h-fit" style="background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);">
+      <p class="t-caption px-2 mb-2">Journey hierarchy</p>
+      <button type="button" class="w-full text-left rounded-xl px-3 py-3 mb-1"
+        style="background:{activeScope === 'release' ? 'rgba(123,92,240,.18)' : 'transparent'};color:#fff;"
+        on:click={() => activeScope = 'release'}>
+        <span class="text-sm font-bold">Release Journey</span>
+        <span class="block text-[10px] mt-1" style="color:var(--ink-muted);">{journey.release_moments.length} release Moments</span>
+      </button>
+      {#each tracks as track, index (track.track_id)}
+        <button type="button" class="w-full text-left rounded-xl px-3 py-2.5 mb-1"
+          style="background:{activeScope === track.track_id ? 'rgba(123,92,240,.18)' : 'transparent'};color:#fff;"
+          on:click={() => activeScope = track.track_id}>
+          <span class="text-[10px] font-mono" style="color:#9a82ff;">TRACK {String(index + 1).padStart(2, '0')}</span>
+          <span class="block text-xs font-bold truncate">{track.title || 'Untitled track'}</span>
+        </button>
+      {/each}
+    </aside>
+
+    <div class="space-y-3">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="t-caption" id="direction-heading">{activeScope === 'release' ? 'Release-level direction' : `Track ${String(activeTrack?.track_number || '').padStart(2, '0')} direction`}</p>
+          <h3 class="text-lg text-white font-black mt-1">{activeScope === 'release' ? $releaseProject.release.title || 'Complete release' : activeTrack?.title || 'Untitled track'}</h3>
+          <p class="text-xs mt-1" style="color:var(--ink-muted);">{activeScope === 'release' ? 'Moments may sit outside song timestamps.' : 'Moments fire against this track’s own clock.'}</p>
+        </div>
+        <button type="button" class="px-3 py-2 rounded-lg text-xs font-bold shrink-0"
+          style="background:#7B5CF0;color:white;" on:click={addMoment}>＋ Add Moment</button>
+      </div>
+
+      {#if !activeMoments.length}
+        <div class="rounded-2xl p-8 text-center" style="border:1px dashed rgba(255,255,255,.13);color:var(--ink-muted);">
+          No authored Moments yet. Playback still works, but the generated default will be used.
+        </div>
+      {/if}
+
+      {#each activeMoments as moment, index (moment.moment_id)}
+        <article class="rounded-2xl p-4 space-y-3" style="background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.09);">
+          <div class="flex items-center gap-3">
+            <span class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0" style="background:rgba(123,92,240,.2);color:#a995ff;">{index + 1}</span>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-bold text-white truncate">{moment.title || LABELS[moment.type]}</p>
+              <p class="text-[10px] uppercase tracking-wider mt-0.5" style="color:var(--ink-muted);">
+                {activeScope === 'release' ? LABELS[moment.placement] : formatTime(moment.at_ms)} · {LABELS[moment.type] || moment.type}
+              </p>
+            </div>
+            {#if activeScope === 'release'}
+              <button type="button" class="w-7 h-7 rounded-lg disabled:opacity-20" disabled={index === 0} aria-label="Move Moment up" on:click={() => moveReleaseMoment(index, -1)}>↑</button>
+              <button type="button" class="w-7 h-7 rounded-lg disabled:opacity-20" disabled={index === activeMoments.length - 1} aria-label="Move Moment down" on:click={() => moveReleaseMoment(index, 1)}>↓</button>
+            {/if}
+            <button type="button" class="w-7 h-7 rounded-lg" style="color:#F06B82;" aria-label="Remove Moment" on:click={() => removeMoment(moment.moment_id)}>×</button>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label class="label-dark" for="moment-type-{moment.moment_id}">Moment type</label>
+              <select class="input-dark" id="moment-type-{moment.moment_id}" value={moment.type} on:change={(event) => updateMoment(moment.moment_id, { type: event.currentTarget.value })}>
+                {#each activeScope === 'release' ? RELEASE_MOMENT_TYPES : TRACK_MOMENT_TYPES as type}
+                  <option value={type}>{LABELS[type] || type.replaceAll('_', ' ')}</option>
+                {/each}
+              </select>
+            </div>
+            {#if activeScope === 'release'}
+              <div>
+                <label class="label-dark" for="moment-placement-{moment.moment_id}">Placement</label>
+                <select class="input-dark" id="moment-placement-{moment.moment_id}" value={moment.placement} on:change={(event) => updateMoment(moment.moment_id, { placement: event.currentTarget.value })}>
+                  {#each RELEASE_PLACEMENTS as placement}<option value={placement}>{LABELS[placement]}</option>{/each}
+                </select>
+              </div>
+            {:else}
+              <div>
+                <label class="label-dark" for="moment-time-{moment.moment_id}">Track time (seconds)</label>
+                <input class="input-dark" id="moment-time-{moment.moment_id}" type="number" min="0" step="0.1" value={moment.at_ms / 1000}
+                  on:input={(event) => updateMoment(moment.moment_id, { at_ms: Math.round((Number(event.currentTarget.value) || 0) * 1000) })} />
+              </div>
+            {/if}
+          </div>
+
+          {#if activeScope === 'release' && ['before_track', 'after_track', 'during_transition'].includes(moment.placement)}
+            <div>
+              <label class="label-dark" for="moment-anchor-{moment.moment_id}">Anchor track</label>
+              <select class="input-dark" id="moment-anchor-{moment.moment_id}" value={moment.anchor_track_id} on:change={(event) => updateMoment(moment.moment_id, { anchor_track_id: event.currentTarget.value })}>
+                <option value="">Choose a track</option>
+                {#each tracks as track}<option value={track.track_id}>Disc {track.disc_number} · Track {track.track_number} — {track.title}</option>{/each}
+              </select>
+            </div>
+          {/if}
+
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label class="label-dark" for="moment-title-{moment.moment_id}">Title</label>
+              <input class="input-dark" id="moment-title-{moment.moment_id}" value={moment.title} on:input={(event) => updateMoment(moment.moment_id, { title: event.currentTarget.value })} />
+            </div>
+            <div>
+              <label class="label-dark" for="moment-effect-{moment.moment_id}">Atmosphere</label>
+              <select class="input-dark" id="moment-effect-{moment.moment_id}" value={moment.effect} on:change={(event) => updateMoment(moment.moment_id, { effect: event.currentTarget.value })}>
+                {#each MOMENT_EFFECTS as effect}<option value={effect}>{effect.replaceAll('_', ' ')}</option>{/each}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="label-dark" for="moment-body-{moment.moment_id}">Words or direction</label>
+            <textarea class="input-dark min-h-20 resize-y" id="moment-body-{moment.moment_id}" value={moment.body} on:input={(event) => updateMoment(moment.moment_id, { body: event.currentTarget.value })}></textarea>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label class="label-dark" for="moment-asset-{moment.moment_id}">Visual or document</label>
+              <select class="input-dark" id="moment-asset-{moment.moment_id}" value={moment.asset_ref} on:change={(event) => updateMoment(moment.moment_id, { asset_ref: event.currentTarget.value })}>
+                <option value="">Cover / automatic</option>
+                {#each scopedAssets as asset}<option value={asset.asset_id}>{asset.title || asset.filename || asset.role}</option>{/each}
+              </select>
+            </div>
+            <div>
+              <label class="label-dark" for="moment-duration-{moment.moment_id}">Display duration (ms)</label>
+              <input class="input-dark" id="moment-duration-{moment.moment_id}" type="number" min="0" step="250" value={moment.duration_ms}
+                on:input={(event) => updateMoment(moment.moment_id, { duration_ms: Math.max(0, Number(event.currentTarget.value) || 0) })} />
+            </div>
+          </div>
+        </article>
+      {/each}
+    </div>
+  </section>
+
+  <div class="rounded-2xl p-4" style="background:rgba(123,92,240,.08);border:1px solid rgba(123,92,240,.25);">
+    <p class="text-sm font-bold text-white">Generated album Journey</p>
+    <p class="text-xs mt-1 leading-relaxed" style="color:var(--ink-muted);">
+      New releases begin with an object encounter, identity and tracklist reveal; each track receives a brief title reveal; the release closes with reflection, credits, collector message, Archive and History invitations. Your edits above replace that direction without adding repetitive introductions between songs.
     </p>
-  {/if}
+    {#if !$releaseProject.lyrics.some((entry) => entry.timed_lines?.length) && !$play.games?.length && !$assets.guide?.nodes?.length}
+      <p class="text-xs mt-2" style="color:var(--ink-muted);">Add lyrics, extras or games to give the Journey more material to reveal.</p>
+    {/if}
+  </div>
 </div>

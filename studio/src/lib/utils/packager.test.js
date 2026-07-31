@@ -181,6 +181,9 @@ describe('buildPackage — experience.json (play pass-through)', () => {
     expect(config.tracks).toHaveLength(2);
     expect(config.tracks[0].src).toBe(`tracks/01-${project.tracks[0].track_id}/audio/primary.wav`);
     expect(config.playback).toMatchObject({ mode: 'sequential', allow_track_skip: true, resume_enabled: true });
+    expect(config.journey.release_moments.map((moment) => moment.type)).toContain('opening');
+    expect(config.journey.track_journeys).toHaveLength(2);
+    expect(config.journey.track_journeys[1].moments[0]).toMatchObject({ track_id: project.tracks[1].track_id, type: 'title_reveal', at_ms: 0 });
     expect(config.audioSrc).toBe(config.tracks[0].src);
     expect(html).not.toContain('data:audio/wav;base64');
   });

@@ -129,6 +129,13 @@ describe('template ↔ catalog contract', () => {
     expect(ULTRA_HTML).toContain("'nz-release-resume:'");
   });
 
+  it('ships synchronized Journey Moments and persists their visited state', () => {
+    expect(ULTRA_HTML).toContain('id="journey-moment"');
+    expect(ULTRA_HTML).toContain('window.NZ_JOURNEY=');
+    expect(ULTRA_HTML).toContain('journey_moments_visited');
+    expect(ULTRA_HTML).toContain('synchronizeTrackJourney');
+  });
+
   it('keeps every generated inline script syntactically valid', () => {
     const html = buildExperienceHTML({ ...base, play: { games: ['pulse'] } });
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);

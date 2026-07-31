@@ -309,6 +309,7 @@ export const manifest = derived(releaseProject, ($project) => ({
   components: [
     ...$project.audio_assets.map(({ file: _file, ...asset }) => asset),
     ...$project.release_assets.map(({ file: _file, ...asset }) => asset),
+    ...$project.track_assets.map(({ file: _file, ...asset }) => asset),
   ],
   edition: $project.edition,
   rights: $project.rights,

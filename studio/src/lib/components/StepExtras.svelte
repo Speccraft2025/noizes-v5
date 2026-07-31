@@ -37,7 +37,7 @@
 
 <div class="space-y-7">
   <div>
-    <p class="t-caption mb-2">Step 4</p>
+    <p class="t-caption mb-2">Step 5</p>
     <h2 class="text-2xl font-black tracking-tight text-white">Extras</h2>
     <p class="text-sm mt-1" style="color: var(--ink-muted);">Add context, interactive moments, and deliberate online pathways around the music.</p>
   </div>

@@ -20,7 +20,9 @@ export async function POST({ request, locals }) {
 
   const { release_id: releaseId, meta } = await request.json();
   if (!UUID_RE.test(releaseId || '')) throw error(400, 'release_id must be the uuid returned by upload-urls');
-  if (!meta?.artist || !meta?.title) throw error(400, 'meta.artist and meta.title are required');
+  if (!meta?.title || (!meta?.artist && meta?.release_type !== 'compilation')) {
+    throw error(400, 'meta.title and a primary artist are required (Compilation may use Various Artists)');
+  }
 
   const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   // Derived from the session, never from the request — a client cannot
@@ -48,15 +50,55 @@ export async function POST({ request, locals }) {
   if (dlErr) throw error(500, `.nz download failed: ${dlErr.message}`);
 
   const zip = await JSZip.loadAsync(Buffer.from(await nzBlob.arrayBuffer()));
-  const audioEntry = Object.keys(zip.files).find(f => f.startsWith('audio/') && !zip.files[f].dir);
-  if (audioEntry) {
-    const audioBuf = await zip.files[audioEntry].async('nodebuffer');
-    const hash = nodeCrypto.createHash('sha256').update(audioBuf).digest('hex');
+  let packageManifest = null;
+  let declaredComponents = [];
+  const manifestEntry = zip.file('manifest.json');
+  if (manifestEntry) {
+    try {
+      packageManifest = JSON.parse(await manifestEntry.async('string'));
+      declaredComponents = packageManifest.components || [];
+    } catch {
+      throw error(400, 'Package manifest.json is not valid JSON');
+    }
+  }
+  if (packageManifest?.release?.release_id && packageManifest.release.release_id !== releaseId) {
+    throw error(400, 'Package release ID does not match the publish target');
+  }
+  const inventoryEntries = declaredComponents.length
+    ? declaredComponents.map((component) => component.path).filter(Boolean)
+    : Object.keys(zip.files).filter((path) =>
+        !zip.files[path].dir && (
+          path.startsWith('audio/')
+          || /^tracks\/[^/]+\/audio\//.test(path)
+          || path.startsWith('release/audio/')
+        )
+      );
+  if (inventoryEntries.length) {
+    const components = [];
+    for (const path of [...new Set(inventoryEntries)].sort()) {
+      const entry = zip.file(path);
+      if (!entry) throw error(400, `Manifest component is missing from package: ${path}`);
+      const audioBuf = await entry.async('nodebuffer');
+      const sha256 = nodeCrypto.createHash('sha256').update(audioBuf).digest('hex');
+      const declared = declaredComponents.find((component) => component.path === path);
+      if (declared?.sha256 && declared.sha256 !== sha256) {
+        throw error(400, `Component checksum mismatch: ${path}`);
+      }
+      components.push({
+        component_id: declared?.component_id || null,
+        path,
+        sha256,
+        size: audioBuf.byteLength,
+      });
+    }
+    const inventory = Buffer.from(components.map((component) => `${component.path}:${component.sha256}:${component.size}`).join('\n'));
+    const hash = nodeCrypto.createHash('sha256').update(inventory).digest('hex');
     const { signature, publicKey } = await signHash(sb, locals.user.id, Buffer.from(hash, 'hex'));
 
     zip.file('authenticity.json', JSON.stringify({
-      method: 'sha256',
+      method: 'sha256-component-inventory',
       hash,
+      components,
       signed: true,
       algorithm: 'ed25519',
       signer_public_key: publicKey,
@@ -78,8 +120,17 @@ export async function POST({ request, locals }) {
     .upsert({
       id: releaseId,
       artist_id: locals.user.id,
-      artist_name: meta.artist,
+      artist_name: meta.artist || 'Various Artists',
       title: meta.title,
+      release_type: meta.release_type || 'single',
+      featured_artists: Array.isArray(meta.featured_artists) ? meta.featured_artists : [],
+      compilation_artists: Array.isArray(meta.compilation_artists) ? meta.compilation_artists : [],
+      release_date: meta.release_date || null,
+      genres: String(meta.genre || '').split(',').map((entry) => entry.trim()).filter(Boolean),
+      catalogue_number: meta.catalogue_number || null,
+      label: meta.label || null,
+      track_count: Number(meta.track_count) || 0,
+      disc_count: Number(meta.disc_count) || 1,
       genre: meta.genre,
       year: meta.year,
       location: meta.location,
@@ -98,6 +149,90 @@ export async function POST({ request, locals }) {
     .single();
 
   if (dbErr) throw error(500, `DB insert failed: ${dbErr.message}`);
+
+  // The package manifest and track.json records are authoritative. Replace the
+  // normalized rows from the service-role publish boundary; acquisitions
+  // remain linked only to the complete release row.
+  if (packageManifest?.package_type === 'music_release') {
+    const trackRecords = [];
+    for (const path of Object.keys(zip.files).filter((name) => /^tracks\/[^/]+\/track\.json$/.test(name)).sort()) {
+      try {
+        trackRecords.push(JSON.parse(await zip.files[path].async('string')));
+      } catch {
+        throw error(400, `Invalid track record: ${path}`);
+      }
+    }
+
+    const { error: clearErr } = await sb.from('tracks').delete().eq('release_id', releaseId);
+    if (clearErr) throw error(500, `Could not replace published tracklist: ${clearErr.message}`);
+
+    if (trackRecords.length) {
+      const { error: trackErr } = await sb.from('tracks').insert(trackRecords.map((track) => ({
+        id: track.track_id,
+        release_id: releaseId,
+        position: track.position,
+        disc_number: track.disc_number,
+        track_number: track.track_number,
+        title: track.title,
+        subtitle: track.subtitle || null,
+        primary_artist: track.primary_artist,
+        featured_artists: track.featured_artists || [],
+        producers: track.producers || [],
+        writers: track.writers || [],
+        isrc: track.isrc || null,
+        explicit: Boolean(track.explicit),
+        bonus: Boolean(track.bonus),
+        hidden: Boolean(track.hidden),
+        description: track.description || null,
+        artwork_ref: track.artwork_ref || null,
+        primary_version_id: track.audio_versions?.find((version) => version.is_primary)?.version_id || null,
+        primary_audio_asset_id: track.primary_audio_component || null,
+        appears_in_journey: track.appears_in_journey !== false,
+        appears_in_archive: track.appears_in_archive !== false,
+        lyrics: track.lyrics || {},
+        credits: track.credits || {},
+        rights: track.rights || {},
+      })));
+      if (trackErr) throw error(500, `Could not publish tracklist: ${trackErr.message}`);
+
+      const versions = trackRecords.flatMap((track) => (track.audio_versions || []).map((version) => ({
+        id: version.version_id,
+        release_id: releaseId,
+        track_id: track.track_id,
+        role: version.role,
+        title: version.title || '',
+        is_primary: Boolean(version.is_primary),
+        notes: version.notes || null,
+      })));
+      if (versions.length) {
+        const { error: versionErr } = await sb.from('audio_versions').insert(versions);
+        if (versionErr) throw error(500, `Could not publish audio versions: ${versionErr.message}`);
+      }
+
+      const audioAssets = declaredComponents.filter((component) => component.type === 'audio').map((component) => ({
+        id: component.component_id,
+        release_id: releaseId,
+        track_id: component.track_id || null,
+        version_id: component.version_id || null,
+        scope: component.scope,
+        role: component.role,
+        title: component.title || null,
+        filename: component.filename || null,
+        storage_path: `${nz_path}#${component.path}`,
+        mime: component.mime || null,
+        duration_ms: Number(component.duration_ms) || 0,
+        sample_rate: Number(component.sample_rate) || 0,
+        bit_depth: Number(component.bit_depth) || 0,
+        channels: Number(component.channels) || 0,
+        size_bytes: Number(component.size) || 0,
+        sha256: component.sha256 || null,
+      }));
+      if (audioAssets.length) {
+        const { error: assetErr } = await sb.from('audio_assets').insert(audioAssets);
+        if (assetErr) throw error(500, `Could not publish audio assets: ${assetErr.message}`);
+      }
+    }
+  }
 
   return json({ success: true, release_id: release.id });
 }

@@ -69,7 +69,7 @@
 
 <div class="space-y-5">
   <div>
-    <p class="t-caption mb-2">Step 5</p>
+    <p class="t-caption mb-2">Step 6</p>
     <h2 class="text-2xl font-black tracking-tight text-white">Guided experience</h2>
     <p class="text-sm mt-1" style="color: var(--ink-muted);">
       Shape the journey listeners take through your music. Rename, reorder and choose each moment.

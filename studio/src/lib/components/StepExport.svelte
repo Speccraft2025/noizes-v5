@@ -1,7 +1,8 @@
 <script>
-  import { identity, edition, assets, rights, template, play, extras } from '$lib/stores/package.js';
+  import { identity, edition, assets, releaseProject, template, play, extras } from '$lib/stores/package.js';
   import { buildPackage } from '$lib/utils/packager.js';
   import { editionErrors } from '$lib/utils/project.js';
+  import { validateReleaseProject } from '$lib/domain/release.js';
 
   let exporting = false;
   let exported = false;
@@ -12,8 +13,10 @@
   let progress = 0;
   let statusLabel = 'Compiling package…';
 
-  $: validationErrors = editionErrors($edition);
-  $: canExport = $identity.artist && $identity.title && $identity.year && $assets.audioFile && $assets.coverFile && !validationErrors.length;
+  $: projectValidation = validateReleaseProject($releaseProject);
+  $: validationErrors = [...editionErrors($edition), ...projectValidation.errors.map((issue) => issue.message)];
+  $: mainCover = $releaseProject.release_assets.find((asset) => asset.role === 'main_cover');
+  $: canExport = Boolean($identity.title && $identity.year && mainCover?.file && !validationErrors.length);
 
   async function doExport() {
     exporting = true;
@@ -33,10 +36,7 @@
     let result;
     try {
       result = await buildPackage({
-        identity: $identity,
-        edition:  $edition,
-        assets:   $assets,
-        rights:   $rights,
+        project:  $releaseProject,
         template: $template,
         play:     $play,
         extras:   $extras,
@@ -99,6 +99,14 @@
           meta: {
             artist: $identity.artist,
             title: $identity.title,
+            release_type: $releaseProject.release.release_type,
+            featured_artists: $releaseProject.release.featured_artists,
+            compilation_artists: $releaseProject.release.compilation_artists,
+            release_date: $releaseProject.release.release_date,
+            catalogue_number: $releaseProject.release.catalogue_number,
+            label: $releaseProject.release.label,
+            track_count: $releaseProject.tracks.length,
+            disc_count: Math.max(1, ...$releaseProject.tracks.map((track) => Number(track.disc_number) || 1)),
             genre: $identity.genre,
             year: $identity.year,
             location: $identity.location,
@@ -126,11 +134,11 @@
   }
 
   const files = [
-    ['manifest.json', 'Work identity & metadata'],
+    ['manifest.json', 'Release, tracklist & complete component inventory'],
     ['edition.json', 'Edition type, size & pricing'],
-    ['rights.json', 'Copyright & license'],
-    ['credits.json', 'Production credits'],
-    ['authenticity.json', 'sha256 integrity record'],
+    ['rights.json', 'Release and track rights declarations'],
+    ['credits.json', 'Release and per-track production credits'],
+    ['authenticity.json', 'Per-component sha256 inventory'],
     ['technical.json', 'Packager & timestamp'],
     ['experience.html', 'Self-contained offline player'],
   ];
@@ -152,16 +160,16 @@
         <span class="text-xs" style="color: var(--ink-muted);">{desc}</span>
       </div>
     {/each}
-    {#if $assets.audioName}
+    {#if $releaseProject.audio_assets.length}
       <div class="flex items-center gap-3 py-1.5 border-b" style="border-color: var(--border-dim);">
-        <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">audio/</span>
-        <span class="text-xs" style="color: var(--ink-muted);">{$assets.audioName}</span>
+        <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">tracks/*/audio/</span>
+        <span class="text-xs" style="color: var(--ink-muted);">{$releaseProject.audio_assets.length} audio component{$releaseProject.audio_assets.length === 1 ? '' : 's'}</span>
       </div>
     {/if}
-    {#if $assets.coverName}
+    {#if mainCover}
       <div class="flex items-center gap-3 py-1.5 border-b" style="border-color: var(--border-dim);">
-        <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">cover/</span>
-        <span class="text-xs" style="color: var(--ink-muted);">{$assets.coverName}</span>
+        <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">release/cover/</span>
+        <span class="text-xs" style="color: var(--ink-muted);">{mainCover.filename}</span>
       </div>
     {/if}
     <div class="flex items-center gap-3 py-1.5">
@@ -172,7 +180,10 @@
 
   {#if !canExport}
     <div class="glass rounded-lg px-4 py-3 text-sm" style="color: var(--ink-muted); border-color: rgba(123,92,240,0.2);">
-      Complete Identity, upload primary audio and cover art, then provide a valid fixed-supply edition before compiling.
+      Complete release identity and tracklist, attach every visible track’s primary audio and a main cover, then provide a valid fixed-supply edition.
+      {#if validationErrors.length}
+        <span class="block mt-2" style="color:#F08A9D;">{validationErrors[0]}{validationErrors.length > 1 ? ` (+${validationErrors.length - 1} more)` : ''}</span>
+      {/if}
     </div>
   {/if}
 

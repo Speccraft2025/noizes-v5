@@ -211,6 +211,27 @@ export function createReleaseAsset(input = {}, options = {}) {
   };
 }
 
+export function createTrackAsset(input = {}, options = {}) {
+  const idFactory = options.idFactory || createUuid;
+  const file = input.file ?? null;
+  const filename = clean(input.filename ?? file?.name);
+  const trackId = clean(input.track_id ?? options.trackId);
+  return {
+    asset_id: normalizeId(input.asset_id ?? input.id, `${options.releaseId}:track-asset:${trackId}:${options.index ?? 0}:${filename || input.role}`, idFactory),
+    track_id: trackId,
+    scope: 'track',
+    type: clean(input.type) || 'image',
+    role: clean(input.role) || 'supporting',
+    title: clean(input.title),
+    filename,
+    path: clean(input.path ?? input.storage_path),
+    mime: clean(input.mime ?? file?.type),
+    size: Math.max(0, Number(input.size ?? file?.size) || 0),
+    sha256: clean(input.sha256).toLowerCase(),
+    file,
+  };
+}
+
 function defaultJourney(trackIds, input = {}) {
   const trackJourneys = Array.isArray(input.track_journeys)
     ? input.track_journeys
@@ -295,6 +316,11 @@ export function normalizeReleaseProject(input = {}, options = {}) {
     index,
   }));
   let releaseAssets = (input.release_assets ?? []).map((asset, index) => createReleaseAsset(asset, {
+    idFactory,
+    releaseId,
+    index,
+  }));
+  const trackAssets = (input.track_assets ?? []).map((asset, index) => createTrackAsset(asset, {
     idFactory,
     releaseId,
     index,
@@ -423,6 +449,7 @@ export function normalizeReleaseProject(input = {}, options = {}) {
     audio_versions: audioVersions,
     audio_assets: audioAssets,
     release_assets: releaseAssets,
+    track_assets: trackAssets,
     lyrics,
     journey: defaultJourney(tracks.map((track) => track.track_id), journeyInput),
     edition,
@@ -497,6 +524,7 @@ export function validateReleaseProject(project, options = {}) {
   const tracks = Array.isArray(project?.tracks) ? project.tracks : [];
   const versions = Array.isArray(project?.audio_versions) ? project.audio_versions : [];
   const assets = Array.isArray(project?.audio_assets) ? project.audio_assets : [];
+  const trackAssets = Array.isArray(project?.track_assets) ? project.track_assets : [];
 
   if (!UUID_RE.test(clean(release.release_id))) add('error', 'release_id_invalid', 'release.release_id', 'Release ID must be a UUID.');
   if (!RELEASE_TYPES.includes(release.release_type)) add('error', 'release_type_invalid', 'release.release_type', 'Choose a supported release type.');
@@ -568,6 +596,13 @@ export function validateReleaseProject(project, options = {}) {
     if (asset.scope === 'release' && asset.track_id) add('error', 'release_asset_has_track', `${path}.track_id`, 'Release-scoped audio cannot also belong to a track.');
     if (asset.scope === 'track' && !asset.track_id) add('error', 'track_asset_missing_track', `${path}.track_id`, 'Track-scoped audio must belong to a track.');
     if (asset.version_id && !versionIds.has(asset.version_id)) add('error', 'asset_version_missing', `${path}.version_id`, 'Audio asset references an unknown version.');
+  }
+
+  for (const [index, asset] of trackAssets.entries()) {
+    const path = `track_assets[${index}]`;
+    if (assetIds.has(asset.asset_id)) add('error', 'asset_id_duplicate', `${path}.asset_id`, 'Component IDs must be unique across the package.');
+    assetIds.add(asset.asset_id);
+    if (!trackIds.has(asset.track_id)) add('error', 'asset_track_missing', `${path}.track_id`, 'Track asset references an unknown track.');
   }
 
   const edition = project?.edition ?? {};

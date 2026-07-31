@@ -1,5 +1,6 @@
 <script>
-  import { assets } from '$lib/stores/package.js';
+  import { releaseProject } from '$lib/stores/package.js';
+  import { orderedTracks } from '$lib/domain/release.js';
   import { onDestroy } from 'svelte';
 
   // ── state ──────────────────────────────────────────────────────────────────
@@ -14,16 +15,103 @@
   let currentMs = 0;
   let duration  = 0;
   let animFrame;
+  let selectedTrackId = '';
+  let loadedAudioFile = null;
 
-  // ── audio from store ───────────────────────────────────────────────────────
-  $: if ($assets.audioFile && !audioUrl) {
-    audioUrl = URL.createObjectURL($assets.audioFile);
+  $: tracks = orderedTracks($releaseProject.tracks);
+  $: if (tracks.length && (!selectedTrackId || !tracks.some((track) => track.track_id === selectedTrackId))) {
+    selectTrack(tracks[0].track_id);
+  }
+  $: selectedTrack = tracks.find((track) => track.track_id === selectedTrackId);
+  $: lyricRecord = $releaseProject.lyrics.find((entry) => entry.track_id === selectedTrackId) ?? {
+    track_id: selectedTrackId,
+    language: '',
+    instrumental: false,
+    spoken_word: false,
+    plain_text: '',
+    timed_lines: [],
+    translations: [],
+    transliterations: [],
+    credits: {},
+  };
+  $: selectedAudio = $releaseProject.audio_assets.find((asset) => asset.asset_id === selectedTrack?.primary_audio_ref)
+    ?? $releaseProject.audio_assets.find((asset) => asset.track_id === selectedTrackId && asset.role === 'primary_master');
+
+  // ── audio from selected track ──────────────────────────────────────────────
+  $: if ((selectedAudio?.file ?? null) !== loadedAudioFile) {
+    loadAudio(selectedAudio?.file ?? null);
   }
 
   onDestroy(() => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     cancelAnimationFrame(animFrame);
   });
+
+  function loadAudio(file) {
+    if (audioEl) audioEl.pause();
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    loadedAudioFile = file;
+    audioUrl = file ? URL.createObjectURL(file) : '';
+    currentMs = 0;
+    duration = 0;
+    playing = false;
+  }
+
+  function selectTrack(trackId) {
+    if (!trackId) return;
+    if (audioEl) audioEl.pause();
+    selectedTrackId = trackId;
+    const record = $releaseProject.lyrics.find((entry) => entry.track_id === trackId);
+    const timed = record?.timed_lines ?? [];
+    lines = timed.map((line) => line.text);
+    stamps = timed.map((line) => Number(line.t) || 0);
+    rawText = record?.plain_text || lines.join('\n');
+    mode = timed.length ? 'review' : 'edit';
+    syncIdx = 0;
+    currentMs = 0;
+    playing = false;
+  }
+
+  function updateLyricRecord(patch) {
+    releaseProject.update((project) => {
+      const current = project.lyrics.find((entry) => entry.track_id === selectedTrackId) ?? {
+        track_id: selectedTrackId,
+        language: '',
+        instrumental: false,
+        spoken_word: false,
+        plain_text: '',
+        timed_lines: [],
+        translations: [],
+        transliterations: [],
+        credits: {},
+      };
+      return {
+        ...project,
+        lyrics: [
+          ...project.lyrics.filter((entry) => entry.track_id !== selectedTrackId),
+          { ...current, ...patch, track_id: selectedTrackId },
+        ],
+      };
+    });
+  }
+
+  async function importLrc(event) {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const imported = text.split(/\r?\n/).flatMap((row) => {
+      const match = row.match(/^\[(\d+):(\d+(?:\.\d+)?)\](.*)$/);
+      if (!match) return [];
+      return [{ t: Math.round((Number(match[1]) * 60 + Number(match[2])) * 1000), text: match[3].trim() }];
+    });
+    if (!imported.length) return;
+    lines = imported.map((line) => line.text);
+    stamps = imported.map((line) => line.t);
+    rawText = lines.join('\n');
+    mode = 'review';
+    updateLyricRecord({ plain_text: rawText, timed_lines: imported });
+    event.currentTarget.value = '';
+  }
 
   // ── helpers ────────────────────────────────────────────────────────────────
   function fmt(ms) {
@@ -130,7 +218,7 @@
     const result = lines
       .map((text, i) => ({ t: stamps[i] >= 0 ? stamps[i] : 0, text }))
       .filter((_, i) => stamps[i] >= 0);
-    assets.update(a => ({ ...a, lyrics: result }));
+    updateLyricRecord({ plain_text: rawText, timed_lines: result });
   }
 
   function restart() {
@@ -162,16 +250,61 @@
 
 <div class="space-y-5">
   <div>
-    <p class="t-caption mb-2">Step 3</p>
-    <h2 class="text-2xl font-black tracking-tight text-white">Lyrics Sync</h2>
+    <p class="t-caption mb-2">Step 4</p>
+    <h2 class="text-2xl font-black tracking-tight text-white">Lyrics by track</h2>
     <p class="text-sm mt-1" style="color: var(--ink-muted);">
       Sync lyric timestamps against the audio in your browser.
     </p>
   </div>
 
-  {#if !$assets.audioFile}
+  {#if tracks.length}
+    <div class="flex gap-2 overflow-x-auto pb-1">
+      {#each tracks as track}
+        <button type="button" class="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold" style={selectedTrackId === track.track_id
+          ? 'background:#7B5CF0;color:white;'
+          : 'background:rgba(255,255,255,.05);color:var(--ink-muted);'} on:click={() => selectTrack(track.track_id)}>
+          {track.disc_number}.{track.track_number} {track.title || 'Untitled'}
+        </button>
+      {/each}
+    </div>
+
+    <div class="glass rounded-xl p-4 space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="label-dark" for="lyric-language">Language</label>
+          <input id="lyric-language" class="input-dark" type="text" value={lyricRecord.language} placeholder="e.g. sw, en"
+            on:input={(event) => updateLyricRecord({ language: event.currentTarget.value })} />
+        </div>
+        <div class="flex items-end pb-2 gap-4 text-xs" style="color:var(--ink-muted);">
+          <label class="flex items-center gap-2"><input type="checkbox" checked={lyricRecord.instrumental} on:change={(event) => updateLyricRecord({ instrumental: event.currentTarget.checked })} /> Instrumental</label>
+          <label class="flex items-center gap-2"><input type="checkbox" checked={lyricRecord.spoken_word} on:change={(event) => updateLyricRecord({ spoken_word: event.currentTarget.checked })} /> Spoken word</label>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-xs" style="color:var(--ink-muted);">Plain text and timed lines are stored against this stable track ID.</p>
+        <label class="btn-ghost text-xs py-1.5 px-3 cursor-pointer shrink-0">Import LRC<input class="hidden" type="file" accept=".lrc,text/plain" on:change={importLrc} /></label>
+      </div>
+    </div>
+  {/if}
+
+  {#if !selectedTrack}
     <div class="glass rounded-xl p-6 text-center">
-      <p class="text-sm" style="color: var(--ink-muted);">Upload an audio file in Step 2 first.</p>
+      <p class="text-sm" style="color: var(--ink-muted);">Add a track in Step 2 before authoring lyrics.</p>
+    </div>
+  {:else if lyricRecord.instrumental}
+    <div class="glass rounded-xl p-6 text-center">
+      <p class="text-sm text-white font-bold">Marked instrumental</p>
+      <p class="text-xs mt-1" style="color:var(--ink-muted);">The Journey and Archive will identify this intentionally; it is not treated as missing content.</p>
+    </div>
+  {:else if !selectedAudio?.file}
+    <div class="glass rounded-xl p-6 text-center">
+      <p class="text-sm" style="color: var(--ink-muted);">Upload this track’s primary master in Step 3 before synchronizing. Plain lyrics can still be saved below.</p>
+    </div>
+
+    <div>
+      <label class="label-dark" for="lyrics-input-no-audio">Plain lyrics</label>
+      <textarea id="lyrics-input-no-audio" class="input-dark resize-none font-mono text-sm" rows="10" bind:value={rawText}
+        on:blur={() => updateLyricRecord({ plain_text: rawText })} placeholder="One line per line"></textarea>
     </div>
 
   {:else if mode === 'edit'}
@@ -183,6 +316,7 @@
         style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-dim); color: #fff; min-height: 220px; outline: none;"
         placeholder={"I never thought I'd see the day\nI thought that I had finally moved along\n..."}
         bind:value={rawText}
+        on:blur={() => updateLyricRecord({ plain_text: rawText })}
       ></textarea>
       <p class="text-xs mt-1" style="color: var(--ink-muted);">
         {rawText.split('\n').filter(l => l.trim()).length} lines
@@ -193,9 +327,9 @@
       Start lyric sync →
     </button>
 
-    {#if $assets.lyrics && $assets.lyrics.length}
+    {#if lyricRecord.timed_lines && lyricRecord.timed_lines.length}
       <p class="text-xs text-center" style="color: var(--ink-muted);">
-        ✓ {$assets.lyrics.length} lines already synced — re-run to replace
+        ✓ {lyricRecord.timed_lines.length} lines already synced — re-run to replace
       </p>
     {/if}
 

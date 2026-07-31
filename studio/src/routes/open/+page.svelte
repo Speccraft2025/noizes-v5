@@ -56,7 +56,9 @@
       // Patch audio to blob URLs so iOS can play them
       const audioFiles = [];
       zip.forEach((path, f) => {
-        if (path.startsWith('audio/') && !f.dir) audioFiles.push({ path, f });
+        if (!f.dir && (path.startsWith('audio/') || path.startsWith('release/audio/') || /^tracks\/[^/]+\/audio\//.test(path))) {
+          audioFiles.push({ path, f });
+        }
       });
       for (const { path, f } of audioFiles) {
         const buf = await f.async('arraybuffer');
@@ -65,10 +67,9 @@
         const blob = new Blob([buf], { type: mime });
         const url = URL.createObjectURL(blob);
         blobUrls.push(url);
-        const rel = path.replace('audio/', '');
-        // Patch HTML src attributes AND JSON string values in NZ_CONFIG
-        html = html.split(`src="audio/${rel}"`).join(`src="${url}"`);
-        html = html.split(`"audio/${rel}"`).join(`"${url}"`);
+        // Patch HTML src attributes AND JSON string values in NZ_CONFIG.
+        html = html.split(`src="${path}"`).join(`src="${url}"`);
+        html = html.split(`"${path}"`).join(`"${url}"`);
       }
 
       // Use blob URL for iframe — more compatible than srcdoc on iOS Safari
@@ -110,13 +111,13 @@
         <span class="font-black text-sm tracking-tight text-white">NOIZES</span>
         <span class="text-xs font-mono px-2 py-0.5 rounded"
           style="background: rgba(123,92,240,0.12); color: #7B5CF0;">
-          {manifest?.title || filename}
+          {manifest?.release?.title || manifest?.title || filename}
         </span>
       </div>
       <div class="flex items-center gap-3">
-        {#if manifest?.artist}
+        {#if manifest?.release?.primary_artist || manifest?.artist}
           <span class="text-xs font-mono" style="color: #555;">
-            {manifest.artist}{manifest.year ? ' · ' + manifest.year : ''}
+            {manifest?.release?.primary_artist || manifest.artist}{(manifest?.release?.year || manifest?.year) ? ' · ' + (manifest?.release?.year || manifest.year) : ''}
           </span>
         {/if}
         <button on:click={reset}

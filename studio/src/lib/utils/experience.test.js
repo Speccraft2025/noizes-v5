@@ -119,6 +119,22 @@ describe('template ↔ catalog contract', () => {
     expect(ULTRA_HTML).toContain('id="view-notes"');
     expect(ULTRA_HTML).toMatch(/\.tabs\{[\s\S]*?display:none/);
   });
+
+  it('ships the release playback engine, tracklist, standby handoff, and resume state', () => {
+    expect(ULTRA_HTML).toContain('id="view-tracklist"');
+    expect(ULTRA_HTML).toContain('id="audio-next"');
+    expect(ULTRA_HTML).toContain('window.NZ_PLAYBACK=');
+    expect(ULTRA_HTML).toContain("playbackSettings.mode==='crossfade'");
+    expect(ULTRA_HTML).toContain("playbackSettings.mode==='gapless'");
+    expect(ULTRA_HTML).toContain("'nz-release-resume:'");
+  });
+
+  it('keeps every generated inline script syntactically valid', () => {
+    const html = buildExperienceHTML({ ...base, play: { games: ['pulse'] } });
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    expect(scripts.length).toBeGreaterThan(1);
+    for (const source of scripts) expect(() => new Function(source)).not.toThrow();
+  });
 });
 
 describe('buildExperienceHTML — script-breakout escaping (XSS regression)', () => {

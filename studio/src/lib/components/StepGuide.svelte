@@ -1,5 +1,5 @@
 <script>
-  import { assets, extras, play, template } from '$lib/stores/package.js';
+  import { assets, extras, play, releaseProject, template } from '$lib/stores/package.js';
 
   const NODE_DEFS = {
     arrival: { type: 'arrival', label: 'Arrival', view: 'intro', hint: 'A cinematic welcome into the release.' },
@@ -17,7 +17,7 @@
   const REQUIRED = new Set(['listen']);
 
   function isAvailable(id) {
-    if (id === 'lyrics') return !!($assets.lyrics && $assets.lyrics.length);
+    if (id === 'lyrics') return $releaseProject.lyrics.some((entry) => entry.timed_lines?.length);
     if (id === 'play') return !!($play.games && $play.games.length);
     if (id === 'story') return !!$extras.story?.trim();
     if (id === 'notes') return !!$extras.pdfs?.length;
@@ -65,6 +65,23 @@
   function setFreeExplore(allowFreeExplore) {
     updateGuide(nodes, allowFreeExplore);
   }
+
+  function setPlayback(patch) {
+    releaseProject.update((project) => ({
+      ...project,
+      journey: { ...project.journey, ...patch },
+    }));
+  }
+
+  function setNavigation(field, value) {
+    releaseProject.update((project) => ({
+      ...project,
+      journey: {
+        ...project.journey,
+        navigation: { ...project.journey.navigation, [field]: value },
+      },
+    }));
+  }
 </script>
 
 <div class="space-y-5">
@@ -74,6 +91,54 @@
     <p class="text-sm mt-1" style="color: var(--ink-muted);">
       Shape the journey listeners take through your music. Rename, reorder and choose each moment.
     </p>
+  </div>
+
+  <div class="glass rounded-2xl p-4 space-y-4">
+    <div>
+      <p class="t-caption">Release playback</p>
+      <p class="text-xs mt-1" style="color:var(--ink-muted);">One engine carries the collector across the complete work.</p>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="label-dark" for="playback-mode">Transition mode</label>
+        <select id="playback-mode" class="input-dark" value={$releaseProject.journey.playback_mode}
+          on:change={(event) => setPlayback({ playback_mode: event.currentTarget.value })}>
+          <option value="sequential">Sequential</option>
+          <option value="gapless">Gapless</option>
+          <option value="crossfade">Crossfade</option>
+        </select>
+      </div>
+      {#if $releaseProject.journey.playback_mode === 'crossfade'}
+        <div>
+          <label class="label-dark" for="crossfade-duration">Crossfade (ms)</label>
+          <input id="crossfade-duration" class="input-dark" type="number" min="250" max="12000" step="250"
+            value={$releaseProject.journey.transitions.find((transition) => transition.type === 'crossfade')?.duration_ms || 1500}
+            on:input={(event) => setPlayback({ transitions: [{ type: 'crossfade', duration_ms: Number(event.currentTarget.value) || 1500 }] })} />
+        </div>
+      {:else}
+        <div class="rounded-xl px-3 py-2 flex items-center" style="background:rgba(255,255,255,.03);">
+          <p class="text-xs" style="color:var(--ink-muted);">{ $releaseProject.journey.playback_mode === 'gapless' ? 'The next master is preloaded for continuous handoff.' : 'Each track completes before the next begins.'}</p>
+        </div>
+      {/if}
+    </div>
+    <div class="grid grid-cols-2 gap-2 text-xs">
+      {#each [
+        ['allow_track_skip', 'Allow track selection'],
+        ['allow_seek', 'Allow seeking'],
+        ['allow_shuffle', 'Allow shuffle'],
+        ['allow_repeat', 'Allow repeat'],
+        ['resume_enabled', 'Remember listening position'],
+        ['allow_archive_during_journey', 'Archive during Journey'],
+      ] as [field, label]}
+        <label class="flex items-center gap-2 rounded-lg px-3 py-2" style="background:rgba(255,255,255,.03);color:var(--ink-muted);">
+          <input type="checkbox" checked={$releaseProject.journey.navigation[field]} on:change={(event) => setNavigation(field, event.currentTarget.checked)} />
+          {label}
+        </label>
+      {/each}
+    </div>
+    {#if $releaseProject.journey.navigation.allow_shuffle}
+      <p class="text-xs" style="color:#F0B06B;">Shuffle can break an authored Journey. It remains off by default.</p>
+    {/if}
   </div>
 
   <div class="rounded-2xl p-4" style="background: rgba(123,92,240,.08); border: 1px solid rgba(123,92,240,.25);">
@@ -140,7 +205,7 @@
     </div>
   {/if}
 
-  {#if !$assets.lyrics?.length || !$play.games?.length}
+  {#if !$releaseProject.lyrics.some((entry) => entry.timed_lines?.length) || !$play.games?.length}
     <p class="text-xs leading-relaxed" style="color: var(--ink-muted);">
       Add lyrics, an artist statement, or games in earlier steps to unlock more moments for this journey.
     </p>

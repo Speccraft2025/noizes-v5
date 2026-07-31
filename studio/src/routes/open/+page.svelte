@@ -53,17 +53,24 @@
       }
       let html = await expFile.async('string');
 
-      // Patch audio to blob URLs so iOS can play them
-      const audioFiles = [];
+      // Resolve packaged components to Blob URLs. The generated experience
+      // stays lightweight and references archive paths instead of duplicating
+      // an album's masters as data URIs.
+      const packagedFiles = [];
       zip.forEach((path, f) => {
-        if (!f.dir && (path.startsWith('audio/') || path.startsWith('release/audio/') || /^tracks\/[^/]+\/audio\//.test(path))) {
-          audioFiles.push({ path, f });
+        const declared = manifest?.components?.find((component) => component.path === path);
+        if (!f.dir && (declared || path.startsWith('audio/') || path.startsWith('release/audio/') || /^tracks\/[^/]+\/audio\//.test(path))) {
+          packagedFiles.push({ path, f, declared });
         }
       });
-      for (const { path, f } of audioFiles) {
+      for (const { path, f, declared } of packagedFiles) {
         const buf = await f.async('arraybuffer');
         const ext = path.split('.').pop().toLowerCase();
-        const mime = { mp3: 'audio/mpeg', flac: 'audio/flac', wav: 'audio/wav', aac: 'audio/aac', m4a: 'audio/mp4' }[ext] || 'audio/mpeg';
+        const mime = declared?.mime || {
+          mp3: 'audio/mpeg', flac: 'audio/flac', wav: 'audio/wav', aac: 'audio/aac', m4a: 'audio/mp4',
+          jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
+          mp4: 'video/mp4', webm: 'video/webm', pdf: 'application/pdf',
+        }[ext] || 'application/octet-stream';
         const blob = new Blob([buf], { type: mime });
         const url = URL.createObjectURL(blob);
         blobUrls.push(url);

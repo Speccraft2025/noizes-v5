@@ -34,7 +34,7 @@ export function buildGuide({ hasLyrics, hasPlay, hasNotes, story, authored }) {
   return { version: 1, allowFreeExplore: true, nodes };
 }
 
-export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template, play, guide, extras, notes = [] }) {
+export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template, play, guide, extras, notes = [], releasePlayback = null }) {
   // Template variants are archived; ULTRA is the single immersive player.
   const themeId = CANONICAL_TEMPLATE;
   const theme   = ULTRA_THEME;
@@ -48,13 +48,15 @@ export function buildExperienceHTML({ identity, edition, rights, audioBase64, au
       }
     : null;
 
-  const audioSrc = (audioBase64 && audioMime)
+  const audioSrc = releasePlayback?.tracks?.[0]?.src || ((audioBase64 && audioMime)
     ? `data:${audioMime};base64,${audioBase64}`
-    : null;
+    : null);
   const coverSrc = (coverBase64 && coverMime)
     ? `data:${coverMime};base64,${coverBase64}`
     : null;
 
+  const playbackTracks = Array.isArray(releasePlayback?.tracks) ? releasePlayback.tracks : [];
+  const hasReleaseLyrics = playbackTracks.some((track) => track.lyrics?.timed_lines?.length);
   const cfg = {
     artist:      identity.artist      || '',
     title:       identity.title       || '',
@@ -68,15 +70,28 @@ export function buildExperienceHTML({ identity, edition, rights, audioBase64, au
     template:    themeId,
     theme,
     features:    [
-      ...(lyrics && lyrics.length ? ['lyrics'] : []),
+      ...((lyrics && lyrics.length) || hasReleaseLyrics ? ['lyrics'] : []),
+      ...(playbackTracks.length > 1 ? ['tracklist'] : []),
       ...(playCfg ? ['play'] : []),
       ...(notes.length ? ['notes'] : []),
     ],
     lyricOffset: 0,
     lyrics:      lyrics || [],
+    release:     releasePlayback?.release || null,
+    tracks:      playbackTracks,
+    playback:    releasePlayback?.playback || {
+      mode: 'sequential',
+      crossfade_ms: 1500,
+      allow_track_skip: true,
+      allow_seek: true,
+      allow_shuffle: false,
+      allow_repeat: true,
+      allow_archive_during_journey: true,
+      resume_enabled: true,
+    },
     play:        playCfg,
     notes,
-    guide:       buildGuide({ hasLyrics: !!(lyrics && lyrics.length), hasPlay: !!playCfg, hasNotes: !!notes.length, story: extras?.story?.trim(), authored: guide }),
+    guide:       buildGuide({ hasLyrics: !!(lyrics && lyrics.length) || hasReleaseLyrics, hasPlay: !!playCfg, hasNotes: !!notes.length, story: extras?.story?.trim(), authored: guide }),
     edition: {
       type:         edition.edition_type || 'Open Edition',
       name:         edition.edition_name || '',

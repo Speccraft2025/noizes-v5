@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { buildExperienceHTML, buildGuide } from './experience.js';
 import { CANONICAL_TEMPLATE, normalizeEdition } from './project.js';
 import { normalizeReleaseProject, orderedTracks } from '../domain/release.js';
+import { normalizePlaybackSettings } from '../domain/playback.js';
 
 const safeFilename = (value, fallback = 'asset') => {
   const cleaned = String(value || fallback).replace(/[^a-z0-9._-]/gi, '_').replace(/_+/g, '_');
@@ -367,11 +368,67 @@ export async function buildPackage(input) {
     location: release.location,
     description: release.description,
   };
+  const playbackTracks = trackRecords.map((track) => {
+    const primaryComponent = componentById.get(track.primary_audio_component);
+    const artworkComponent = componentById.get(track.artwork_ref);
+    return {
+      track_id: track.track_id,
+      position: track.position,
+      disc_number: track.disc_number,
+      track_number: track.track_number,
+      title: track.title,
+      subtitle: track.subtitle,
+      primary_artist: track.primary_artist,
+      featured_artists: track.featured_artists,
+      hidden: track.hidden,
+      bonus: track.bonus,
+      src: primaryComponent?.path || '',
+      cover_src: artworkComponent?.path || '',
+      duration_ms: track.duration_ms || 0,
+      lyrics: track.lyrics,
+    };
+  });
+  if (!playbackTracks.length) {
+    const continuous = components.find((component) => component.scope === 'release' && component.role === 'continuous_master');
+    if (continuous) playbackTracks.push({
+      track_id: `${release.release_id}-continuous`,
+      position: 1,
+      disc_number: 1,
+      track_number: 1,
+      title: release.title,
+      subtitle: 'Continuous master',
+      primary_artist: release.primary_artist,
+      featured_artists: [],
+      hidden: false,
+      bonus: false,
+      src: continuous.path,
+      cover_src: '',
+      duration_ms: continuous.duration_ms || 0,
+      lyrics: { timed_lines: [], instrumental: true },
+    });
+  }
+  const crossfadeOverride = project.journey.transitions.find((transition) => transition.type === 'crossfade' && transition.duration_ms);
+  const releasePlayback = {
+    release: {
+      release_id: release.release_id,
+      release_type: release.release_type,
+      title: release.title,
+      primary_artist: release.primary_artist,
+      track_count: tracks.length,
+      disc_count: manifest.release.disc_count,
+    },
+    tracks: playbackTracks,
+    playback: normalizePlaybackSettings({
+      mode: project.journey.playback_mode || 'sequential',
+      crossfade_ms: Number(crossfadeOverride?.duration_ms) || 1500,
+      ...project.journey.navigation,
+    }),
+  };
   const experienceHTML = buildExperienceHTML({
     identity: legacyIdentity,
     edition: fixedEdition,
     rights: releaseRights,
-    audioBase64: primaryBuffer ? arrayBufferToBase64(primaryBuffer) : '',
+    audioBase64: legacyCall && primaryBuffer ? arrayBufferToBase64(primaryBuffer) : '',
     audioMime: primaryAudioAsset?.mime || primaryAudioAsset?.file?.type || '',
     coverBase64: coverBuffer ? arrayBufferToBase64(coverBuffer) : '',
     coverMime: coverAsset?.mime || coverAsset?.file?.type || '',
@@ -381,6 +438,7 @@ export async function buildPackage(input) {
     guide: project.journey.legacy_guide,
     extras,
     notes,
+    releasePlayback,
   });
   zip.file('experience.html', experienceHTML);
 

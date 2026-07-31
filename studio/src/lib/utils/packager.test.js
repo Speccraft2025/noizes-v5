@@ -175,5 +175,13 @@ describe('buildPackage — experience.json (play pass-through)', () => {
     }
     const edition = JSON.parse(await zip.file('edition.json').async('string'));
     expect(edition).toMatchObject({ applies_to: 'release', release_id: project.release.release_id, edition_size: 100 });
+    const html = await zip.file('experience.html').async('string');
+    const configMatch = html.match(/window\.NZ_CONFIG = (\{[\s\S]*?\});\n/);
+    const config = JSON.parse(configMatch[1]);
+    expect(config.tracks).toHaveLength(2);
+    expect(config.tracks[0].src).toBe(`tracks/01-${project.tracks[0].track_id}/audio/primary.wav`);
+    expect(config.playback).toMatchObject({ mode: 'sequential', allow_track_skip: true, resume_enabled: true });
+    expect(config.audioSrc).toBe(config.tracks[0].src);
+    expect(html).not.toContain('data:audio/wav;base64');
   });
 });

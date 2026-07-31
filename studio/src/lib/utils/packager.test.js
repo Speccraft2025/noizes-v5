@@ -21,10 +21,10 @@ afterAll(() => {
 
 const base = {
   identity: { artist: 'A', title: 'T', release_id: 'nz-p-1', year: '2026' },
-  edition: { edition_type: 'Open Edition' },
+  edition: { edition_type: 'fixed', edition_name: 'First Edition', edition_size: '100', price: '1000', currency: 'KES' },
   rights: {},
   assets: { audioFile: null, coverFile: null, lyrics: [] },
-  template: 'ultra',
+  template: 'ultra-v2',
 };
 
 async function unzip(result) {
@@ -58,6 +58,40 @@ describe('buildPackage — experience.json (play pass-through)', () => {
     for (const name of ['manifest.json', 'edition.json', 'rights.json', 'credits.json', 'authenticity.json', 'technical.json', 'experience.html']) {
       expect(zip.file(name), `${name} missing`).toBeTruthy();
     }
-    expect(result.filename).toBe('t_ultra_noizes.nz');
+    expect(result.filename).toBe('t_ultra-v2_noizes.nz');
+  });
+
+  it('preserves a creator-authored Guide order and labels', async () => {
+    const guide = {
+      version: 1,
+      allowFreeExplore: false,
+      nodes: [
+        { id: 'listen', type: 'listen', label: 'Enter the sound', view: 'view-player' },
+        { id: 'arrival', type: 'arrival', label: 'A note from A', view: 'intro' },
+      ],
+    };
+    const result = await buildPackage({ ...base, assets: { ...base.assets, guide }, template: 'monument' });
+    const zip = await unzip(result);
+    const exp = JSON.parse(await zip.file('experience.json').async('string'));
+    expect(exp.guide).toEqual(guide);
+    expect(result.filename).toBe('t_ultra-v2_noizes.nz');
+  });
+
+  it('records ultra-v2 as the canonical manifest experience and emits safe online resources separately', async () => {
+    const result = await buildPackage({
+      ...base,
+      template: 'codex',
+      extras: { story: 'Behind the song', links: [
+        { label: 'Tickets', url: 'https://example.com/tickets', kind: 'tickets' },
+        { label: 'Unsafe', url: 'javascript:alert(1)', kind: 'artist' },
+      ] },
+    });
+    const zip = await unzip(result);
+    const manifest = JSON.parse(await zip.file('manifest.json').async('string'));
+    const resources = JSON.parse(await zip.file('resources.json').async('string'));
+    expect(manifest.experience.template).toBe('ultra-v2');
+    expect(resources.groups[0].links).toEqual([
+      { label: 'Tickets', url: 'https://example.com/tickets', kind: 'tickets', requires_internet: true }
+    ]);
   });
 });

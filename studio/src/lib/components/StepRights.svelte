@@ -5,7 +5,7 @@
 
 <div class="space-y-5">
   <div>
-    <p class="t-caption mb-2">Step 4</p>
+    <p class="t-caption mb-2">Step 7 · Rights, Compile &amp; Publish</p>
     <h2 class="text-2xl font-black tracking-tight text-white">Rights</h2>
     <p class="text-sm mt-1" style="color: var(--ink-muted);">Declare ownership, licensing, and credits.</p>
   </div>

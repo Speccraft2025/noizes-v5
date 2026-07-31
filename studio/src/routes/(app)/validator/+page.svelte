@@ -14,6 +14,10 @@
     const checks = [];
 
     try {
+      if (file.name.toLowerCase().endsWith('.json')) {
+        result = await validateProvenance(JSON.parse(await file.text()));
+        return;
+      }
       const zip = await JSZip.loadAsync(file);
       const files = Object.keys(zip.files);
 
@@ -92,6 +96,50 @@
     }
   }
 
+  const EVENT_FIELDS = ['release_id', 'edition_number', 'seq', 'kind', 'from_owner_id', 'to_owner_id', 'price', 'currency', 'note', 'occurred_at', 'prev_hash'];
+
+  async function validateProvenance(doc) {
+    const checks = [];
+    const events = Array.isArray(doc?.events) ? [...doc.events].sort((a, b) => a.seq - b.seq) : [];
+    checks.push({ label: 'document type', status: doc?.kind === 'noizes-provenance' ? 'pass' : 'fail', note: doc?.kind || 'Missing kind' });
+    checks.push({ label: 'event chain', status: events.length ? 'pass' : 'fail', note: events.length ? `${events.length} events` : 'Chain is empty' });
+
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      const canonical = {};
+      for (const field of EVENT_FIELDS) canonical[field] = event[field] === undefined ? null : event[field];
+      const contentHash = await sha256Hex(new TextEncoder().encode(JSON.stringify(canonical)));
+      const linked = i === 0
+        ? event.seq === 0 && event.kind === 'created' && event.prev_hash == null
+        : event.seq === i && event.prev_hash === events[i - 1].content_hash;
+      const hashValid = contentHash === event.content_hash;
+      const signatureValid = hashValid && await verifyEd25519(event.content_hash, event.signature, event.signer_public_key);
+      checks.push({
+        label: `event ${event.seq}`,
+        status: linked && hashValid && signatureValid ? 'pass' : 'fail',
+        note: !linked ? 'Broken chain link' : !hashValid ? 'Content hash mismatch' : !signatureValid ? 'Invalid signature' : `${event.kind} verified`,
+      });
+    }
+
+    const failed = checks.filter((check) => check.status === 'fail').length;
+    return {
+      valid: failed === 0,
+      checks,
+      manifest: { title: doc?.title, artist: doc?.artist, edition_number: doc?.edition_number, schema_version: doc?.schema_version },
+      summary: { passed: checks.length - failed, failed, warned: 0 },
+    };
+  }
+
+  async function verifyEd25519(hash, signature, publicKey) {
+    try {
+      const decode = (value) => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+      const key = await crypto.subtle.importKey('spki', decode(publicKey), { name: 'Ed25519' }, false, ['verify']);
+      return crypto.subtle.verify({ name: 'Ed25519' }, key, decode(signature), Uint8Array.from(hash.match(/.{2}/g), (byte) => parseInt(byte, 16)));
+    } catch {
+      return false;
+    }
+  }
+
   function handleDrop(e) {
     e.preventDefault();
     dragging = false;
@@ -115,7 +163,7 @@
   <div class="mb-10">
     <p class="t-caption mb-2">Inspector</p>
     <h1 class="t-monumental-small text-white mb-2">Validator</h1>
-    <p class="text-base" style="color: var(--ink-muted);">Drop a .nz package to inspect and validate its structure.</p>
+    <p class="text-base" style="color: var(--ink-muted);">Validate a .nz package or verify a provenance.json chain entirely in your browser.</p>
   </div>
 
   <!-- Drop zone -->
@@ -130,9 +178,9 @@
       style={dragging ? 'background: var(--gradient-spectral);' : 'background: rgba(123,92,240,0.12); border: 1px solid rgba(123,92,240,0.25);'}>
       <span class="text-2xl" style="color: #7B5CF0;">⬡</span>
     </div>
-    <p class="t-caption mb-2">.nz · .zip</p>
+    <p class="t-caption mb-2">.nz · .zip · provenance.json</p>
     <p class="text-sm" style="color: var(--ink-muted);">Drop package here or <span class="text-white underline">browse</span></p>
-    <input type="file" class="hidden" accept=".nz,.zip" on:change={(e) => { const f = e.target.files?.[0]; if (f) validate(f); }} />
+    <input type="file" class="hidden" accept=".nz,.zip,.json,application/json" on:change={(e) => { const f = e.target.files?.[0]; if (f) validate(f); }} />
   </label>
 
   {#if result}

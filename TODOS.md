@@ -32,19 +32,6 @@ recorded) shipped. Migration: `backend/provenance-resale-2026-07-26.sql` (must b
 run against Supabase; also requires `SIGNING_KEK` already used by creator signing).
 
 **Remaining / deferred:**
-- **Secondary-market browse (buyer discovery).** Buyers can pay/withdraw their own
-  offers and owners can accept from the collection page, but there is no page that
-  lists editions currently `accepting_offers` for a buyer to *find* and offer on.
-  Add a per-edition secondary listing. P1 for a usable resale loop.
-- **Offline provenance verifier UI.** Export is live (`/provenance/[releaseId]/[edition]`);
-  the standalone self-contained verifier (drag-drop a `provenance.json`, checks the
-  chain offline against the registry key) is not built yet. `verifyChain` /
-  `buildProvenanceDocument` in `studio/src/lib/server/provenance.js` are the reusable
-  core. P2.
-- **Collector-note moderation UI.** `collector_notes.status` supports 'hidden' at the
-  DB level; there is no admin control to hide an abusive note. A folded note is
-  immutable in the signed chain (hiding suppresses on-platform display only). Decide
-  policy + build the control before notes go public. P1 (abuse surface).
 - **Automated resale royalty payout.** `resale.js` records the 85/15 split in
   `payment_intents.paystack_data` and logs it; payout is manual, same as primary
   sales. Fold into the Paystack split-settlement TODO below.
@@ -58,7 +45,9 @@ run against Supabase; also requires `SIGNING_KEK` already used by creator signin
 
 **Status (2026-07-19):** Largely built. The acquire flow shipped with idempotency from day one (Paystack, not Daraja): `acquisitions.payment_reference` unique index is the idempotency key; the webhook 500s on insert failure so Paystack retries into idempotent re-fulfillment (`studio/src/lib/server/acquire.js`). Every attempted charge is recorded in `payment_intents`.
 
-**Remaining:** Automated diffing of stuck intents — a periodic query/report for `payment_intents` where `status = 'pending'` and `created_at < now() - interval '1 hour'` (abandoned) and `status = 'needs_reconciliation'` (paid-but-unfulfilled, e.g. sellout race → manual refund). Manual SQL in the Supabase dashboard is fine at current volume.
+**Status update (2026-07-31):** The admin dashboard and `/admin/payments` now surface
+stale pending intents and `needs_reconciliation` rows automatically on every load.
+External alert delivery remains optional at current volume.
 
 **Context:** Original scope assumed Daraja (M-Pesa direct); superseded by Paystack (approved 2026-07-19, Spec Music account) which carries M-Pesa as a channel. Design doc: `~/.gstack/projects/Speccraft2025-noizes-v5/speccraftmedialtd.-master-design-20260704-001053.md`.
 

@@ -1,8 +1,10 @@
 import JSZip from 'jszip';
 import { buildExperienceHTML, buildGuide } from './experience.js';
+import { CANONICAL_TEMPLATE, normalizeEdition } from './project.js';
 
-export async function buildPackage({ identity, edition, rights, assets, template, play }) {
+export async function buildPackage({ identity, edition, rights, assets, template: _template, play, extras = {} }) {
   const zip = new JSZip();
+  const fixedEdition = normalizeEdition(edition);
   const releaseId = identity.release_id || `nz-${Date.now()}`;
   const now = new Date().toISOString();
 
@@ -16,16 +18,18 @@ export async function buildPackage({ identity, edition, rights, assets, template
     genre:          identity.genre,
     location:       identity.location,
     description:    identity.description,
+    experience:     { template: CANONICAL_TEMPLATE },
     created_at:     now,
   }, null, 2));
 
   zip.file('edition.json', JSON.stringify({
-    edition_name:  edition.edition_name || edition.edition_type,
-    edition_type:  edition.edition_type,
-    edition_size:  edition.edition_size || 'unlimited',
-    price:         edition.price,
-    currency:      edition.currency,
-    transferable:  edition.transferable,
+    edition_name:  fixedEdition.edition_name,
+    edition_description: fixedEdition.edition_description || '',
+    edition_type:  fixedEdition.edition_type,
+    edition_size:  Number(fixedEdition.edition_size),
+    price:         fixedEdition.price,
+    currency:      fixedEdition.currency,
+    transferable: fixedEdition.transferable,
   }, null, 2));
 
   zip.file('rights.json', JSON.stringify({
@@ -69,6 +73,7 @@ export async function buildPackage({ identity, edition, rights, assets, template
   const guideBlock = buildGuide({
     hasLyrics: !!(assets.lyrics && assets.lyrics.length),
     hasPlay:   !!(play && play.games?.length),
+    story:     extras.story?.trim(),
     authored:  assets.guide,
   });
   const experienceJson = {
@@ -85,6 +90,13 @@ export async function buildPackage({ identity, edition, rights, assets, template
   }
   zip.file('experience.json', JSON.stringify(experienceJson, null, 2));
 
+  const safeLinks = (extras.links || []).filter((link) =>
+    link.label?.trim() && /^https:\/\//i.test(link.url || '')
+  ).map(({ label, url, kind }) => ({ label: label.trim(), url, kind: kind || 'artist', requires_internet: true }));
+  if (safeLinks.length) {
+    zip.file('resources.json', JSON.stringify({ groups: [{ label: 'Online', links: safeLinks }] }, null, 2));
+  }
+
   // Cover
   let coverBase64 = '';
   let coverMime   = '';
@@ -97,20 +109,21 @@ export async function buildPackage({ identity, edition, rights, assets, template
 
   // experience.html — fully self-contained
   const experienceHTML = buildExperienceHTML({
-    identity, edition, rights,
+    identity, edition: fixedEdition, rights,
     audioBase64, audioMime,
     coverBase64, coverMime,
     lyrics:   assets.lyrics || [],
-    template: template      || 'ultra',
+    template: CANONICAL_TEMPLATE,
     play,
     guide:    assets.guide,
+    extras,
   });
   zip.file('experience.html', experienceHTML);
 
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 
   const safeName = (identity.title || 'untitled').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const filename = `${safeName}_${(template || 'ultra')}_noizes.nz`;
+  const filename = `${safeName}_ultra-v2_noizes.nz`;
 
   const url = URL.createObjectURL(blob);
   const a   = document.createElement('a');

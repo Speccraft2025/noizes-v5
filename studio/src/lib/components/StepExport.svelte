@@ -1,6 +1,7 @@
 <script>
-  import { identity, edition, assets, rights, template, play } from '$lib/stores/package.js';
+  import { identity, edition, assets, rights, template, play, extras } from '$lib/stores/package.js';
   import { buildPackage } from '$lib/utils/packager.js';
+  import { editionErrors } from '$lib/utils/project.js';
 
   let exporting = false;
   let exported = false;
@@ -11,7 +12,8 @@
   let progress = 0;
   let statusLabel = 'Compiling package…';
 
-  $: canExport = $identity.artist && $identity.title && $identity.year;
+  $: validationErrors = editionErrors($edition);
+  $: canExport = $identity.artist && $identity.title && $identity.year && $assets.audioFile && $assets.coverFile && !validationErrors.length;
 
   async function doExport() {
     exporting = true;
@@ -37,6 +39,7 @@
         rights:   $rights,
         template: $template,
         play:     $play,
+        extras:   $extras,
       });
       exportedFilename = result.filename;
       progress = 90;
@@ -135,7 +138,7 @@
 
 <div class="space-y-6">
   <div>
-    <p class="t-caption mb-2">Step 7</p>
+    <p class="t-caption mb-2">Compile &amp; Publish</p>
     <h2 class="text-2xl font-black tracking-tight text-white">The Compiler</h2>
     <p class="text-sm mt-1" style="color: var(--ink-muted);">Package your work as a self-contained .nz file.</p>
   </div>
@@ -162,14 +165,14 @@
       </div>
     {/if}
     <div class="flex items-center gap-3 py-1.5">
-      <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">template</span>
-      <span class="text-xs" style="color: var(--ink-muted);">{$template} · {$assets.lyrics?.length ?? 0} lyric lines synced</span>
+      <span class="text-xs font-mono w-36 shrink-0" style="color: #7B5CF0;">guided experience</span>
+      <span class="text-xs" style="color: var(--ink-muted);">ULTRA · {$assets.guide?.nodes?.length ?? 0} moments · {$assets.lyrics?.length ?? 0} lyric lines</span>
     </div>
   </div>
 
   {#if !canExport}
     <div class="glass rounded-lg px-4 py-3 text-sm" style="color: var(--ink-muted); border-color: rgba(123,92,240,0.2);">
-      Complete Step 1 (artist, title, year) before forging.
+      Complete Identity, upload primary audio and cover art, then provide a valid fixed-supply edition before compiling.
     </div>
   {/if}
 

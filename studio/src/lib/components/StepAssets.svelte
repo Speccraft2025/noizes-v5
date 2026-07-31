@@ -30,7 +30,7 @@
 
   <!-- Audio -->
   <div>
-    <label class="label-dark">Audio File *</label>
+    <p class="label-dark">Audio File *</p>
     {#if $assets.audioName}
       <div class="flex items-center justify-between rounded-lg px-4 py-3 glass">
         <div class="flex items-center gap-3">
@@ -55,7 +55,7 @@
 
   <!-- Cover -->
   <div>
-    <label class="label-dark">Cover Image *</label>
+    <p class="label-dark">Cover Image *</p>
     {#if $assets.coverName}
       <div class="flex items-center justify-between rounded-lg px-4 py-3 glass">
         <div class="flex items-center gap-3">

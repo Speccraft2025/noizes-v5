@@ -16,11 +16,24 @@ export const assets = writable({
   audioName: '',
   coverName: '',
   // lyrics: array of {t: ms, text: string} — set by StepLyrics
-  lyrics: []
+  lyrics: [],
+  // Creator-authored journey shown by the Guide drawer in the experience.
+  guide: {
+    version: 1,
+    allowFreeExplore: true,
+    nodes: [
+      { id: 'arrival', type: 'arrival', label: 'Arrival', view: 'intro' },
+      { id: 'object', type: 'object', label: 'The Object', view: 'intro' },
+      { id: 'listen', type: 'listen', label: 'Listen', view: 'view-player' },
+      { id: 'record', type: 'record', label: 'Collector Record', view: 'intro' },
+      { id: 'end', type: 'ending', label: 'End', view: 'view-player' }
+    ]
+  }
 });
 
 // Which template / theme the package uses
-export const template = writable('ultra'); // 'ultra' | 'codex' | 'transmission' | 'monument'
+// Canonical experience. Legacy draft values are normalized during compilation.
+export const template = writable('ultra-v2');
 
 // Optional game add-ons baked into the experience ("play" block).
 // games: enabled game ids ([] = no Games tab in the package).
@@ -28,6 +41,13 @@ export const play = writable({
   games: [],
   difficulty: 'standard', // 'gentle' | 'standard' | 'sharp'
   intensity: 1            // 0.4–1.4 particle/glow budget
+});
+
+// Supplementary content library. Games remain in `play` for viewer backwards
+// compatibility but are authored from the Extras step alongside narrative media.
+export const extras = writable({
+  story: '',
+  links: []
 });
 
 // The nine games the ULTRA template ships. Order = display order.
@@ -44,8 +64,9 @@ export const GAME_CATALOG = [
 ];
 
 export const edition = writable({
-  edition_name: '',
-  edition_type: 'Open Edition',
+  edition_name: 'First Edition',
+  edition_description: '',
+  edition_type: 'fixed',
   edition_size: '',
   price: '',
   currency: 'KES',
@@ -58,17 +79,6 @@ export const rights = writable({
   producer: '',
   credits: ''
 });
-
-export const EDITION_TYPES = [
-  'First Edition',
-  'Open Edition',
-  'Founder Edition',
-  'Collector Edition',
-  'Archive Edition',
-  'Artist Proof'
-];
-
-export const LIMITED_TYPES = ['First Edition', 'Founder Edition', 'Collector Edition', 'Archive Edition', 'Artist Proof'];
 
 export const CURRENCIES = ['KES', 'USD', 'EUR'];
 
@@ -95,7 +105,7 @@ export const manifest = derived(
     description: $identity.description,
     edition_type: $edition.edition_type,
     edition_name: $edition.edition_name,
-    edition_size: $edition.edition_size || 'unlimited',
+    edition_size: $edition.edition_size,
     price: $edition.price,
     currency: $edition.currency,
     copyright: $rights.copyright,

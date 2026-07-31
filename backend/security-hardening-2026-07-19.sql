@@ -9,7 +9,8 @@ drop policy if exists "Owners can update own acquisitions" on public.acquisition
 create or replace function public.protect_privileged_profile_columns()
 returns trigger as $$
 begin
-  if coalesce(auth.role(), 'service_role') <> 'service_role' then
+  if current_user not in ('postgres', 'service_role', 'supabase_admin')
+     and coalesce((select auth.jwt()->>'role'), '') <> 'service_role' then
     new.is_admin := old.is_admin;
     -- role gates /studio access and is assigned from the invite at signup —
     -- never self-escalatable from the client.

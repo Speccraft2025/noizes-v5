@@ -4,7 +4,8 @@ import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 
 export async function load({ locals }) {
-  const { data: users } = await locals.supabase
+  const adminClient = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data: users } = await adminClient
     .from('profiles')
     .select('*')
     .order('created_at', { ascending: false });

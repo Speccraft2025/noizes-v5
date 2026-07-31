@@ -1,21 +1,23 @@
 import ULTRA_HTML from '../templates/ULTRA.html?raw';
+import { CANONICAL_TEMPLATE } from './project.js';
 
-// Theme colour palettes
-const THEMES = {
-  ultra:       { primary: '#7B5CF0', accent: '#F04BD8', bg: '#030303' },
-  codex:       { primary: '#4B6BF0', accent: '#6BE0F0', bg: '#030608' },
-  transmission:{ primary: '#F0A84B', accent: '#F04B6B', bg: '#060300' },
-  monument:    { primary: '#C8A96E', accent: '#E8C88E', bg: '#050403' },
-};
+const ULTRA_THEME = { primary: '#7B5CF0', accent: '#F04BD8', bg: '#030303' };
 
 // Builds the Guide: the creator's recommended journey through the object.
 // "Folded into the existing schema" — it's an ordered list of steps derived
 // from what the package actually contains, not a separate node-graph format.
 // The viewer shows it as a drawer; collectors may still explore freely.
-// `authored` (optional) lets a creator override the order/labels later.
-export function buildGuide({ hasLyrics, hasPlay, authored }) {
+// `authored` lets a creator override the order and labels in Studio.
+export function buildGuide({ hasLyrics, hasPlay, story, authored }) {
   if (authored && Array.isArray(authored.nodes) && authored.nodes.length) {
-    return { version: 1, allowFreeExplore: authored.allowFreeExplore !== false, nodes: authored.nodes };
+    const nodes = authored.nodes.filter((node) =>
+      (node.id !== 'lyrics' || hasLyrics) &&
+      (node.id !== 'play' || hasPlay) &&
+      (node.id !== 'story' || !!story)
+    ).map((node) => node.id === 'story' ? { ...node, introduction: story } : node);
+    if (nodes.length) {
+      return { version: 1, allowFreeExplore: authored.allowFreeExplore !== false, nodes };
+    }
   }
   const nodes = [
     { id: 'arrival', type: 'arrival', label: 'Arrival', view: 'intro' },
@@ -23,15 +25,17 @@ export function buildGuide({ hasLyrics, hasPlay, authored }) {
     { id: 'listen', type: 'listen', label: 'Listen', view: 'view-player' },
   ];
   if (hasLyrics) nodes.push({ id: 'lyrics', type: 'lyrics', label: 'Lyrics', view: 'view-lyrics' });
+  if (story) nodes.push({ id: 'story', type: 'narrative', label: 'Artist Statement', view: 'intro', introduction: story });
   if (hasPlay) nodes.push({ id: 'play', type: 'interactive', label: 'Play', view: 'view-games' });
   nodes.push({ id: 'record', type: 'record', label: 'Collector Record', view: 'intro' });
   nodes.push({ id: 'end', type: 'ending', label: 'End', view: 'view-player' });
   return { version: 1, allowFreeExplore: true, nodes };
 }
 
-export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template, play, guide }) {
-  const themeId = template || 'ultra';
-  const theme   = THEMES[themeId] || THEMES.ultra;
+export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template, play, guide, extras }) {
+  // Template variants are archived; ULTRA is the single immersive player.
+  const themeId = CANONICAL_TEMPLATE;
+  const theme   = ULTRA_THEME;
 
   // Optional game add-ons — only baked when the creator enabled games
   const playCfg = (play && Array.isArray(play.games) && play.games.length)
@@ -68,7 +72,7 @@ export function buildExperienceHTML({ identity, edition, rights, audioBase64, au
     lyricOffset: 0,
     lyrics:      lyrics || [],
     play:        playCfg,
-    guide:       buildGuide({ hasLyrics: !!(lyrics && lyrics.length), hasPlay: !!playCfg, authored: guide }),
+    guide:       buildGuide({ hasLyrics: !!(lyrics && lyrics.length), hasPlay: !!playCfg, story: extras?.story?.trim(), authored: guide }),
     edition: {
       type:         edition.edition_type || 'Open Edition',
       name:         edition.edition_name || '',

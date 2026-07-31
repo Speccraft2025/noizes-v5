@@ -1,13 +1,13 @@
 <script>
   import { page } from '$app/stores';
   import WaveCanvas from '$lib/components/WaveCanvas.svelte';
-  export let data;
-
   const nav = [
     { href: '/admin',          label: 'Overview',  icon: '◎' },
     { href: '/admin/waitlist', label: 'Waitlist',  icon: '◉' },
     { href: '/admin/users',    label: 'Users',     icon: '◈' },
     { href: '/admin/kyc',      label: 'KYC',       icon: '⬡' },
+    { href: '/admin/notes',    label: 'Notes',     icon: '✎' },
+    { href: '/admin/payments', label: 'Payments',  icon: '¤' },
   ];
 </script>
 

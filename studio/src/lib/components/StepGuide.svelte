@@ -8,17 +8,19 @@
     lyrics:  { type: 'lyrics', label: 'Lyrics', view: 'view-lyrics', hint: 'Time-synced words alongside the track.' },
     play:    { type: 'interactive', label: 'Play', view: 'view-games', hint: 'Beat-synced interactive moments.' },
     story:   { type: 'narrative', label: 'Artist Statement', view: 'intro', hint: 'The story or liner note behind the work.' },
+    notes:   { type: 'notes', label: 'Note Wall', view: 'view-notes', hint: 'A wall of embedded PDF notes and booklets.' },
     record:  { type: 'record', label: 'Collector Record', view: 'intro', hint: 'Provenance and the life of the object.' },
     end:     { type: 'ending', label: 'End', view: 'view-player', hint: 'A closing moment that returns to the music.' }
   };
 
-  const DEFAULT_ORDER = ['arrival', 'object', 'listen', 'lyrics', 'story', 'play', 'record', 'end'];
+  const DEFAULT_ORDER = ['arrival', 'object', 'listen', 'lyrics', 'story', 'notes', 'play', 'record', 'end'];
   const REQUIRED = new Set(['listen']);
 
   function isAvailable(id) {
     if (id === 'lyrics') return !!($assets.lyrics && $assets.lyrics.length);
     if (id === 'play') return !!($play.games && $play.games.length);
     if (id === 'story') return !!$extras.story?.trim();
+    if (id === 'notes') return !!$extras.pdfs?.length;
     return true;
   }
 

@@ -23,7 +23,7 @@ window.NZ_CONFIG = {
   description: "A demonstration Noizes package.",
   audioSrc:    "audio/track.mp3",
   coverSrc:    null,
-  template:    "ultra",
+  template:    "ultra-v2",
   theme:       { primary:"#7B5CF0", accent:"#F04BD8", bg:"#030303" },
   features:    ["lyrics","gallery","world","game"],
   bpm:         120,
@@ -52,6 +52,7 @@ window.NZ_CONFIG = {
     difficulty: "standard",
     intensity: 1
   },
+  notes: [],
   guide: {
     version: 1,
     allowFreeExplore: true,
@@ -74,7 +75,7 @@ window.NZ_CONFIG = {
   --surface:rgba(255,255,255,.04);
   --border:rgba(255,255,255,.08);
   --text:#f5f2ec; --muted:rgba(245,242,236,.45);
-  --tab-h:60px;
+  --tab-h:0px;
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-t:env(safe-area-inset-top,0px);
 }
@@ -140,7 +141,7 @@ html,body{
   background:rgba(3,3,3,.92);
   backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   border-top:1px solid var(--border);
-  display:flex;z-index:20;
+  display:none;z-index:20;
 }
 .tab{
   flex:1;display:flex;flex-direction:column;align-items:center;
@@ -159,17 +160,17 @@ html,body{
    VIEW 1: PLAYER
    ═══════════════════════════════ */
 #view-player{
-  display:flex;flex-direction:column;justify-content:flex-end;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
   padding-left:28px;padding-right:28px;
-  padding-bottom:calc(var(--tab-h) + var(--safe-b) + 24px);
+  padding-bottom:calc(var(--safe-b) + 24px);
 }
 
 /* Cover art thumbnail */
 .p-cover-thumb{
-  width:88px;height:88px;border-radius:14px;
-  overflow:hidden;margin-bottom:20px;
-  box-shadow:0 12px 40px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.07);
-  flex-shrink:0;display:none; /* shown when src loads */
+  width:min(68vw,52vh,560px);height:min(68vw,52vh,560px);border-radius:22px;
+  overflow:hidden;margin-bottom:22px;
+  box-shadow:0 32px 100px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.12),0 0 80px color-mix(in srgb,var(--primary) 22%,transparent);
+  flex-shrink:1;display:none; /* shown when src loads */
 }
 .p-cover-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
 
@@ -177,8 +178,8 @@ html,body{
 .p-artist span{display:block;}
 .p-title{
   font-family:'Bebas Neue',sans-serif;
-  font-size:clamp(48px,13vw,100px);line-height:.88;
-  letter-spacing:.01em;color:var(--text);margin-bottom:16px;
+  font-size:clamp(34px,8vw,66px);line-height:.9;
+  letter-spacing:.01em;color:var(--text);margin-bottom:12px;
 }
 .p-title-line{display:block;overflow:hidden;}
 .p-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;}
@@ -193,7 +194,7 @@ html,body{
   display:flex;align-items:center;gap:16px;
   background:rgba(255,255,255,.07);
   border:1px solid rgba(255,255,255,.13);
-  border-radius:18px;padding:14px 16px;
+  border-radius:18px;padding:14px 16px;width:min(100%,620px);
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
 }
 .btn-play-main{
@@ -294,6 +295,23 @@ html,body{
    VIEW 3: GAMES (play add-ons)
    ═══════════════════════════════ */
 #view-games{padding-left:28px;padding-right:28px;}
+
+/* ═══════════════════════════════
+   VIEW 4: NOTE WALL
+   ═══════════════════════════════ */
+#view-notes{padding:calc(var(--safe-t) + 78px) 24px 42px;}
+.notes-head{max-width:900px;margin:0 auto 28px;}
+.notes-head .eyebrow{font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--primary);}
+.notes-head h2{font-size:clamp(38px,9vw,82px);font-weight:300;letter-spacing:-.04em;margin-top:6px;}
+.notes-wall{max-width:900px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:34px;padding:12px 4px 80px;}
+.note-paper{position:relative;min-height:310px;padding:30px 24px 24px;background:#e8e1d3;color:#171513;
+  box-shadow:0 24px 70px rgba(0,0,0,.55);transform:rotate(var(--tilt));display:flex;flex-direction:column;justify-content:space-between;}
+.note-paper:before{content:'';position:absolute;width:16px;height:16px;border-radius:50%;top:12px;left:50%;transform:translateX(-50%);
+  background:var(--primary);box-shadow:0 3px 8px rgba(0,0,0,.5),inset 0 1px rgba(255,255,255,.45);}
+.note-paper .num{font-size:10px;letter-spacing:.22em;text-transform:uppercase;opacity:.5;}
+.note-paper h3{font-size:25px;line-height:1.05;font-weight:600;word-break:break-word;}
+.note-paper .actions{display:flex;gap:8px;margin-top:24px;}
+.note-paper a{color:#171513;text-decoration:none;border:1px solid rgba(23,21,19,.35);padding:9px 12px;border-radius:99px;font-size:11px;font-weight:700;}
 .games-header h2{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--text);}
 .games-header p{font-size:11px;color:var(--muted);margin:2px 0 18px;}
 .games-grid{display:grid;grid-template-columns:1fr;gap:10px;max-width:520px;}
@@ -416,36 +434,72 @@ html,body{
   <div class="games-grid" id="games-grid"></div>
 </div>
 
+<!-- ── VIEW 4: NOTE WALL ── -->
+<div class="view" id="view-notes">
+  <div class="notes-head">
+    <div class="eyebrow">From inside the object</div>
+    <h2>Note Wall</h2>
+  </div>
+  <div class="notes-wall" id="notes-wall"></div>
+</div>
+
 <!-- ── GUIDE (authored journey) ── -->
 <style>
-.guide-btn{position:fixed;top:calc(var(--safe-t) + 14px);right:14px;z-index:60;
-  width:40px;height:40px;border-radius:50%;border:1px solid var(--border);
-  background:var(--surface);color:var(--text);font-size:16px;cursor:pointer;
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+.entry-gate{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;
+  background:linear-gradient(to bottom,rgba(3,3,3,.3),rgba(3,3,3,.86));backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+.entry-gate.gone{opacity:0;pointer-events:none;transition:opacity .8s ease;}
+.entry-object{display:flex;flex-direction:column;align-items:center;max-width:540px;}
+.entry-mark{font-size:10px;letter-spacing:.38em;text-transform:uppercase;color:var(--primary);margin-bottom:24px;}
+.entry-cover{width:min(58vw,300px);aspect-ratio:1;border-radius:18px;object-fit:cover;margin-bottom:24px;display:none;
+  box-shadow:0 30px 100px rgba(0,0,0,.7),0 0 70px color-mix(in srgb,var(--primary) 24%,transparent);}
+.entry-title{font-size:clamp(38px,11vw,78px);line-height:.88;font-weight:300;letter-spacing:-.045em;}
+.entry-meta{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:12px 0 28px;line-height:1.8;}
+.entry-button{border:1px solid rgba(255,255,255,.65);color:#fff;background:rgba(255,255,255,.06);padding:13px 30px;border-radius:99px;
+  font:600 12px/1 inherit;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(18px);}
+.guide-btn{position:fixed;top:calc(var(--safe-t) + 16px);left:16px;z-index:65;
+  width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.18);
+  background:rgba(3,3,3,.35);color:var(--text);font-size:18px;cursor:pointer;
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 10px 40px rgba(0,0,0,.35);}
 .guide-btn:active{opacity:.6;}
-.guide-scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:70;opacity:0;
-  pointer-events:none;transition:opacity .25s;}
-.guide-scrim.open{opacity:1;pointer-events:auto;}
-.guide-drawer{position:fixed;top:0;right:0;height:100%;width:min(84vw,320px);z-index:80;
-  background:var(--bg);border-left:1px solid var(--border);
-  transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
-  padding:calc(var(--safe-t) + 22px) 20px 24px;overflow-y:auto;}
-.guide-drawer.open{transform:translateX(0);}
-.guide-title{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
-.guide-step{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:12px;
-  cursor:pointer;color:var(--muted);transition:background .15s,color .15s;}
-.guide-step:active{background:var(--surface);}
-.guide-step.current{background:var(--surface);color:var(--text);}
+.menu-coach{position:fixed;top:calc(var(--safe-t) + 25px);left:76px;z-index:64;display:flex;align-items:center;gap:9px;
+  color:#fff;font-size:11px;letter-spacing:.08em;animation:coachFloat 1.8s ease-in-out infinite;transition:opacity .4s;}
+.menu-coach:before{content:'←';font-size:18px;color:var(--primary);}
+.menu-coach.hide{opacity:0;pointer-events:none;}
+@keyframes coachFloat{50%{transform:translateX(5px)}}
+.guide-scrim{display:none;}
+.guide-drawer{position:fixed;inset:0;z-index:80;opacity:0;pointer-events:none;transform:scale(1.025);
+  transition:opacity .45s ease,transform .55s cubic-bezier(.2,.7,.1,1);overflow-y:auto;
+  padding:calc(var(--safe-t) + 88px) clamp(24px,8vw,110px) 60px;
+  background:linear-gradient(110deg,rgba(3,3,3,.9),rgba(3,3,3,.52) 58%,rgba(3,3,3,.82));
+  backdrop-filter:blur(34px) saturate(1.25);-webkit-backdrop-filter:blur(34px) saturate(1.25);}
+.guide-drawer.open{opacity:1;pointer-events:auto;transform:scale(1);}
+.menu-close{position:fixed;top:calc(var(--safe-t) + 17px);right:18px;width:46px;height:46px;border-radius:50%;border:1px solid var(--border);
+  background:rgba(0,0,0,.2);color:#fff;font-size:20px;cursor:pointer;}
+.guide-title{font-size:10px;letter-spacing:.34em;text-transform:uppercase;color:var(--primary);margin-bottom:28px;}
+.world-menu{display:flex;flex-direction:column;align-items:flex-start;gap:3px;max-width:900px;}
+.world-link{display:flex;align-items:baseline;gap:18px;border:0;background:transparent;color:rgba(255,255,255,.42);cursor:pointer;
+  font-family:inherit;font-weight:300;font-size:clamp(32px,7vw,76px);line-height:1.08;letter-spacing:-.045em;padding:5px 0;
+  transition:color .25s,transform .35s,text-shadow .35s;text-align:left;}
+.world-link:hover,.world-link:focus-visible{color:#fff;transform:translateX(18px);text-shadow:0 0 38px color-mix(in srgb,var(--primary) 55%,transparent);outline:none;}
+.world-link .index{font-size:10px;letter-spacing:.18em;color:var(--primary);min-width:26px;}
+.world-link[hidden]{display:none;}
+.guide-route{margin-top:42px;padding-top:24px;border-top:1px solid var(--border);max-width:760px;}
+.guide-route-title{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+#guide-steps{display:flex;flex-wrap:wrap;gap:8px;}
+.guide-step{display:flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--border);border-radius:99px;
+  cursor:pointer;color:var(--muted);transition:background .15s,color .15s;font-size:12px;}
+.guide-step:active,.guide-step:hover{background:var(--surface);color:#fff;}
+.guide-step.current{border-color:var(--primary);color:var(--text);}
 .guide-step.visited{color:var(--text);}
-.guide-dot{width:16px;height:16px;border-radius:50%;border:1.5px solid currentColor;flex-shrink:0;
+.guide-dot{width:12px;height:12px;border-radius:50%;border:1px solid currentColor;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;font-size:10px;}
 .guide-step.current .guide-dot{border-color:var(--primary);color:var(--primary);box-shadow:0 0 10px var(--primary);}
 .guide-step.visited .guide-dot{background:var(--primary);border-color:var(--primary);color:#000;}
-.guide-step-label{font-size:14px;font-weight:500;}
-.guide-note{font-size:11px;color:var(--muted);margin-top:18px;line-height:1.5;}
+.guide-step-label{font-size:12px;font-weight:500;}
+.guide-note{font-size:11px;color:var(--muted);margin-top:16px;line-height:1.5;}
 .intro-card{position:fixed;inset:0;z-index:55;display:none;flex-direction:column;
   align-items:center;justify-content:center;text-align:center;padding:32px;
-  background:radial-gradient(ellipse at top,rgba(123,92,240,.14),var(--bg) 60%);}
+  background:radial-gradient(ellipse at top,rgba(123,92,240,.16),rgba(3,3,3,.86) 65%);backdrop-filter:blur(28px);}
 .intro-card.show{display:flex;}
 .intro-kicker{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--primary);margin-bottom:12px;}
 .intro-headline{font-size:26px;font-weight:800;color:var(--text);margin-bottom:12px;}
@@ -453,13 +507,36 @@ html,body{
 .intro-next{border:1px solid var(--primary);color:var(--primary);background:transparent;
   padding:11px 26px;border-radius:999px;font-size:13px;cursor:pointer;}
 .intro-next:active{opacity:.6;}
+@media(max-width:560px){.guide-drawer{padding-left:24px;padding-right:24px}.world-link{font-size:clamp(34px,12vw,58px)}.menu-coach{font-size:10px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
-<button class="guide-btn" id="guide-btn" aria-label="Open guide">☰</button>
+<div class="entry-gate" id="entry-gate">
+  <div class="entry-object">
+    <div class="entry-mark">Noizes Object</div>
+    <img class="entry-cover" id="entry-cover" alt="" />
+    <h1 class="entry-title" id="entry-title"></h1>
+    <div class="entry-meta" id="entry-meta"></div>
+    <button class="entry-button" id="enter-object">Enter</button>
+  </div>
+</div>
+<button class="guide-btn" id="guide-btn" aria-label="Open experience menu" aria-expanded="false">☰</button>
+<div class="menu-coach" id="menu-coach" role="status">Open the experience</div>
 <div class="guide-scrim" id="guide-scrim"></div>
-<nav class="guide-drawer" id="guide-drawer" aria-label="Guide">
-  <div class="guide-title">Guide</div>
-  <div id="guide-steps"></div>
-  <div class="guide-note">The artist's recommended path. You're free to wander off it anytime.</div>
+<nav class="guide-drawer" id="guide-drawer" aria-label="Experience menu">
+  <button class="menu-close" id="menu-close" aria-label="Close experience menu">×</button>
+  <div class="guide-title">Inside this object</div>
+  <div class="world-menu">
+    <button class="world-link" data-menu-view="view-player"><span class="index">01</span>Playback</button>
+    <button class="world-link" id="menu-lyrics" data-menu-view="view-lyrics" hidden><span class="index">02</span>Lyrics</button>
+    <button class="world-link" id="menu-guide"><span class="index">03</span>Guided tour</button>
+    <button class="world-link" id="menu-games" data-menu-view="view-games" hidden><span class="index">04</span>Games</button>
+    <button class="world-link" id="menu-notes" data-menu-view="view-notes" hidden><span class="index">05</span>Note wall</button>
+  </div>
+  <div class="guide-route" id="guide-route">
+    <div class="guide-route-title">Artist-authored route</div>
+    <div id="guide-steps"></div>
+    <div class="guide-note">Follow the route or move freely through the object.</div>
+  </div>
 </nav>
 <div class="intro-card" id="intro-card">
   <div class="intro-kicker" id="intro-kicker"></div>
@@ -508,6 +585,8 @@ ROOT.style.setProperty('--accent',  C.theme.accent);
 ROOT.style.setProperty('--bg',      C.theme.bg);
 document.title = C.title + ' — ' + C.artist;
 document.getElementById('p-artist').textContent = C.artist;
+document.getElementById('entry-title').textContent = C.title || 'Untitled Object';
+document.getElementById('entry-meta').textContent = [C.artist, C.edition && C.edition.type, C.edition && C.edition.size ? ('Edition of '+C.edition.size) : ''].filter(Boolean).join(' · ');
 
 // Build title words as animated lines
 (function(){
@@ -538,7 +617,27 @@ document.getElementById('p-artist').textContent = C.artist;
 if((C.features||[]).indexOf('lyrics') !== -1 || (C.lyrics||[]).length){
   var tl = document.getElementById('tab-lyrics');
   if(tl) tl.style.display = '';
+  document.getElementById('menu-lyrics').hidden = false;
 }
+
+// Embedded PDF notes become physical-feeling objects on the Note Wall.
+(function(){
+  var notes = Array.isArray(C.notes) ? C.notes : [];
+  if(!notes.length) return;
+  document.getElementById('menu-notes').hidden = false;
+  var wall = document.getElementById('notes-wall');
+  notes.forEach(function(note,index){
+    var paper=document.createElement('article'); paper.className='note-paper';
+    paper.style.setProperty('--tilt',((index%5)-2)*.7+'deg');
+    var num=document.createElement('div'); num.className='num'; num.textContent='Note '+String(index+1).padStart(2,'0');
+    var title=document.createElement('h3'); title.textContent=note.title || ('Note '+(index+1));
+    var actions=document.createElement('div'); actions.className='actions';
+    var open=document.createElement('a'); open.href=note.src; open.target='_blank'; open.rel='noopener'; open.textContent='Open PDF';
+    var save=document.createElement('a'); save.href=note.src; save.download=(note.title||'note')+'.pdf'; save.textContent='Keep copy';
+    actions.appendChild(open); actions.appendChild(save);
+    paper.appendChild(num); paper.appendChild(title); paper.appendChild(actions); wall.appendChild(paper);
+  });
+})();
 
 // ── COVER ART ──
 if(C.coverSrc){
@@ -556,6 +655,9 @@ if(C.coverSrc){
   var thumbImg = document.getElementById('p-cover-img');
   thumbImg.src = C.coverSrc;
   thumbImg.onload = function(){ thumb.style.display = 'block'; };
+  var entryCover = document.getElementById('entry-cover');
+  entryCover.src = C.coverSrc;
+  entryCover.onload = function(){ entryCover.style.display = 'block'; };
 }
 
 /* ═══════════════════════════════════════════════════
@@ -646,14 +748,6 @@ document.querySelectorAll('.tab').forEach(function(tab){
   var visited  = {};
   var current  = null;
 
-  if(guide.allowFreeExplore === false){
-    document.querySelectorAll('.tab').forEach(function(tab){
-      tab.style.pointerEvents = 'none';
-      tab.setAttribute('aria-disabled','true');
-      tab.style.opacity = '.35';
-    });
-  }
-
   var INTRO = {
     arrival: { kicker:'Noizes Object', headline:C.title, body:(C.artist ? 'by '+C.artist+'. ' : '')+'Tap to enter the experience.' },
     object:  { kicker:(C.edition && C.edition.type) || 'Edition', headline:'The Object', body:[(C.edition&&C.edition.type)||'', (C.edition&&C.edition.size?('Edition of '+C.edition.size):''), (C.rights&&C.rights.copyright)||''].filter(Boolean).join(' · ') },
@@ -700,12 +794,22 @@ document.querySelectorAll('.tab').forEach(function(tab){
     else { card.classList.remove('show'); }
   });
 
-  function openDrawer(){ drawer.classList.add('open'); scrim.classList.add('open'); }
-  function closeDrawer(){ drawer.classList.remove('open'); scrim.classList.remove('open'); }
-  document.getElementById('guide-btn').addEventListener('click',openDrawer);
-  scrim.addEventListener('click',closeDrawer);
-
-  goToNode(guide.nodes[0]);
+  var menuButton=document.getElementById('guide-btn');
+  function openDrawer(){
+    drawer.classList.add('open'); menuButton.setAttribute('aria-expanded','true');
+    document.getElementById('menu-coach').classList.add('hide');
+    document.getElementById('menu-close').focus();
+  }
+  function closeDrawer(){ drawer.classList.remove('open'); menuButton.setAttribute('aria-expanded','false'); menuButton.focus(); }
+  menuButton.addEventListener('click',openDrawer);
+  document.getElementById('menu-close').addEventListener('click',closeDrawer);
+  document.querySelectorAll('[data-menu-view]').forEach(function(item){
+    item.addEventListener('click',function(){ switchView(item.dataset.menuView); closeDrawer(); });
+  });
+  document.getElementById('menu-guide').addEventListener('click',function(){ goToNode(guide.nodes[0]); closeDrawer(); });
+  document.addEventListener('keydown',function(event){ if(event.key==='Escape'&&drawer.classList.contains('open')) closeDrawer(); });
+  window.NZ_GUIDE={start:function(){goToNode(guide.nodes[0]);},goToNode:goToNode,openMenu:openDrawer,closeMenu:closeDrawer};
+  renderSteps();
 })();
 
 /* ═══════════════════════════════════════════════════
@@ -731,6 +835,18 @@ if(C.audioSrc){
   audio.src = C.audioSrc;
   audio.load();
 }
+
+document.getElementById('enter-object').addEventListener('click',function(){
+  var gate=document.getElementById('entry-gate');
+  switchView('view-player');
+  gate.classList.add('gone');
+  setTimeout(function(){ gate.style.display='none'; },850);
+  if(C.audioSrc){
+    var promise=audio.play();
+    if(promise&&promise.then){ promise.then(function(){setPlaying(true);}).catch(function(){setPlaying(false);}); }
+    else setPlaying(true);
+  }
+});
 
 audio.addEventListener('loadedmetadata', function(){
   fakeTotal = audio.duration;
@@ -2008,6 +2124,7 @@ var layer=document.getElementById('game-layer');
 var current=null, rafId=null, lastT=0;
 
 document.getElementById('tab-games').style.display='';
+document.getElementById('menu-games').hidden=false;
 (function(){
   var grid=document.getElementById('games-grid');
   PLAY.games.forEach(function(id){

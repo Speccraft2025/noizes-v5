@@ -94,4 +94,25 @@ describe('buildPackage — experience.json (play pass-through)', () => {
       { label: 'Tickets', url: 'https://example.com/tickets', kind: 'tickets', requires_internet: true }
     ]);
   });
+
+  it('embeds PDF extras as a portable Note Wall without external dependencies', async () => {
+    const pdfFile = {
+      name: 'liner notes.pdf',
+      type: 'application/pdf',
+      arrayBuffer: async () => Uint8Array.from([0x25, 0x50, 0x44, 0x46]).buffer,
+    };
+    const result = await buildPackage({
+      ...base,
+      extras: { story: '', links: [], pdfs: [{ id: 'note-1', title: 'Liner Notes', name: pdfFile.name, file: pdfFile }] },
+    });
+    const zip = await unzip(result);
+    const exp = JSON.parse(await zip.file('experience.json').async('string'));
+    expect(exp.attachments).toEqual([{
+      id: 'note-1', title: 'Liner Notes', path: 'attachments/01-liner_notes.pdf', mime: 'application/pdf', kind: 'notes'
+    }]);
+    expect(zip.file('attachments/01-liner_notes.pdf')).toBeTruthy();
+    const html = await zip.file('experience.html').async('string');
+    expect(html).toContain('data:application/pdf;base64,JVBERg==');
+    expect(html).toContain('Note Wall');
+  });
 });

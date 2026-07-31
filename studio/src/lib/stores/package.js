@@ -47,7 +47,8 @@ export const play = writable({
 // compatibility but are authored from the Extras step alongside narrative media.
 export const extras = writable({
   story: '',
-  links: []
+  links: [],
+  pdfs: []
 });
 
 // The nine games the ULTRA template ships. Order = display order.

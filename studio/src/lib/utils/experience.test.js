@@ -111,6 +111,14 @@ describe('template ↔ catalog contract', () => {
   it('template gates the Games tab on the play block', () => {
     expect(ULTRA_HTML).toContain("if(!PLAY || !PLAY.games || !PLAY.games.length) return;");
   });
+
+  it('uses an immersive entry, spatial menu, and shared Note Wall view instead of visible tabs', () => {
+    expect(ULTRA_HTML).toContain('id="enter-object"');
+    expect(ULTRA_HTML).toContain('id="guide-drawer" aria-label="Experience menu"');
+    expect(ULTRA_HTML).toContain('data-menu-view="view-player"');
+    expect(ULTRA_HTML).toContain('id="view-notes"');
+    expect(ULTRA_HTML).toMatch(/\.tabs\{[\s\S]*?display:none/);
+  });
 });
 
 describe('buildExperienceHTML — script-breakout escaping (XSS regression)', () => {

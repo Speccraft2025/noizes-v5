@@ -73,6 +73,7 @@ export async function buildPackage({ identity, edition, rights, assets, template
   const guideBlock = buildGuide({
     hasLyrics: !!(assets.lyrics && assets.lyrics.length),
     hasPlay:   !!(play && play.games?.length),
+    hasNotes:  !!extras.pdfs?.length,
     story:     extras.story?.trim(),
     authored:  assets.guide,
   });
@@ -87,6 +88,25 @@ export async function buildPackage({ identity, edition, rights, assets, template
       difficulty: play.difficulty || 'standard',
       intensity:  typeof play.intensity === 'number' ? play.intensity : 1,
     };
+  }
+
+  const notes = [];
+  for (const [index, pdf] of (extras.pdfs || []).entries()) {
+    if (!pdf.file || !(pdf.file.type === 'application/pdf' || pdf.name?.toLowerCase().endsWith('.pdf'))) continue;
+    const buf = await pdf.file.arrayBuffer();
+    const safe = (pdf.name || `note-${index + 1}.pdf`).replace(/[^a-z0-9._-]/gi, '_');
+    const path = `attachments/${String(index + 1).padStart(2, '0')}-${safe}`;
+    zip.file(path, buf);
+    notes.push({
+      id: pdf.id || `note-${index + 1}`,
+      title: pdf.title?.trim() || pdf.name || `Note ${index + 1}`,
+      path,
+      mime: 'application/pdf',
+      src: `data:application/pdf;base64,${arrayBufferToBase64(buf)}`,
+    });
+  }
+  if (notes.length) {
+    experienceJson.attachments = notes.map(({ id, title, path, mime }) => ({ id, title, path, mime, kind: 'notes' }));
   }
   zip.file('experience.json', JSON.stringify(experienceJson, null, 2));
 
@@ -117,6 +137,7 @@ export async function buildPackage({ identity, edition, rights, assets, template
     play,
     guide:    assets.guide,
     extras,
+    notes,
   });
   zip.file('experience.html', experienceHTML);
 

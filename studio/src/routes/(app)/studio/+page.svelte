@@ -175,7 +175,7 @@
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Extras</span>
-          <span class="text-white">{$play.games.length + ($extras.story ? 1 : 0) + $extras.links.length}</span>
+          <span class="text-white">{$play.games.length + ($extras.story ? 1 : 0) + $extras.links.length + $extras.pdfs.length}</span>
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Edition</span>

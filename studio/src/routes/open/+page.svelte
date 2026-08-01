@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { prepareNzForViewer } from '$lib/utils/viewer.js';
+  import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
 
   let dragging = false;
   let loading = false;
@@ -8,9 +8,9 @@
   let ready = false;
   let manifest = null;
   let filename = '';
-  let iframeSrc = '';
   let iframeEl;
-  let blobUrls = [];
+  let preparedFrame = null;
+  let frameSent = false;
   let validationResult = null;
   let storageKeys = null;
 
@@ -25,6 +25,11 @@
     const handleStorageMessage = (event) => {
       if (!iframeEl || event.source !== iframeEl.contentWindow) return;
       const message = event.data;
+      if (message?.type === 'noizes:viewer:error') {
+        error = `Failed to open: ${message.message || 'Experience could not start.'}`;
+        ready = false;
+        return;
+      }
       if (!message || !['noizes:storage:set', 'noizes:storage:remove'].includes(message.type)) return;
       if (![storageKeys?.resumeKey, storageKeys?.noteKey].includes(message.key)) return;
       try {
@@ -38,14 +43,24 @@
     return () => window.removeEventListener('message', handleStorageMessage);
   });
 
+  function loadExperienceFrame() {
+    if (!iframeEl?.contentWindow || !preparedFrame || frameSent) return;
+    const resources = preparedFrame.resources.map((resource) => ({ ...resource }));
+    iframeEl.contentWindow.postMessage({
+      type: 'noizes:viewer:load',
+      html: preparedFrame.html,
+      resources,
+    }, '*', resources.map((resource) => resource.bytes));
+    frameSent = true;
+  }
+
   function reset() {
-    blobUrls.forEach(u => URL.revokeObjectURL(u));
-    blobUrls = [];
     ready = false;
     manifest = null;
     filename = '';
     error = '';
-    iframeSrc = '';
+    preparedFrame = null;
+    frameSent = false;
     validationResult = null;
     storageKeys = null;
   }
@@ -60,8 +75,8 @@
       const prepared = await prepareNzForViewer(file);
       validationResult = prepared.validation;
       manifest = prepared.manifest;
-      blobUrls = prepared.blobUrls;
-      iframeSrc = prepared.htmlUrl;
+      preparedFrame = prepared;
+      frameSent = false;
       storageKeys = prepared.storageKeys;
       ready = true;
 
@@ -90,37 +105,19 @@
 <svelte:head><title>Noizes Viewer</title></svelte:head>
 
 {#if ready}
-  <div class="fixed inset-0 z-50 flex flex-col" style="background: #030303;">
-    <div class="flex items-center justify-between px-4 py-2 shrink-0 border-b"
-      style="background: rgba(3,3,3,0.95); border-color: rgba(255,255,255,0.06);">
-      <div class="flex items-center gap-3">
-        <span class="font-black text-sm tracking-tight text-white">NOIZES</span>
-        <span class="text-xs font-mono px-2 py-0.5 rounded"
-          style="background: rgba(123,92,240,0.12); color: #7B5CF0;">
-          {manifest?.release?.title || manifest?.title || filename}
-        </span>
-        <span class="text-[10px] font-mono px-2 py-0.5 rounded" style="background:rgba(74,222,128,.1);color:#4ade80;">
-          ✓ {validationResult?.format === 'legacy_single' ? 'Legacy Single normalized' : 'Components verified'}
-        </span>
-      </div>
-      <div class="flex items-center gap-3">
-        {#if manifest?.release?.primary_artist || manifest?.artist}
-          <span class="text-xs font-mono" style="color: #555;">
-            {manifest?.release?.primary_artist || manifest.artist}{(manifest?.release?.year || manifest?.year) ? ' · ' + (manifest?.release?.year || manifest.year) : ''}
-          </span>
-        {/if}
-        <button on:click={reset}
-          class="text-xs px-3 py-1 rounded-full border"
-          style="border-color: rgba(255,255,255,0.1); color: #666; background: none; cursor: pointer;">
-          ✕ Close
-        </button>
-      </div>
-    </div>
+  <div class="fixed inset-0 z-50" style="background: #030303;">
+    <h1 class="sr-only">{manifest?.release?.title || manifest?.title || filename}</h1>
+    <button on:click={reset} aria-label="Close experience"
+      class="fixed z-[60] flex items-center justify-center rounded-full"
+      style="top:max(14px,env(safe-area-inset-top));right:14px;width:42px;height:42px;border:1px solid rgba(255,255,255,.16);color:rgba(255,255,255,.76);background:rgba(4,7,7,.48);backdrop-filter:blur(18px);cursor:pointer;">
+      <span aria-hidden="true" style="font-size:18px;line-height:1;transform:translateY(-1px);">×</span>
+    </button>
     <iframe
       bind:this={iframeEl}
       title="Noizes Experience"
-      src={iframeSrc}
-      class="flex-1 border-0 w-full"
+      srcdoc={VIEWER_FRAME_BOOTSTRAP}
+      on:load={loadExperienceFrame}
+      class="absolute inset-0 border-0 w-full h-full"
       allow="autoplay"
       sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
     ></iframe>

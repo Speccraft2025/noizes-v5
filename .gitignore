@@ -1,2 +1,11 @@
 # Local Netlify folder
 .netlify
+
+# Reproducible immersive-reference-album outputs and preserved source downloads.
+# Run examples/immersive-reference-album/npm run build to recreate build/ and dist/.
+examples/immersive-reference-album/build/
+examples/immersive-reference-album/dist/
+examples/immersive-reference-album/sources/original/
+examples/immersive-reference-album/.DS_Store
+examples/immersive-reference-album/screenshots/*.png
+!examples/immersive-reference-album/screenshots/09-integrated-viewer-mobile.png

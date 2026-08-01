@@ -430,3 +430,8 @@ create policy "Creators can update own releases" on public.releases for update
   with check ((select auth.uid()) = artist_id);
 
 commit;
+
+-- PostgREST normally receives DDL notifications automatically. Explicitly
+-- reload the API schema as well so a freshly deployed migration cannot leave
+-- publishing on a stale `catalogue_number` cache entry.
+notify pgrst, 'reload schema';

@@ -6,6 +6,7 @@ import nodeCrypto from 'node:crypto';
 import JSZip from 'jszip';
 import { signHash } from '$lib/server/signing.js';
 import { validateNzArchive } from '$lib/domain/package-validation.js';
+import { findPublishSchemaError, publishSchemaMessage } from '$lib/server/publish-schema.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -35,6 +36,8 @@ export async function POST({ request, locals }) {
   }
 
   const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const schemaFailure = await findPublishSchemaError(sb);
+  if (schemaFailure) throw error(503, publishSchemaMessage(schemaFailure));
   // Derived from the session, never from the request — a client cannot
   // publish paths under another user's prefix.
   const basePath = `${locals.user.id}/${releaseId}`;

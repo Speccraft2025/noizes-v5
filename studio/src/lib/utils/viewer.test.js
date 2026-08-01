@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { sha256Hex } from '../domain/package-validation.js';
-import { prepareNzForViewer } from './viewer.js';
+import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from './viewer.js';
 
 async function viewerPackage() {
   const zip = new JSZip();
@@ -24,11 +24,8 @@ async function viewerPackage() {
 }
 
 describe('offline viewer preparation', () => {
-  it('validates package bytes and resolves relative component paths to Blob URLs', async () => {
-    let index = 0;
+  it('validates package bytes and hands resources to the sandbox bootstrap', async () => {
     const result = await prepareNzForViewer(await viewerPackage(), {
-      createObjectURL: () => `blob:test-${++index}`,
-      revokeObjectURL: () => {},
       storage: {
         getItem: (key) => key === 'nz-release-resume:r:edition:open-copy'
           ? JSON.stringify({ current_track_id: 'track', current_track_position_ms: 1200 })
@@ -36,11 +33,17 @@ describe('offline viewer preparation', () => {
       },
     });
     expect(result.validation.valid).toBe(true);
-    expect(result.html).toContain('src="blob:test-1"');
-    expect(result.html).toContain('"src":"blob:test-1"');
+    expect(result.html).toContain('src="tracks/01-track/audio/primary.wav"');
+    expect(result.html).toContain('"src":"tracks/01-track/audio/primary.wav"');
     expect(result.html).toContain('window.NZ_VIEWER_STATE');
     expect(result.html).toContain('"current_track_position_ms":1200');
     expect(result.storageKeys.resumeKey).toBe('nz-release-resume:r:edition:open-copy');
-    expect(result.htmlUrl).toBe('blob:test-2');
+    expect(result.resources).toHaveLength(1);
+    expect(result.resources[0]).toMatchObject({ path: 'tracks/01-track/audio/primary.wav', mime: 'audio/wav' });
+    expect(Array.from(new Uint8Array(result.resources[0].bytes))).toEqual([1, 2, 3]);
+    expect(VIEWER_FRAME_BOOTSTRAP).toContain('noizes:viewer:load');
+    expect(VIEWER_FRAME_BOOTSTRAP).toContain('window.NZ_RESOURCE_URLS');
+    expect(VIEWER_FRAME_BOOTSTRAP).toContain("html.split(\"'\"+resource.path+\"'\")");
+    expect(VIEWER_FRAME_BOOTSTRAP).toContain('document.write(html)');
   });
 });

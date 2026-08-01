@@ -1,6 +1,6 @@
 import { validateJourney } from './journey.js';
 
-export const STUDIO_PROJECT_SCHEMA_VERSION = 2;
+export const STUDIO_PROJECT_SCHEMA_VERSION = 3;
 
 export const RELEASE_TYPES = Object.freeze([
   'single',
@@ -436,18 +436,29 @@ export function normalizeReleaseProject(input = {}, options = {}) {
   };
 
   const simpleRights = input.rights ?? {};
-  const rights = simpleRights.release_rights
-    ? simpleRights
-    : {
-        release_rights: {
-          copyright: clean(simpleRights.copyright),
-          license: clean(simpleRights.license) || 'All Rights Reserved',
-          producer: clean(simpleRights.producer),
-          credits: clean(simpleRights.credits),
-        },
-        track_rights: [],
-        asset_permissions: [],
-      };
+  const suppliedReleaseRights = simpleRights.release_rights ?? simpleRights;
+  const rights = {
+    ...simpleRights,
+    release_rights: {
+      ...suppliedReleaseRights,
+      copyright: clean(suppliedReleaseRights.copyright),
+      license: clean(suppliedReleaseRights.license) || 'All Rights Reserved',
+      producer: clean(suppliedReleaseRights.producer),
+      credits: clean(suppliedReleaseRights.credits),
+      credit_records: Array.isArray(suppliedReleaseRights.credit_records)
+        ? suppliedReleaseRights.credit_records.map((record, index) => ({
+            ...(record || {}),
+            credit_id: normalizeId(record?.credit_id, `${releaseId}:credit:${index}:${record?.role}:${record?.name}`, idFactory),
+            name: clean(record?.name),
+            role: clean(record?.role),
+            email: clean(record?.email).toLocaleLowerCase(),
+            track_ids: stringList(record?.track_ids),
+          }))
+        : [],
+    },
+    track_rights: Array.isArray(simpleRights.track_rights) ? simpleRights.track_rights : [],
+    asset_permissions: Array.isArray(simpleRights.asset_permissions) ? simpleRights.asset_permissions : [],
+  };
 
   const journeyInput = input.journey ?? {
     legacy_guide: legacyAssets?.guide ?? null,
@@ -521,6 +532,13 @@ export function removeTrack(project, trackId) {
     lyrics: project.lyrics.filter((entry) => entry.track_id !== trackId),
     rights: {
       ...project.rights,
+      release_rights: {
+        ...project.rights.release_rights,
+        credit_records: (project.rights.release_rights?.credit_records || []).map((record) => ({
+          ...record,
+          track_ids: (record.track_ids || []).filter((id) => id !== trackId),
+        })),
+      },
       track_rights: (project.rights.track_rights || []).filter((entry) => entry.track_id !== trackId),
       asset_permissions: (project.rights.asset_permissions || []).filter((entry) => !removedAssetIds.has(entry.asset_id)),
     },
@@ -673,6 +691,22 @@ export function validateReleaseProject(project, options = {}) {
     add('warning', 'release_authority_unconfirmed', 'rights.release_rights.authority_confirmed', 'Confirm your authority to include and publish the complete release.');
   }
   const trackRights = Array.isArray(project?.rights?.track_rights) ? project.rights.track_rights : [];
+  const creditRecords = Array.isArray(releaseRights.credit_records) ? releaseRights.credit_records : [];
+  const creditIds = new Set();
+  for (const [index, record] of creditRecords.entries()) {
+    if (!clean(record?.credit_id) || creditIds.has(record?.credit_id)) {
+      add('error', 'credit_id_invalid', `rights.release_rights.credit_records[${index}].credit_id`, 'Every credit must have a unique stable ID.');
+    }
+    creditIds.add(record?.credit_id);
+    if (!clean(record?.name) || !clean(record?.role)) {
+      add('warning', 'credit_record_incomplete', `rights.release_rights.credit_records[${index}]`, 'Every structured credit should name a contributor and their role.');
+    }
+    for (const trackId of record?.track_ids || []) {
+      if (!trackIds.has(trackId)) {
+        add('error', 'credit_track_missing', `rights.release_rights.credit_records[${index}].track_ids`, 'A credit references a track that no longer exists.');
+      }
+    }
+  }
   for (const [index, declaration] of trackRights.entries()) {
     if (!trackIds.has(declaration.track_id)) {
       add('error', 'rights_track_missing', `rights.track_rights[${index}].track_id`, 'Track rights reference an unknown track.');

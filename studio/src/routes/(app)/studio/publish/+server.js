@@ -66,6 +66,7 @@ export async function POST({ request, locals }) {
     throw error(400, `Package validation failed${failed ? `: ${failed.label} — ${failed.note}` : ''}`);
   }
   let packageManifest = null;
+  let packageCredits = {};
   let declaredComponents = [];
   const manifestEntry = zip.file('manifest.json');
   if (manifestEntry) {
@@ -78,6 +79,14 @@ export async function POST({ request, locals }) {
   }
   if (packageManifest?.release?.release_id && packageManifest.release.release_id !== releaseId) {
     throw error(400, 'Package release ID does not match the publish target');
+  }
+  const creditsEntry = zip.file('credits.json');
+  if (creditsEntry) {
+    try {
+      packageCredits = JSON.parse(await creditsEntry.async('string'));
+    } catch {
+      throw error(400, 'Package credits.json is not valid JSON');
+    }
   }
   const inventoryEntries = declaredComponents.length
     ? declaredComponents.map((component) => component.path).filter(Boolean)
@@ -158,6 +167,7 @@ export async function POST({ request, locals }) {
       venue: meta.venue || null,
       event_name: meta.event_name || null,
       recording_date: meta.recording_date || null,
+      release_metadata: { credits: packageCredits },
       track_count: Number(meta.track_count) || 0,
       disc_count: Number(meta.disc_count) || 1,
       total_duration_ms: Number(meta.total_duration_ms) || 0,

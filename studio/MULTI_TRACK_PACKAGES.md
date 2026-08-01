@@ -39,6 +39,24 @@ Studio preview compiles the same `.nz` bytes used for download, validates them,
 resolves their component paths, and opens the generated experience. It is not a
 separate approximation of playback or Journey timing.
 
+Studio automatically saves the active creator draft to browser IndexedDB after
+each edit and restores it after a refresh, including selected audio, artwork,
+video, and PDF `File` objects. A creator-scoped localStorage copy provides
+metadata recovery when IndexedDB is unavailable. The UI always reports whether
+the draft is restoring, saving, saved, or unable to preserve file bytes.
+
+Release credits are structured records with stable IDs, public name/role data,
+and explicit track links. Featured artists entered in Identity or Tracklist are
+prefilled without overwriting later edits. Private email and invitation state
+remain in the Studio draft; only public attribution enters `credits.json`,
+`rights.json`, and Archive. Sending an invitation is an authenticated server
+action that grants Creator access through the platform invite table before
+asking Supabase Auth for a single-use invitation link. A branded Resend email
+delivers that link when Resend is configured; otherwise Supabase Auth's email
+provider remains the fallback. Each generated-link delivery is idempotent, and
+failed new-account deliveries are rolled back so the creator can retry with a
+fresh token.
+
 ## Package source of truth
 
 `manifest.json` is authoritative for release identity, track ordering, and the

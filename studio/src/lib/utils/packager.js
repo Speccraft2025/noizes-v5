@@ -51,6 +51,20 @@ export async function buildPackage(input) {
   const release = project.release;
   const tracks = orderedTracks(project.tracks);
   const fixedEdition = normalizeEdition(project.edition);
+  const releaseRights = project.rights.release_rights ?? project.rights;
+  // Contact and invitation metadata stays in the creator's private draft. A
+  // portable collector package receives only the public attribution record.
+  const releaseCreditRecords = (releaseRights.credit_records || []).map((record) => ({
+    credit_id: record.credit_id,
+    name: record.name,
+    role: record.role,
+    track_ids: Array.isArray(record.track_ids) ? record.track_ids : [],
+    source: record.source || 'manual',
+  }));
+  const publicRights = stripFiles({
+    ...project.rights,
+    release_rights: { ...releaseRights, credit_records: releaseCreditRecords },
+  });
   const releaseId = legacyCall && input.identity?.release_id
     ? input.identity.release_id
     : release.release_id;
@@ -223,6 +237,9 @@ export async function buildPackage(input) {
       lyrics: stripFiles(lyricRecord),
       credits: {
         inherited_release_credits: track.inherit_release_credits,
+        linked_release_credit_ids: releaseCreditRecords
+          .filter((credit) => credit.track_ids.includes(track.track_id))
+          .map((credit) => credit.credit_id),
         ...(track.credits ?? {}),
       },
       rights: project.rights.track_rights?.find((entry) => entry.track_id === track.track_id) ?? {},
@@ -243,7 +260,6 @@ export async function buildPackage(input) {
     });
   }
 
-  const releaseRights = project.rights.release_rights ?? project.rights;
   const authoredJourney = materializeJourney(project.journey, tracks);
   const runtimeJourney = {
     ...stripFiles(authoredJourney),
@@ -267,16 +283,21 @@ export async function buildPackage(input) {
     edition_size: Number(fixedEdition.edition_size),
   };
   zip.file('edition.json', JSON.stringify(editionData, null, 2));
-  zip.file('rights.json', JSON.stringify(stripFiles(project.rights), null, 2));
+  zip.file('rights.json', JSON.stringify(publicRights, null, 2));
   const creditsData = {
+    schema_version: '2.0.0',
     release: releaseRights.credits
       ? String(releaseRights.credits).split('\n').map((line) => line.trim()).filter(Boolean)
       : [],
+    records: releaseCreditRecords,
     tracks: tracks.map((track) => ({
       track_id: track.track_id,
       producers: track.producers,
       writers: track.writers,
       inherited_release_credits: track.inherit_release_credits,
+      linked_release_credit_ids: releaseCreditRecords
+        .filter((credit) => credit.track_ids.includes(track.track_id))
+        .map((credit) => credit.credit_id),
       credits: track.credits ?? {},
     })),
   };
@@ -408,7 +429,7 @@ export async function buildPackage(input) {
     components,
     notes: notes.map(({ id, title, path, mime }) => ({ id, title, path, src: path, mime })),
     credits: creditsData,
-    rights: stripFiles(project.rights),
+    rights: publicRights,
     edition: editionData,
     authenticity,
     technical: technicalData,

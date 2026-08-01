@@ -164,6 +164,12 @@ describe('normalized release project', () => {
     project.lyrics = [{ track_id: removedId, plain_text: 'Gone' }];
     project.rights.track_rights = [{ track_id: removedId }];
     project.rights.asset_permissions = [{ asset_id: removedAssetId, confirmed: true }];
+    project.rights.release_rights.credit_records = [{
+      credit_id: 'ce179b9c-d1ef-469d-b6ba-e8cda646ee04',
+      name: 'Guest',
+      role: 'Performer',
+      track_ids: [removedId, project.tracks[1].track_id],
+    }];
     project.journey.transitions = [{ from_track_id: removedId, to_track_id: project.tracks[1].track_id }];
     const remainingId = project.tracks[1].track_id;
     const next = removeTrack(project, removedId);
@@ -174,6 +180,7 @@ describe('normalized release project', () => {
     expect(next.lyrics).toHaveLength(0);
     expect(next.rights.track_rights).toHaveLength(0);
     expect(next.rights.asset_permissions).toHaveLength(0);
+    expect(next.rights.release_rights.credit_records[0].track_ids).toEqual([remainingId]);
     expect(next.journey.transitions).toHaveLength(0);
   });
 

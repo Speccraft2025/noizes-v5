@@ -128,6 +128,27 @@ export async function validateNzArchive(zip, options = {}) {
   }
   checks.push(issue('release relationships', relationshipFailure ? 'fail' : 'pass', relationshipFailure || `${manifest.tracks.length} track records are internally linked`, relationshipFailure ? 'relationships_invalid' : ''));
 
+  if (current) {
+    const credits = await readJson(zip, 'credits.json').catch(() => null);
+    const records = Array.isArray(credits?.records) ? credits.records : [];
+    const recordIds = new Set();
+    let creditFailure = '';
+    for (const record of records) {
+      if (!record.credit_id || recordIds.has(record.credit_id)) creditFailure ||= 'Credit IDs are missing or duplicated';
+      recordIds.add(record.credit_id);
+      if (!record.name || !record.role) creditFailure ||= 'A structured credit is missing its name or role';
+      if ('email' in record || 'invite_status' in record || 'collaborator_user_id' in record) {
+        creditFailure ||= 'Private collaborator invitation data is present in the portable package';
+      }
+      if ((record.track_ids || []).some((trackId) => !trackIds.has(trackId))) creditFailure ||= `Credit ${record.credit_id || record.name} references an unknown track`;
+    }
+    for (const trackCredit of Array.isArray(credits?.tracks) ? credits.tracks : []) {
+      if (trackCredit.track_id && !trackIds.has(trackCredit.track_id)) creditFailure ||= `Credits reference unknown track ${trackCredit.track_id}`;
+      if ((trackCredit.linked_release_credit_ids || []).some((creditId) => !recordIds.has(creditId))) creditFailure ||= `Track ${trackCredit.track_id} references an unknown release credit`;
+    }
+    checks.push(issue('credit relationships', creditFailure ? 'fail' : 'pass', creditFailure || `${records.length} structured credits are public and internally linked`, creditFailure ? 'credits_invalid' : ''));
+  }
+
   let componentFailures = 0;
   let componentVerified = 0;
   const computedComponents = [];

@@ -1,6 +1,9 @@
 <script>
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { identity, edition, assets, rights, releaseProject, template, play, extras } from '$lib/stores/package.js';
+  import { createReleaseProject } from '$lib/domain/release.js';
+  import { loadStudioDraft, saveStudioDraft } from '$lib/utils/studio-draft.js';
   import StepIdentity    from '$lib/components/StepIdentity.svelte';
   import StepTracklist   from '$lib/components/StepTracklist.svelte';
   import StepAssets      from '$lib/components/StepAssets.svelte';
@@ -10,6 +13,8 @@
   import StepEdition     from '$lib/components/StepEdition.svelte';
   import StepRights      from '$lib/components/StepRights.svelte';
   import StepExport      from '$lib/components/StepExport.svelte';
+
+  export let data;
 
   const steps = [
     { id: 1, label: 'Identity', icon: '◈' },
@@ -23,13 +28,21 @@
   ];
 
   let currentStep = 1;
+  let draftStatus = 'restoring';
+  let draftSavedAt = '';
+  let draftRestored = false;
+  let draftWarning = '';
+  let saveTimer;
+  let saveQueue = Promise.resolve();
+  let draftSubscriptions = [];
+  let lastFileSignature = '';
 
   // Handoff from beatsunlimited: a countersigned split-sheet deal arrives as
   // ?source=beatsunlimited&deal=<token>&title=&producer=&master=&pub=.
   // Purely additive — only prefills empty Rights fields, never overwrites.
   let importedDeal = null;
 
-  onMount(() => {
+  function importBeatsUnlimitedDeal() {
     const p = new URLSearchParams(window.location.search);
     if (p.get('source') !== 'beatsunlimited' || !p.get('producer')) return;
     importedDeal = {
@@ -50,6 +63,119 @@
         ? (v.credits.includes(creditLine) ? v.credits : v.credits + '\n' + creditLine)
         : creditLine
     }));
+  }
+
+  function draftSnapshot() {
+    return {
+      project: get(releaseProject),
+      template: get(template),
+      play: get(play),
+      extras: get(extras),
+      currentStep,
+    };
+  }
+
+  function persistDraft() {
+    const userId = data?.user?.id;
+    if (!userId) return Promise.resolve();
+    draftStatus = 'saving';
+    saveQueue = saveQueue.then(async () => {
+      const result = await saveStudioDraft(userId, draftSnapshot());
+      draftSavedAt = result.savedAt;
+      draftWarning = result.durableFiles ? '' : 'File bytes could not be stored; metadata is safe but uploads may need reselecting.';
+      draftStatus = 'saved';
+    }).catch((error) => {
+      draftStatus = 'error';
+      draftWarning = error?.message || 'This browser could not save the Studio draft.';
+    });
+    return saveQueue;
+  }
+
+  function fileSignature() {
+    const project = get(releaseProject);
+    const files = [
+      ...project.audio_assets,
+      ...project.release_assets,
+      ...project.track_assets,
+      ...(get(extras).pdfs || []),
+    ];
+    return files.map((asset) => {
+      const file = asset.file;
+      return [asset.asset_id || asset.id || '', file?.name || '', file?.size || 0, file?.lastModified || 0].join(':');
+    }).join('|');
+  }
+
+  function scheduleDraftSave() {
+    if (draftStatus === 'restoring') return;
+    clearTimeout(saveTimer);
+    const nextFileSignature = fileSignature();
+    if (nextFileSignature !== lastFileSignature) {
+      lastFileSignature = nextFileSignature;
+      void persistDraft();
+      return;
+    }
+    draftStatus = 'saving';
+    saveTimer = setTimeout(() => void persistDraft(), 650);
+  }
+
+  function goToStep(step) {
+    currentStep = Math.max(1, Math.min(steps.length, Number(step) || 1));
+    scheduleDraftSave();
+  }
+
+  function savedTime(value) {
+    if (!value) return '';
+    return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  onMount(() => {
+    let disposed = false;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        clearTimeout(saveTimer);
+        void persistDraft();
+      }
+    };
+    const onPageHide = () => {
+      clearTimeout(saveTimer);
+      void persistDraft();
+    };
+
+    async function initializeDraft() {
+      try {
+        const restored = await loadStudioDraft(data?.user?.id);
+        if (restored?.snapshot && !disposed) {
+          const snapshot = restored.snapshot;
+          releaseProject.set(createReleaseProject(snapshot.project || {}));
+          template.set(snapshot.template || 'ultra-v2');
+          play.set(snapshot.play || { games: [], difficulty: 'standard', intensity: 1 });
+          extras.set(snapshot.extras || { story: '', links: [], pdfs: [] });
+          currentStep = Math.max(1, Math.min(steps.length, Number(snapshot.currentStep) || 1));
+          draftSavedAt = restored.saved_at;
+          draftRestored = true;
+          if (!restored.durableFiles) draftWarning = 'Draft metadata was restored; uploaded files may need to be selected again.';
+        }
+      } catch (error) {
+        draftWarning = error?.message || 'The previous Studio draft could not be restored.';
+      }
+
+      if (disposed) return;
+      importBeatsUnlimitedDeal();
+      draftStatus = 'saved';
+      lastFileSignature = fileSignature();
+      draftSubscriptions = [releaseProject, template, play, extras].map((store) => store.subscribe(() => scheduleDraftSave()));
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      window.addEventListener('pagehide', onPageHide);
+    }
+
+    void initializeDraft();
+    return () => {
+      disposed = true;
+      clearTimeout(saveTimer);
+      draftSubscriptions.forEach((unsubscribe) => unsubscribe());
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', onPageHide);
+    };
   });
 </script>
 
@@ -78,7 +204,7 @@
           style={currentStep === step.id
             ? 'background: rgba(123,92,240,0.15); color: #fff; border: 1px solid rgba(123,92,240,0.25);'
             : 'color: var(--ink-tertiary); border: 1px solid transparent;'}
-          on:click={() => currentStep = step.id}
+          on:click={() => goToStep(step.id)}
         >
           <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0"
             style={currentStep === step.id
@@ -103,6 +229,12 @@
           style="width: {Math.round((currentStep - 1) / (steps.length - 1) * 100)}%; background: var(--gradient-spectral);">
         </div>
       </div>
+      <div class="mt-3 text-[10px] font-mono leading-relaxed" style="color:{draftStatus === 'error' ? '#F08A9D' : 'var(--ink-muted)'};">
+        {#if draftStatus === 'restoring'}Restoring draft…
+        {:else if draftStatus === 'saving'}Saving draft…
+        {:else if draftStatus === 'error'}Draft not saved
+        {:else}✓ Saved {savedTime(draftSavedAt)}{/if}
+      </div>
     </div>
   </aside>
 
@@ -116,12 +248,22 @@
           style={currentStep === step.id
             ? 'border-color: #7B5CF0; color: #fff;'
             : 'border-color: transparent; color: var(--ink-muted);'}
-          on:click={() => currentStep = step.id}
+          on:click={() => goToStep(step.id)}
         >{step.label}</button>
       {/each}
     </div>
 
     <div class="flex-1 px-8 py-8 max-w-3xl">
+      {#if draftRestored || draftWarning}
+        <div class="mb-6 rounded-xl px-4 py-3 flex items-start gap-3 text-xs"
+          style="background:rgba(123,92,240,.08);border:1px solid rgba(123,92,240,.2);color:var(--ink-secondary);">
+          <span style="color:#7B5CF0;">✓</span>
+          <span>
+            {#if draftRestored}<strong class="text-white">Draft restored.</strong> Continue from where you left off.{/if}
+            {#if draftWarning}<span class="block mt-1" style="color:#F0C98A;">{draftWarning}</span>{/if}
+          </span>
+        </div>
+      {/if}
       {#if currentStep === 1}
         <StepIdentity />
       {:else if currentStep === 2}
@@ -145,9 +287,9 @@
     <div class="px-8 py-5 border-t flex justify-between items-center" style="border-color: var(--border-dim);">
       <button class="btn-ghost" disabled={currentStep === 1}
         style={currentStep === 1 ? 'opacity: 0.3; cursor: not-allowed;' : ''}
-        on:click={() => currentStep--}>← Back</button>
+        on:click={() => goToStep(currentStep - 1)}>← Back</button>
       {#if currentStep < steps.length}
-        <button class="btn-spectral" on:click={() => currentStep++}>Continue →</button>
+        <button class="btn-spectral" on:click={() => goToStep(currentStep + 1)}>Continue →</button>
       {/if}
     </div>
   </div>

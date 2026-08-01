@@ -53,6 +53,17 @@ describe('package validation', () => {
     ]));
   });
 
+  it('blocks private invitation data or unknown track links in portable credits', async () => {
+    const zip = await normalizedZip();
+    zip.file('credits.json', JSON.stringify({
+      records: [{ credit_id: 'credit-1', name: 'Guest', role: 'Featured Artist', email: 'private@example.com', track_ids: ['missing-track'] }],
+      tracks: [{ track_id: 'track', linked_release_credit_ids: ['missing-credit'] }],
+    }));
+    const result = await validateNzArchive(zip);
+    expect(result.valid).toBe(false);
+    expect(result.checks).toContainEqual(expect.objectContaining({ label: 'credit relationships', status: 'fail', code: 'credits_invalid' }));
+  });
+
   it('normalizes legacy manifests into one internal Single track without migration', () => {
     const manifest = normalizePackageManifest({ noizes_version: '0.1', release_id: 'old', artist: 'A', title: 'T' }, ['audio/song.mp3']);
     expect(manifest).toMatchObject({

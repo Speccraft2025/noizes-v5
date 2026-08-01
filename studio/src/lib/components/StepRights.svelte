@@ -1,8 +1,20 @@
 <script>
+  import { onMount } from 'svelte';
   import { extras, identity, releaseProject, rights, LICENSES } from '$lib/stores/package.js';
   import { orderedTracks } from '$lib/domain/release.js';
+  import { createCreditRecord, mergeFeaturedCreditRecords } from '$lib/domain/credit-records.js';
+
+  const CREDIT_ROLES = [
+    'Featured Artist', 'Primary Artist', 'Producer', 'Executive Producer', 'Songwriter',
+    'Composer', 'Arranger', 'Performer', 'Mix Engineer', 'Mastering Engineer',
+    'Recording Engineer', 'Artwork', 'Photography', 'Creative Director', 'Other',
+  ];
 
   let selectedTrackId = '';
+  let creditModalOpen = false;
+  let creditForm = null;
+  let creditError = '';
+  let inviting = false;
   $: tracks = orderedTracks($releaseProject.tracks);
   $: if (!selectedTrackId || !tracks.some((track) => track.track_id === selectedTrackId)) selectedTrackId = tracks[0]?.track_id || '';
   $: selectedTrack = tracks.find((track) => track.track_id === selectedTrackId);
@@ -19,6 +31,108 @@
     ...$releaseProject.track_assets,
     ...($extras.pdfs || []).map((pdf, index) => ({ asset_id: pdf.id || `extra-pdf-${index + 1}`, title: pdf.title, filename: pdf.name, role: 'notes', type: 'document' })),
   ];
+  $: creditRecords = Array.isArray($rights.credit_records) ? $rights.credit_records : [];
+
+  onMount(() => {
+    releaseProject.update((project) => mergeFeaturedCreditRecords(project));
+  });
+
+  function openCredit(record = null) {
+    creditError = '';
+    creditForm = createCreditRecord(record || {}, {
+      releaseId: $releaseProject.release.release_id,
+      index: creditRecords.length,
+    });
+    creditForm = { ...creditForm, track_ids: [...creditForm.track_ids] };
+    creditModalOpen = true;
+  }
+
+  function closeCredit() {
+    creditModalOpen = false;
+    creditForm = null;
+    creditError = '';
+  }
+
+  function updateCreditField(field, value) {
+    creditForm = { ...creditForm, [field]: value };
+  }
+
+  function toggleCreditTrack(trackId) {
+    const selected = new Set(creditForm.track_ids || []);
+    if (selected.has(trackId)) selected.delete(trackId);
+    else selected.add(trackId);
+    updateCreditField('track_ids', [...selected]);
+  }
+
+  function storeCredit(record) {
+    rights.update((value) => ({
+      ...value,
+      credit_records: [
+        ...(value.credit_records || []).filter((entry) => entry.credit_id !== record.credit_id),
+        record,
+      ],
+    }));
+  }
+
+  function saveCredit(close = true) {
+    const normalized = createCreditRecord(creditForm, { releaseId: $releaseProject.release.release_id });
+    if (!normalized.name || !normalized.role) {
+      creditError = 'Add the credit holder’s name and role.';
+      return null;
+    }
+    creditForm = normalized;
+    storeCredit(normalized);
+    if (close) closeCredit();
+    return normalized;
+  }
+
+  function removeCredit() {
+    if (!creditForm?.credit_id) return;
+    rights.update((value) => ({
+      ...value,
+      credit_records: (value.credit_records || []).filter((entry) => entry.credit_id !== creditForm.credit_id),
+    }));
+    closeCredit();
+  }
+
+  async function inviteCollaborator() {
+    const record = saveCredit(false);
+    if (!record) return;
+    if (!record.email) {
+      creditError = 'Add an email address before sending an invitation.';
+      return;
+    }
+    inviting = true;
+    creditError = '';
+    try {
+      const response = await fetch('/studio/collaborators/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: record.email,
+          name: record.name,
+          role: record.role,
+          release_id: $releaseProject.release.release_id,
+          credit_id: record.credit_id,
+          track_ids: record.track_ids,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.message || `Invitation failed (${response.status}).`);
+      const invitedRecord = {
+        ...record,
+        invite_status: body.already_registered ? 'already_registered' : 'invited',
+        invited_at: body.invited_at,
+        collaborator_user_id: body.user_id || record.collaborator_user_id,
+      };
+      creditForm = invitedRecord;
+      storeCredit(invitedRecord);
+    } catch (error) {
+      creditError = error?.message || 'The collaborator invitation could not be sent.';
+    } finally {
+      inviting = false;
+    }
+  }
 
   function updateReleaseAuthority(confirmed) {
     rights.update((value) => ({ ...value, authority_confirmed: confirmed }));
@@ -97,10 +211,47 @@
       <label class="label-dark" for="producer">Producer</label>
       <input id="producer" class="input-dark" type="text" bind:value={$rights.producer} placeholder="Producer name(s)" />
     </div>
-    <div>
-      <label class="label-dark" for="credits">Release credits</label>
-      <textarea id="credits" class="input-dark resize-none font-mono text-xs" rows="5" bind:value={$rights.credits}
-        placeholder="One credit per line&#10;Mastering — Studio X&#10;Artwork — Jane Doe"></textarea>
+    <div class="space-y-3">
+      <div class="flex items-end justify-between gap-4">
+        <div>
+          <p class="label-dark">Release credits</p>
+          <p class="text-xs" style="color:var(--ink-muted);">Featured artists from Identity and Tracklist are added automatically. Open a record to match it to songs.</p>
+        </div>
+        <button type="button" class="btn-spectral text-xs shrink-0" on:click={() => openCredit()}>＋ Add credit</button>
+      </div>
+
+      {#if creditRecords.length}
+        <div class="grid sm:grid-cols-2 gap-3">
+          {#each creditRecords as credit (credit.credit_id)}
+            {@const linkedTracks = tracks.filter((track) => credit.track_ids?.includes(track.track_id))}
+            <button type="button" class="glass rounded-xl p-4 text-left transition-all hover:-translate-y-0.5"
+              style="border:1px solid rgba(123,92,240,.2);" on:click={() => openCredit(credit)}>
+              <span class="flex items-start justify-between gap-3">
+                <span class="min-w-0">
+                  <span class="block text-sm font-black text-white truncate">{credit.name || 'Unnamed credit'}</span>
+                  <span class="block text-[10px] uppercase tracking-wider mt-1" style="color:#9F8CFF;">{credit.role || 'Role needed'}</span>
+                </span>
+                <span class="text-xs" style="color:{credit.invite_status === 'invited' || credit.invite_status === 'already_registered' ? '#7FE0B8' : 'var(--ink-muted)'};">
+                  {credit.invite_status === 'invited' ? 'Invited' : credit.invite_status === 'already_registered' ? 'Creator' : 'Edit →'}
+                </span>
+              </span>
+              <span class="block text-xs mt-3 truncate" style="color:var(--ink-muted);">
+                {#if linkedTracks.length}{linkedTracks.map((track) => track.title || `Track ${track.track_number}`).join(' · ')}{:else}Release-wide · choose tracks{/if}
+              </span>
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <button type="button" class="w-full rounded-xl p-5 text-left" style="border:1px dashed rgba(123,92,240,.3);color:var(--ink-muted);" on:click={() => openCredit()}>
+          Add artists, writers, producers, engineers, visual collaborators and other contributors.
+        </button>
+      {/if}
+
+      <div>
+        <label class="label-dark" for="credits">Additional credit notes</label>
+        <textarea id="credits" class="input-dark resize-none font-mono text-xs" rows="3" bind:value={$rights.credits}
+          placeholder="Legacy or free-form notes&#10;Mastering — Studio X&#10;Artwork — Jane Doe"></textarea>
+      </div>
     </div>
     <label class="flex items-start gap-3 rounded-xl p-3" style="background:rgba(123,92,240,.08);border:1px solid rgba(123,92,240,.2);">
       <input class="mt-0.5" type="checkbox" checked={$rights.authority_confirmed === true} on:change={(event) => updateReleaseAuthority(event.currentTarget.checked)} />
@@ -204,3 +355,66 @@
     </section>
   {/if}
 </div>
+
+{#if creditModalOpen && creditForm}
+  <div class="fixed inset-0 z-[100] flex items-center justify-center p-4" style="background:rgba(0,0,0,.82);backdrop-filter:blur(10px);" role="presentation" on:click={(event) => event.currentTarget === event.target && closeCredit()}>
+    <div class="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-5" style="background:#09090c;border:1px solid rgba(123,92,240,.35);box-shadow:0 24px 80px rgba(0,0,0,.6);" role="dialog" aria-modal="true" aria-labelledby="credit-dialog-title">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="t-caption">Release credit record</p>
+          <h3 id="credit-dialog-title" class="text-xl font-black text-white mt-1">{creditForm.name || 'Add collaborator'}</h3>
+        </div>
+        <button type="button" class="w-8 h-8 rounded-full" style="background:rgba(255,255,255,.06);color:var(--ink-muted);" aria-label="Close credit editor" on:click={closeCredit}>×</button>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="label-dark" for="credit-name">Name *</label>
+          <input id="credit-name" class="input-dark" type="text" value={creditForm.name} on:input={(event) => updateCreditField('name', event.currentTarget.value)} placeholder="Person, artist or organisation" />
+        </div>
+        <div>
+          <label class="label-dark" for="credit-role">Role *</label>
+          <input id="credit-role" class="input-dark" type="text" list="credit-roles" value={creditForm.role} on:input={(event) => updateCreditField('role', event.currentTarget.value)} placeholder="Featured Artist" />
+          <datalist id="credit-roles">{#each CREDIT_ROLES as role}<option value={role}></option>{/each}</datalist>
+        </div>
+      </div>
+
+      <div>
+        <label class="label-dark" for="credit-email">Email invitation</label>
+        <input id="credit-email" class="input-dark" type="email" value={creditForm.email} on:input={(event) => updateCreditField('email', event.currentTarget.value)} placeholder="collaborator@example.com" />
+        <p class="text-[11px] mt-2" style="color:var(--ink-muted);">Sending grants invite-only access and asks this collaborator to finish a Noizes Creator account. Email is not shown in the collector package.</p>
+      </div>
+
+      <div>
+        <p class="label-dark">Match this credit to the tracklist</p>
+        <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+          {#each tracks as track (track.track_id)}
+            <label class="flex items-center gap-3 rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.035);border:1px solid var(--border-dim);">
+              <input type="checkbox" checked={creditForm.track_ids.includes(track.track_id)} on:change={() => toggleCreditTrack(track.track_id)} />
+              <span class="font-mono text-[10px]" style="color:#7B5CF0;">{track.disc_number}.{track.track_number}</span>
+              <span class="text-sm text-white truncate">{track.title || 'Untitled track'}</span>
+            </label>
+          {/each}
+        </div>
+        <p class="text-[11px] mt-2" style="color:var(--ink-muted);">Leave every track unchecked for a release-wide credit.</p>
+      </div>
+
+      {#if creditForm.invite_status === 'invited' || creditForm.invite_status === 'already_registered'}
+        <div class="rounded-lg px-3 py-2 text-xs" style="background:rgba(60,200,140,.08);border:1px solid rgba(60,200,140,.22);color:#7FE0B8;">
+          {creditForm.invite_status === 'invited' ? `Invitation sent to ${creditForm.email}.` : `${creditForm.email} already has an account and now has Creator access.`}
+        </div>
+      {/if}
+      {#if creditError}<p class="text-xs" style="color:#F08A9D;">{creditError}</p>{/if}
+
+      <div class="flex flex-wrap items-center gap-2 pt-2">
+        {#if creditRecords.some((record) => record.credit_id === creditForm.credit_id)}
+          <button type="button" class="btn-ghost text-xs mr-auto" style="color:#F08A9D;" on:click={removeCredit}>Remove credit</button>
+        {:else}<span class="mr-auto"></span>{/if}
+        <button type="button" class="btn-ghost text-xs" on:click={() => saveCredit(true)}>Save credit</button>
+        <button type="button" class="btn-spectral text-xs" disabled={inviting || !creditForm.email} style={inviting || !creditForm.email ? 'opacity:.45;cursor:not-allowed;' : ''} on:click={inviteCollaborator}>
+          {inviting ? 'Sending…' : 'Save & send invite'}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

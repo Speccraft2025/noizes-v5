@@ -213,4 +213,40 @@ describe('buildPackage — experience.json (play pass-through)', () => {
     expect(result.sizeReport).toMatchObject({ actual_archive_bytes: result.blob.size });
     expect(result.sizeReport.browser_memory_estimate_bytes).toBeGreaterThan(0);
   });
+
+  it('packages structured track-linked credits without private invitation details', async () => {
+    const project = createReleaseProject({
+      release: { title: 'Credit Test', primary_artist: 'A' },
+      tracks: [{ title: 'Together', featured_artists: ['Guest'] }],
+      edition: base.edition,
+      rights: {
+        release_rights: {
+          credits: 'Mastering — Studio X',
+          credit_records: [{
+            credit_id: 'ce179b9c-d1ef-469d-b6ba-e8cda646ee04',
+            name: 'Guest',
+            role: 'Featured Artist',
+            email: 'private@example.com',
+            invite_status: 'invited',
+            collaborator_user_id: 'private-user-id',
+            track_ids: [],
+          }],
+        },
+      },
+    });
+    project.rights.release_rights.credit_records[0].track_ids = [project.tracks[0].track_id];
+    const result = await buildPackage({ project, template: 'ultra-v2', download: false });
+    const zip = await unzip(result);
+    const credits = JSON.parse(await zip.file('credits.json').async('string'));
+    const packagedRights = JSON.parse(await zip.file('rights.json').async('string'));
+    expect(credits).toMatchObject({
+      schema_version: '2.0.0',
+      records: [{ name: 'Guest', role: 'Featured Artist', track_ids: [project.tracks[0].track_id] }],
+      tracks: [{ linked_release_credit_ids: ['ce179b9c-d1ef-469d-b6ba-e8cda646ee04'] }],
+    });
+    expect(JSON.stringify(credits)).not.toContain('private@example.com');
+    expect(JSON.stringify(credits)).not.toContain('private-user-id');
+    expect(JSON.stringify(packagedRights)).not.toContain('private@example.com');
+    expect(JSON.stringify(packagedRights)).not.toContain('private-user-id');
+  });
 });

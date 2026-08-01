@@ -15,7 +15,7 @@
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;touch-action:manipulation}
 
 #drop-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 24px;text-align:center}
-#exp-screen{display:none;flex-direction:column;height:100vh}
+#exp-screen{display:none;position:fixed;inset:0;height:100vh;background:#030303}
 
 .logo{font-size:18px;font-weight:900;letter-spacing:-.02em;color:var(--text);margin-bottom:48px}
 .logo span{color:var(--violet)}
@@ -49,13 +49,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .pills{display:flex;gap:10px;justify-content:center;margin-top:40px;flex-wrap:wrap}
 .pill{font-size:11px;font-family:monospace;letter-spacing:.08em;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:4px 12px;border-radius:99px}
 
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:rgba(3,3,3,0.95);border-bottom:1px solid rgba(255,255,255,0.06);shrink:0;flex-shrink:0}
-.topbar-logo{font-weight:900;font-size:14px;letter-spacing:-.01em}
-.topbar-meta{font-size:11px;font-family:monospace;color:var(--muted)}
-.topbar-close{font-size:12px;padding:5px 14px;border-radius:99px;border:1px solid rgba(255,255,255,0.1);background:none;color:var(--muted);cursor:pointer}
+.topbar{position:fixed;z-index:20;top:max(14px,env(safe-area-inset-top));right:14px}
+.topbar-logo,.topbar-meta{display:none}
+.topbar-close{width:42px;height:42px;font-size:0;border-radius:50%;border:1px solid rgba(255,255,255,.16);background:rgba(4,7,7,.48);color:rgba(255,255,255,.76);cursor:pointer;backdrop-filter:blur(18px)}
+.topbar-close:after{content:'×';font-size:20px;line-height:1}
 .topbar-close:hover{color:var(--text)}
 
-#exp-iframe{flex:1;border:0;width:100%;background:var(--bg)}
+#exp-iframe{position:absolute;inset:0;border:0;width:100%;height:100%;background:var(--bg)}
 </style>
 </head>
 <body>
@@ -168,8 +168,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   var expIframe = document.getElementById('exp-iframe');
   var topbarMeta = document.getElementById('topbar-meta');
   var closeBtn = document.getElementById('close-btn');
-  var blobUrls = [];
   var allowedStorageKeys = [];
+  var pendingExperience = null;
+  var experienceSent = false;
+
+  function frameBootstrapHtml(){
+    // Component Blob URLs must be created inside the opaque sandbox. A URL
+    // created by this signed-in parent cannot be fetched from that origin.
+    return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>'+
+      '<scr'+'ipt>(function(){window.addEventListener("message",function receive(event){var message=event.data;if(event.source!==parent||!message||message.type!=="noizes:viewer:load")return;window.removeEventListener("message",receive);try{var html=String(message.html||""),resourceUrls={};(message.resources||[]).forEach(function(resource){var url=URL.createObjectURL(new Blob([resource.bytes],{type:resource.mime||"application/octet-stream"}));resourceUrls[resource.path]=url;html=html.split("src=\\\""+resource.path+"\\\"").join("src=\\\""+url+"\\\"");html=html.split("href=\\\""+resource.path+"\\\"").join("href=\\\""+url+"\\\"");html=html.split("\\\""+resource.path+"\\\"").join("\\\""+url+"\\\"");html=html.split("\'"+resource.path+"\'").join("\'"+url+"\'");});var resourceScript="<scr"+"ipt>window.NZ_RESOURCE_URLS="+JSON.stringify(resourceUrls).replace(/</g,"\\u003c")+";</scr"+"ipt>";html=html.indexOf("</head>")>=0?html.replace("</head>",resourceScript+"</head>"):resourceScript+html;document.open();document.write(html);document.close();}catch(error){parent.postMessage({type:"noizes:viewer:error",message:error&&error.message||"Experience could not start."},"*");}});})();</scr'+'ipt></body></html>';
+  }
 
   dropZone.addEventListener('dragover', function(e){ e.preventDefault(); dropZone.classList.add('drag'); });
   dropZone.addEventListener('dragleave', function(){ dropZone.classList.remove('drag'); });
@@ -190,9 +198,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   closeBtn.addEventListener('click', function(){
-    blobUrls.forEach(function(u){ URL.revokeObjectURL(u); });
-    blobUrls = [];
-    expIframe.src = '';
+    pendingExperience = null;
+    experienceSent = false;
+    expIframe.removeAttribute('src');
+    expIframe.srcdoc = '';
     expScreen.style.display = 'none';
     dropScreen.style.display = 'flex';
     fileInput.value = '';
@@ -203,12 +212,33 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   window.addEventListener('message', function(event){
     if(event.source!==expIframe.contentWindow) return;
     var message=event.data;
+    if(message&&message.type==='noizes:viewer:error'){
+      pendingExperience = null;
+      experienceSent = false;
+      expScreen.style.display = 'none';
+      dropScreen.style.display = 'flex';
+      showError(message.message||'Experience could not start.');
+      return;
+    }
     if(!message||['noizes:storage:set','noizes:storage:remove'].indexOf(message.type)===-1) return;
     if(allowedStorageKeys.indexOf(message.key)===-1) return;
     try{
       if(message.type==='noizes:storage:remove') localStorage.removeItem(message.key);
       else if(typeof message.value==='string') localStorage.setItem(message.key,message.value);
     }catch(ignore){}
+  });
+
+  expIframe.addEventListener('load', function(){
+    if(!pendingExperience||experienceSent||!expIframe.contentWindow) return;
+    var resources = pendingExperience.resources.map(function(resource){
+      return {path:resource.path,mime:resource.mime,bytes:resource.bytes};
+    });
+    experienceSent = true;
+    expIframe.contentWindow.postMessage({
+      type:'noizes:viewer:load',
+      html:pendingExperience.html,
+      resources:resources
+    },'*',resources.map(function(resource){ return resource.bytes; }));
   });
 
   function showError(msg){
@@ -281,30 +311,27 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           if(!entry.dir && (path.indexOf('audio/')===0 || path.indexOf('release/')===0 || /^tracks\/[^/]+\//.test(path))) paths.push(path);
         });
       }
+      var resources = [];
       for(var i=0;i<paths.length;i++){
         var path = paths[i], component = declaredByPath[path], entry = zip.file(path);
         if(!entry) throw new Error('Declared component is missing: '+path);
         var buf = await entry.async('arraybuffer');
         if(component && component.size && Number(component.size)!==buf.byteLength) throw new Error('Component size mismatch: '+path);
         if(component && component.sha256 && await sha256Hex(buf)!==component.sha256) throw new Error('Component checksum mismatch: '+path);
-        var blob = new Blob([buf],{type:mimeForPath(path,component)});
-        var url = URL.createObjectURL(blob);
-        blobUrls.push(url);
-        html = html.split('src="'+path+'"').join('src="'+url+'"');
-        html = html.split('href="'+path+'"').join('href="'+url+'"');
-        html = html.split('"'+path+'"').join('"'+url+'"');
+        resources.push({path:path,mime:mimeForPath(path,component),bytes:buf});
       }
 
-      // Run the package in a sandboxed Blob frame. It can play packaged media
-      // and post narrowly scoped resume/note updates, but it never inherits the
-      // Noizes app's authenticated document privileges.
+      // srcdoc renders inside the opaque sandbox without granting the package
+      // the Noizes app's authenticated origin. Sandboxed navigation to a
+      // same-origin Blob URL produces an empty document in Chromium.
       var title = manifest && manifest.release && manifest.release.title || manifest && manifest.title || file.name;
       var artistName = manifest && manifest.release && manifest.release.primary_artist || manifest && manifest.artist || '';
       var artist = artistName ? ' · ' + artistName : '';
-      var htmlUrl=URL.createObjectURL(new Blob([html],{type:'text/html'}));
-      blobUrls.push(htmlUrl);
       topbarMeta.textContent=title+artist;
-      expIframe.src=htmlUrl;
+      pendingExperience = {html:html,resources:resources};
+      experienceSent = false;
+      expIframe.removeAttribute('src');
+      expIframe.srcdoc=frameBootstrapHtml();
       loading.style.display='none';
       dropScreen.style.display='none';
       expScreen.style.display='flex';

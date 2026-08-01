@@ -4,7 +4,7 @@
   import { editionErrors } from '$lib/utils/project.js';
   import { validateReleaseProject } from '$lib/domain/release.js';
   import { estimatePackageSize, formatBytes } from '$lib/domain/package-size.js';
-  import { prepareNzForViewer } from '$lib/utils/viewer.js';
+  import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
 
   let exporting = false;
   let exported = false;
@@ -15,8 +15,9 @@
   let progress = 0;
   let statusLabel = 'Compiling package…';
   let previewBusy = false;
-  let previewSrc = '';
-  let previewUrls = [];
+  let previewPrepared = null;
+  let previewSent = false;
+  let previewIframe;
 
   $: projectValidation = validateReleaseProject({ ...$releaseProject, extras: $extras });
   $: validationErrors = [...editionErrors($edition), ...projectValidation.errors.map((issue) => issue.message)];
@@ -44,8 +45,8 @@
         onProgress: progressUpdate,
       });
       const prepared = await prepareNzForViewer(result.blob);
-      previewUrls = prepared.blobUrls;
-      previewSrc = prepared.htmlUrl;
+      previewPrepared = prepared;
+      previewSent = false;
     } catch (e) {
       error = `${e.message || 'Preview failed.'} Your Studio draft is unchanged; correct the reported item and try again.`;
     } finally {
@@ -53,10 +54,20 @@
     }
   }
 
+  function loadPreviewFrame() {
+    if (!previewIframe?.contentWindow || !previewPrepared || previewSent) return;
+    const resources = previewPrepared.resources.map((resource) => ({ ...resource }));
+    previewIframe.contentWindow.postMessage({
+      type: 'noizes:viewer:load',
+      html: previewPrepared.html,
+      resources,
+    }, '*', resources.map((resource) => resource.bytes));
+    previewSent = true;
+  }
+
   function closePreview() {
-    previewUrls.forEach((url) => URL.revokeObjectURL(url));
-    previewUrls = [];
-    previewSrc = '';
+    previewPrepared = null;
+    previewSent = false;
   }
 
   async function doExport() {
@@ -334,12 +345,12 @@
   </div>
 </div>
 
-{#if previewSrc}
+{#if previewPrepared}
   <div class="fixed inset-0 z-[200] flex flex-col" style="background:#030303;">
     <div class="h-12 px-4 flex items-center justify-between border-b" style="border-color:rgba(255,255,255,.08);background:#080808;">
       <div><span class="text-xs font-black text-white">STUDIO PREVIEW</span><span class="text-[10px] ml-3" style="color:var(--ink-muted);">Generated .nz · real multi-track playback and Journey timing</span></div>
       <button class="btn-ghost rounded-full px-4 py-1.5 text-xs" on:click={closePreview}>Close preview</button>
     </div>
-    <iframe title="Studio package preview" src={previewSrc} allow="autoplay" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads" class="flex-1 w-full border-0"></iframe>
+    <iframe bind:this={previewIframe} title="Studio package preview" srcdoc={VIEWER_FRAME_BOOTSTRAP} on:load={loadPreviewFrame} allow="autoplay" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads" class="flex-1 w-full border-0"></iframe>
   </div>
 {/if}

@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { findPublishSchemaError, publishSchemaMessage } from '$lib/server/publish-schema.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -25,6 +26,8 @@ export async function POST({ request, locals }) {
   const releaseId = UUID_RE.test(release_id || '') ? release_id : crypto.randomUUID();
 
   const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const schemaFailure = await findPublishSchemaError(sb);
+  if (schemaFailure) throw error(503, publishSchemaMessage(schemaFailure));
   const basePath = `${locals.user.id}/${releaseId}`;
 
   const targets = { nz: `${basePath}/package.nz` };

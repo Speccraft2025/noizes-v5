@@ -7,6 +7,40 @@ const MIME_BY_EXTENSION = Object.freeze({
   mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', pdf: 'application/pdf',
 });
 
+// The package runs in an opaque sandbox so untrusted experience scripts can
+// never inherit the signed-in Noizes origin. Chromium blocks Blob URLs created
+// by the parent from that opaque document, so validated component bytes cross
+// the boundary once and become Blob URLs inside the sandbox itself.
+export const VIEWER_FRAME_BOOTSTRAP = `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<script>
+(function(){
+  window.addEventListener('message', function receive(event){
+    var message=event.data;
+    if(event.source!==parent||!message||message.type!=='noizes:viewer:load') return;
+    window.removeEventListener('message',receive);
+    try{
+      var html=String(message.html||'');
+      var resourceUrls={};
+      (message.resources||[]).forEach(function(resource){
+        var url=URL.createObjectURL(new Blob([resource.bytes],{type:resource.mime||'application/octet-stream'}));
+        resourceUrls[resource.path]=url;
+        html=html.split('src="'+resource.path+'"').join('src="'+url+'"');
+        html=html.split('href="'+resource.path+'"').join('href="'+url+'"');
+        html=html.split('"'+resource.path+'"').join('"'+url+'"');
+        html=html.split("'"+resource.path+"'").join("'"+url+"'");
+        html=html.split('\u0060'+resource.path+'\u0060').join('\u0060'+url+'\u0060');
+      });
+      var resourceScript='<scr'+'ipt>window.NZ_RESOURCE_URLS='+JSON.stringify(resourceUrls).replace(/</g,'\\u003c')+';</scr'+'ipt>';
+      html=html.indexOf('</head>')>=0?html.replace('</head>',resourceScript+'</head>'):resourceScript+html;
+      document.open();document.write(html);document.close();
+    }catch(error){
+      parent.postMessage({type:'noizes:viewer:error',message:error&&error.message||'Experience could not start.'},'*');
+    }
+  });
+})();
+</script></body></html>`;
+
 async function readJson(zip, path) {
   const entry = zip.file(path);
   if (!entry) return {};
@@ -23,8 +57,6 @@ function readStorage(storage, key) {
 }
 
 export async function prepareNzForViewer(file, options = {}) {
-  const createUrl = options.createObjectURL || ((blob) => URL.createObjectURL(blob));
-  const revokeUrl = options.revokeObjectURL || ((url) => URL.revokeObjectURL(url));
   // Normalizing browser File/Blob input to bytes also keeps this boundary
   // portable in runtimes whose JSZip adapter does not recognize native Blob.
   const source = typeof Blob !== 'undefined' && file instanceof Blob
@@ -65,7 +97,7 @@ export async function prepareNzForViewer(file, options = {}) {
   html = configAssignment.test(html)
     ? html.replace(configAssignment, `${stateScript}window.NZ_CONFIG =`)
     : html.replace('</head>', `<script>${stateScript}</script></head>`);
-  const blobUrls = [];
+  const resources = [];
   const declaredByPath = new Map((validation.manifest.components || []).map((component) => [component.path, component]));
   const packagePaths = new Set(declaredByPath.keys());
   zip.forEach((path, entry) => {
@@ -78,24 +110,14 @@ export async function prepareNzForViewer(file, options = {}) {
     const buffer = await entry.async('arraybuffer');
     const extension = path.split('.').pop().toLowerCase();
     const mime = declaredByPath.get(path)?.mime || MIME_BY_EXTENSION[extension] || 'application/octet-stream';
-    const url = createUrl(new Blob([buffer], { type: mime }));
-    blobUrls.push(url);
-    html = html.split(`src="${path}"`).join(`src="${url}"`);
-    html = html.split(`href="${path}"`).join(`href="${url}"`);
-    html = html.split(`"${path}"`).join(`"${url}"`);
+    resources.push({ path, mime, bytes: buffer });
   }
 
-  const htmlUrl = createUrl(new Blob([html], { type: 'text/html' }));
-  blobUrls.push(htmlUrl);
   return {
     html,
-    htmlUrl,
-    blobUrls,
+    resources,
     manifest: validation.manifest,
     validation,
     storageKeys: { resumeKey, noteKey },
-    revoke() {
-      blobUrls.forEach((url) => revokeUrl(url));
-    },
   };
 }

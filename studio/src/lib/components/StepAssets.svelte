@@ -1,4 +1,5 @@
 <script>
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import { releaseProject } from '$lib/stores/package.js';
   import {
     AUDIO_VERSION_ROLES,
@@ -223,7 +224,7 @@
 
     <div class="grid grid-cols-2 gap-3">
       <div class="glass rounded-xl p-3">
-        <p class="label-dark">Main cover *</p>
+        <p class="label-dark">Main cover *<HelpTip field="main_cover" /></p>
         {#if mainCover}
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-violet">◼</span>
@@ -239,7 +240,7 @@
       </div>
 
       <div class="glass rounded-xl p-3">
-        <p class="label-dark">Continuous master</p>
+        <p class="label-dark">Continuous master<HelpTip field="continuous_master" /></p>
         {#if continuousMaster}
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-violet">♫</span>
@@ -300,10 +301,15 @@
               <p class="font-bold text-white truncate">{selectedTrack.title || 'Untitled track'}</p>
               <p class="text-xs truncate" style="color:var(--ink-muted);">{selectedTrack.primary_artist}</p>
             </div>
-            <label class="btn-ghost text-xs py-1.5 px-3 cursor-pointer shrink-0">
-              {trackArtwork ? 'Replace artwork' : 'Track artwork'}
-              <input class="hidden" type="file" accept="image/*" on:change={(event) => setTrackArtwork(event.currentTarget.files?.[0])} />
-            </label>
+            <!-- The tip sits outside the label: nested in it, a click would
+                 also open the file picker. -->
+            <div class="flex items-center gap-1 shrink-0">
+              <label class="btn-ghost text-xs py-1.5 px-3 cursor-pointer">
+                {trackArtwork ? 'Replace artwork' : 'Track artwork'}
+                <input class="hidden" type="file" accept="image/*" on:change={(event) => setTrackArtwork(event.currentTarget.files?.[0])} />
+              </label>
+              <HelpTip field="track_artwork" align="right" />
+            </div>
           </div>
 
           {#if trackArtwork}
@@ -330,7 +336,7 @@
 
           {#if !selectedVersions.some((version) => version.is_primary)}
             <label class="rounded-xl flex flex-col items-center justify-center py-7 cursor-pointer" style="border:1px dashed rgba(123,92,240,.35);background:rgba(123,92,240,.05);">
-              <span class="font-bold text-sm text-white">Upload primary master *</span>
+              <span class="font-bold text-sm text-white">Upload primary master *<HelpTip field="primary_master" /></span>
               <span class="text-xs mt-1" style="color:var(--ink-muted);">WAV · FLAC · MP3 · M4A</span>
               <input class="hidden" type="file" accept="audio/*,.wav,.flac,.mp3,.m4a" on:change={(event) => attachAudio(event.currentTarget.files?.[0], 'primary_master')} />
             </label>

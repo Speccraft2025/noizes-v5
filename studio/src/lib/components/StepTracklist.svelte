@@ -1,4 +1,5 @@
 <script>
+  import HelpTip from './HelpTip.svelte';
   import { releaseProject } from '$lib/stores/package.js';
   import { createTrack, duplicateTrack as duplicateReleaseTrack, orderedTracks, removeTrack, reorderTrack } from '$lib/domain/release.js';
 
@@ -118,27 +119,27 @@
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="label-dark" for="disc-number">Disc</label>
+            <label class="label-dark" for="disc-number">Disc<HelpTip field="disc_number" /></label>
             <input id="disc-number" class="input-dark" type="number" min="1" value={selected.disc_number} on:input={(event) => updateTrack(selectedTrackId, { disc_number: Number(event.currentTarget.value) || 1 })} />
           </div>
           <div>
-            <label class="label-dark" for="track-number">Track number</label>
+            <label class="label-dark" for="track-number">Track number<HelpTip field="track_number" /></label>
             <input id="track-number" class="input-dark" type="number" min="1" value={selected.track_number} on:input={(event) => updateTrack(selectedTrackId, { track_number: Number(event.currentTarget.value) || 1 })} />
           </div>
         </div>
 
         <div>
-          <label class="label-dark" for="track-title">Track title *</label>
+          <label class="label-dark" for="track-title">Track title *<HelpTip field="track_title" /></label>
           <input id="track-title" class="input-dark" type="text" value={selected.title} on:input={(event) => updateTrack(selectedTrackId, { title: event.currentTarget.value })} placeholder="Title of this musical work" />
         </div>
         <div>
-          <label class="label-dark" for="track-subtitle">Subtitle</label>
+          <label class="label-dark" for="track-subtitle">Subtitle<HelpTip field="track_subtitle" /></label>
           <input id="track-subtitle" class="input-dark" type="text" value={selected.subtitle} on:input={(event) => updateTrack(selectedTrackId, { subtitle: event.currentTarget.value })} placeholder="Movement, mix, or performance subtitle" />
         </div>
 
         <div>
           <div class="flex items-center justify-between">
-            <label class="label-dark" for="track-artist">Primary artist *</label>
+            <label class="label-dark" for="track-artist">Primary artist *<HelpTip field="track_artist" /></label>
             {#if !selected.inherit_release_artist}
               <button type="button" class="text-[10px] font-bold mb-1" style="color:#7B5CF0;" on:click={() => updateTrack(selectedTrackId, { primary_artist: $releaseProject.release.primary_artist, inherit_release_artist: true })}>Use release artist</button>
             {/if}
@@ -149,28 +150,28 @@
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="label-dark" for="track-featured">Featured artists</label>
+            <label class="label-dark" for="track-featured">Featured artists<HelpTip field="track_featured" /></label>
             <input id="track-featured" class="input-dark" type="text" value={selected.featured_artists.join(', ')} on:input={(event) => setList('featured_artists', event.currentTarget.value)} placeholder="Comma-separated" />
           </div>
           <div>
-            <label class="label-dark" for="track-producers">Producers</label>
+            <label class="label-dark" for="track-producers">Producers<HelpTip field="track_producers" /></label>
             <input id="track-producers" class="input-dark" type="text" value={selected.producers.join(', ')} on:input={(event) => setList('producers', event.currentTarget.value)} placeholder="Comma-separated" />
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="label-dark" for="track-writers">Writers / composers</label>
+            <label class="label-dark" for="track-writers">Writers / composers<HelpTip field="track_writers" /></label>
             <input id="track-writers" class="input-dark" type="text" value={selected.writers.join(', ')} on:input={(event) => setList('writers', event.currentTarget.value)} placeholder="Comma-separated" />
           </div>
           <div>
-            <label class="label-dark" for="track-isrc">ISRC</label>
+            <label class="label-dark" for="track-isrc">ISRC<HelpTip field="track_isrc" /></label>
             <input id="track-isrc" class="input-dark font-mono text-xs" type="text" value={selected.isrc} on:input={(event) => updateTrack(selectedTrackId, { isrc: event.currentTarget.value.toUpperCase() })} placeholder="Optional" />
           </div>
         </div>
 
         <div>
-          <label class="label-dark" for="track-description">Track notes</label>
+          <label class="label-dark" for="track-description">Track notes<HelpTip field="track_description" /></label>
           <textarea id="track-description" class="input-dark resize-none" rows="3" value={selected.description} on:input={(event) => updateTrack(selectedTrackId, { description: event.currentTarget.value })} placeholder="Context, recording notes, or movement description"></textarea>
         </div>
 
@@ -178,10 +179,10 @@
           <label class="flex items-center gap-2 text-xs" style="color:var(--ink-muted);">
             <input type="checkbox" checked={selected.inherit_release_credits}
               on:change={(event) => updateTrack(selectedTrackId, { inherit_release_credits: event.currentTarget.checked })} />
-            Use release-level credits
+            Use release-level credits<HelpTip field="track_inherit_credits" />
           </label>
           {#if !selected.inherit_release_credits}
-            <label class="label-dark" for="track-credits">Track-specific credits</label>
+            <label class="label-dark" for="track-credits">Track-specific credits<HelpTip field="track_credits" /></label>
             <textarea id="track-credits" class="input-dark resize-none font-mono text-xs" rows="3"
               value={selected.credits?.text || ''}
               on:input={(event) => updateTrack(selectedTrackId, { credits: { ...selected.credits, text: event.currentTarget.value } })}
@@ -191,36 +192,36 @@
 
         <div class="grid sm:grid-cols-3 gap-3">
           <div>
-            <label class="label-dark" for="track-release-date">Track release date</label>
+            <label class="label-dark" for="track-release-date">Track release date<HelpTip field="track_release_date" /></label>
             <input id="track-release-date" class="input-dark" type="date" value={selected.release_date} on:input={(event) => updateTrack(selectedTrackId, { release_date: event.currentTarget.value })} />
           </div>
           <div>
-            <label class="label-dark" for="track-recording-date">Recording date</label>
+            <label class="label-dark" for="track-recording-date">Recording date<HelpTip field="track_recording_date" /></label>
             <input id="track-recording-date" class="input-dark" type="date" value={selected.recording_date} on:input={(event) => updateTrack(selectedTrackId, { recording_date: event.currentTarget.value })} />
           </div>
           <div>
-            <label class="label-dark" for="track-recording-location">Recording location</label>
+            <label class="label-dark" for="track-recording-location">Recording location<HelpTip field="track_recording_location" /></label>
             <input id="track-recording-location" class="input-dark" type="text" value={selected.recording_location} on:input={(event) => updateTrack(selectedTrackId, { recording_location: event.currentTarget.value })} />
           </div>
         </div>
         {#if $releaseProject.release.release_type === 'compilation'}
           <div>
-            <label class="label-dark" for="source-release">Source release</label>
+            <label class="label-dark" for="source-release">Source release<HelpTip field="source_release" /></label>
             <input id="source-release" class="input-dark" type="text" value={selected.source_release} on:input={(event) => updateTrack(selectedTrackId, { source_release: event.currentTarget.value })} placeholder="Original release or archive source" />
           </div>
         {/if}
 
         <div class="grid grid-cols-2 gap-2 text-xs">
           {#each [
-            ['explicit', 'Explicit content'],
-            ['bonus', 'Bonus track'],
-            ['hidden', 'Hidden track'],
-            ['appears_in_journey', 'Include in Journey'],
-            ['appears_in_archive', 'Include in Archive'],
-          ] as [field, label]}
+            ['explicit', 'Explicit content', 'track_flag_explicit'],
+            ['bonus', 'Bonus track', 'track_flag_bonus'],
+            ['hidden', 'Hidden track', 'track_flag_hidden'],
+            ['appears_in_journey', 'Include in Journey', 'track_flag_journey'],
+            ['appears_in_archive', 'Include in Archive', 'track_flag_archive'],
+          ] as [field, label, help]}
             <label class="flex items-center gap-2 rounded-lg px-3 py-2" style="background:rgba(255,255,255,.03);color:var(--ink-muted);">
               <input type="checkbox" checked={selected[field]} on:change={(event) => updateTrack(selectedTrackId, { [field]: event.currentTarget.checked })} />
-              {label}
+              {label}<HelpTip field={help} />
             </label>
           {/each}
         </div>

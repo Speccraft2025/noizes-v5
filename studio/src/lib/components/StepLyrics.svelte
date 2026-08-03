@@ -1,4 +1,5 @@
 <script>
+  import HelpTip from './HelpTip.svelte';
   import { releaseProject } from '$lib/stores/package.js';
   import { orderedTracks } from '$lib/domain/release.js';
   import { onDestroy } from 'svelte';
@@ -295,7 +296,7 @@
     <div class="glass rounded-xl p-4 space-y-3">
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="label-dark" for="lyric-language">Language</label>
+          <label class="label-dark" for="lyric-language">Language<HelpTip field="lyric_language" /></label>
           <input id="lyric-language" class="input-dark" type="text" value={lyricRecord.language} placeholder="e.g. sw, en"
             on:input={(event) => updateLyricRecord({ language: event.currentTarget.value })} />
         </div>
@@ -326,14 +327,14 @@
     </div>
 
     <div>
-      <label class="label-dark" for="lyrics-input-no-audio">Plain lyrics</label>
+      <label class="label-dark" for="lyrics-input-no-audio">Plain lyrics<HelpTip field="lyrics_text" /></label>
       <textarea id="lyrics-input-no-audio" class="input-dark resize-none font-mono text-sm" rows="10" bind:value={rawText}
         on:blur={() => updateLyricRecord({ plain_text: rawText })} placeholder="One line per line"></textarea>
     </div>
 
   {:else if mode === 'edit'}
     <div>
-      <label class="label-dark" for="lyrics-input">Paste lyrics — one line per line</label>
+      <label class="label-dark" for="lyrics-input">Paste lyrics — one line per line<HelpTip field="lyrics_text" /></label>
       <textarea
         id="lyrics-input"
         class="w-full rounded-xl p-4 text-sm font-mono leading-relaxed resize-none"
@@ -497,7 +498,7 @@
     </div>
 
     <div class="glass rounded-xl p-4">
-      <label class="label-dark" for="lyric-credits">Lyric and translation credits</label>
+      <label class="label-dark" for="lyric-credits">Lyric and translation credits<HelpTip field="lyric_credits" /></label>
       <textarea id="lyric-credits" class="input-dark resize-none" rows="3" value={lyricRecord.credits?.text || ''}
         placeholder="Lyricist, translator, transliterator, synchronization credit…"
         on:input={(event) => updateLyricRecord({ credits: { ...lyricRecord.credits, text: event.currentTarget.value } })}></textarea>

@@ -1,0 +1,1 @@
+{"name":"Noizes Gallery","short_name":"Noizes","description":"Your offline-first private gallery for portable .nz music objects.","start_url":"/","display":"standalone","background_color":"#080a09","theme_color":"#080a09","orientation":"landscape","categories":["music","entertainment"],"icons":[{"src":"/favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}

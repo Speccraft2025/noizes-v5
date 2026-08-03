@@ -461,6 +461,7 @@ html,body{
   <div class="p-artist"><span id="p-artist">—</span></div>
   <div class="p-title" id="p-title"></div>
   <div class="p-chips" id="p-chips"></div>
+  <div class="version-switch" id="version-switch" role="group" aria-label="Audio version" hidden></div>
   <div class="p-controls">
     <button class="btn-skip" id="btn-prev" aria-label="Previous track">│‹</button>
     <button class="btn-play-main" id="btn-play">
@@ -563,7 +564,10 @@ html,body{
 .entry-button{border:1px solid rgba(255,255,255,.65);color:#fff;background:rgba(255,255,255,.06);padding:13px 30px;border-radius:99px;
   font:600 12px/1 inherit;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(18px);}
 .entry-return-actions{display:none;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:12px;}.entry-return-actions button{border:1px solid var(--border);background:rgba(255,255,255,.035);color:var(--muted);border-radius:99px;padding:8px 12px;font:600 9px/1 inherit;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;}
-.guide-btn{position:fixed;top:calc(var(--safe-t) + 16px);left:16px;z-index:65;
+/* Above the drawer (z-index 80) so the one button both opens and closes the
+   menu. It used to sit under it, which is why a second close button existed
+   in the top right — where it collided with the package's own close. */
+.guide-btn{position:fixed;top:calc(var(--safe-t) + 16px);left:16px;z-index:85;
   width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.18);
   background:rgba(3,3,3,.35);color:var(--text);font-size:18px;cursor:pointer;
   backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 10px 40px rgba(0,0,0,.35);}
@@ -580,8 +584,15 @@ html,body{
   background:linear-gradient(110deg,rgba(3,3,3,.9),rgba(3,3,3,.52) 58%,rgba(3,3,3,.82));
   backdrop-filter:blur(34px) saturate(1.25);-webkit-backdrop-filter:blur(34px) saturate(1.25);}
 .guide-drawer.open{opacity:1;pointer-events:auto;transform:scale(1);}
-.menu-close{position:fixed;top:calc(var(--safe-t) + 17px);right:18px;width:46px;height:46px;border-radius:50%;border:1px solid var(--border);
-  background:rgba(0,0,0,.2);color:#fff;font-size:20px;cursor:pointer;}
+.version-switch{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:12px 0 2px;}
+.version-chip{border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--muted);
+  border-radius:99px;padding:6px 13px;font:600 10px/1 inherit;letter-spacing:.14em;text-transform:uppercase;
+  cursor:pointer;transition:color .18s,border-color .18s,background .18s;}
+.version-chip:hover{color:var(--text);border-color:var(--primary);}
+.version-chip[aria-pressed="true"]{color:#fff;border-color:var(--primary);background:color-mix(in srgb,var(--primary) 22%,transparent);}
+.version-chip[disabled]{opacity:.45;cursor:progress;}
+.version-chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
+@media(max-width:560px){.version-chip{padding:5px 10px;font-size:9px;letter-spacing:.1em;}}
 .guide-title{font-size:10px;letter-spacing:.34em;text-transform:uppercase;color:var(--primary);margin-bottom:28px;}
 .world-menu{display:flex;flex-direction:column;align-items:flex-start;gap:3px;max-width:900px;}
 .world-link{display:flex;align-items:baseline;gap:18px;border:0;background:transparent;color:rgba(255,255,255,.42);cursor:pointer;
@@ -655,7 +666,6 @@ html,body{
 <div class="menu-coach" id="menu-coach" role="status">Open the experience</div>
 <div class="guide-scrim" id="guide-scrim"></div>
 <nav class="guide-drawer" id="guide-drawer" aria-label="Experience menu">
-  <button class="menu-close" id="menu-close" aria-label="Close experience menu">×</button>
   <div class="guide-title">Inside this object</div>
   <div class="world-menu">
     <button class="world-link" data-menu-view="view-player"><span class="index">01</span>Playback</button>
@@ -1029,15 +1039,42 @@ document.querySelectorAll('.tab').forEach(function(tab){
     else { card.classList.remove('show'); }
   });
 
+  /* One control for the menu. The button stays put and becomes the close,
+     so nothing lands on top of the package's own close button. */
   var menuButton=document.getElementById('guide-btn');
-  function openDrawer(){
-    drawer.classList.add('open'); menuButton.setAttribute('aria-expanded','true');
-    document.getElementById('menu-coach').classList.add('hide');
-    document.getElementById('menu-close').focus();
+  /* The indices are authored 01–08, but entries hide when the package has no
+     lyrics, no games and so on — leaving gaps like 01, 03, 04. Number what is
+     actually on screen. */
+  function renumberMenu(){
+    var n=0;
+    drawer.querySelectorAll('.world-link').forEach(function(link){
+      var index=link.querySelector('.index');
+      if(!index)return;
+      if(link.hidden){index.textContent='';return;}
+      n+=1;index.textContent=(n<10?'0':'')+n;
+    });
   }
-  function closeDrawer(){ drawer.classList.remove('open'); menuButton.setAttribute('aria-expanded','false'); menuButton.focus(); }
-  menuButton.addEventListener('click',openDrawer);
-  document.getElementById('menu-close').addEventListener('click',closeDrawer);
+  function openDrawer(){
+    renumberMenu();
+    drawer.classList.add('open');
+    menuButton.setAttribute('aria-expanded','true');
+    menuButton.setAttribute('aria-label','Close experience menu');
+    menuButton.textContent='×';
+    document.getElementById('menu-coach').classList.add('hide');
+    var first=drawer.querySelector('.world-link:not([hidden])');
+    if(first)first.focus();else menuButton.focus();
+  }
+  function closeDrawer(){
+    drawer.classList.remove('open');
+    menuButton.setAttribute('aria-expanded','false');
+    menuButton.setAttribute('aria-label','Open experience menu');
+    menuButton.textContent='☰';
+    menuButton.focus();
+  }
+  function toggleDrawer(){
+    if(drawer.classList.contains('open'))closeDrawer();else openDrawer();
+  }
+  menuButton.addEventListener('click',toggleDrawer);
   document.querySelectorAll('[data-menu-view]').forEach(function(item){
     item.addEventListener('click',function(){ switchView(item.dataset.menuView); closeDrawer(); });
   });
@@ -1083,6 +1120,20 @@ var journeyMomentTimer = 0;
 var journeyMomentShowing = false;
 var journeyStarted = false;
 var lastJourneyTrackMs = -1;
+var journeyDrainCallbacks = [];
+
+/* Run fn once the moment queue is empty. "before_first_track" moments are
+   authored to happen BEFORE the music, so playback has to wait for them
+   rather than starting underneath them. */
+function onJourneyQueueDrained(fn){
+  if(!journeyMomentShowing&&!journeyMomentQueue.length){fn();return;}
+  journeyDrainCallbacks.push(fn);
+}
+function flushJourneyDrainCallbacks(){
+  if(journeyMomentShowing||journeyMomentQueue.length)return;
+  var pending=journeyDrainCallbacks;journeyDrainCallbacks=[];
+  pending.forEach(function(fn){try{fn();}catch(ignore){}});
+}
 
 function journeyTypeLabel(type){return String(type||'Moment').replace(/_/g,' ');}
 function trackJourneyMoments(trackId){
@@ -1104,7 +1155,7 @@ function showNextJourneyMoment(){
   window.clearTimeout(journeyMomentTimer);
   journeyMomentTimer=window.setTimeout(function(){
     host.classList.remove('show');journeyMomentShowing=false;
-    window.setTimeout(showNextJourneyMoment,380);
+    window.setTimeout(function(){showNextJourneyMoment();flushJourneyDrainCallbacks();},380);
   },Math.max(1200,Number(moment.duration_ms)||3500));
 }
 function queueJourneyMoment(moment){
@@ -1159,6 +1210,76 @@ function setPlaying(v){
   document.getElementById('btn-play').classList.toggle('playing', v);
   if(C.archive&&playbackSettings.allow_archive_during_journey===false)document.getElementById('menu-archive').hidden=v;
 }
+/* ── Switchable sources ───────────────────────────────────────────────────
+   A track can ship several takes of the same performance — main, acapella,
+   instrumental. They are alignments of one recording, so switching carries
+   the playhead across rather than restarting. */
+var activeVersions = {};      /* track_id -> version_id */
+var versionSwitching = false;
+
+function trackVersions(track){
+  return track&&Array.isArray(track.versions)?track.versions:[];
+}
+function activeVersionId(track){
+  if(!track)return '';
+  if(activeVersions[track.track_id])return activeVersions[track.track_id];
+  var versions=trackVersions(track);
+  var primary=versions.filter(function(v){return v.is_primary;})[0]||versions[0];
+  return primary?primary.version_id:'';
+}
+function renderVersionSwitch(){
+  var host=document.getElementById('version-switch');
+  if(!host)return;
+  var track=currentTrack();
+  var versions=trackVersions(track);
+  /* One take is not a choice; don't show a control that does nothing. */
+  if(versions.length<2){host.hidden=true;host.innerHTML='';return;}
+  var active=activeVersionId(track);
+  host.hidden=false;host.innerHTML='';
+  versions.forEach(function(version){
+    var chip=document.createElement('button');
+    chip.type='button';chip.className='version-chip';
+    chip.textContent=version.title||version.role||'Version';
+    chip.setAttribute('aria-pressed',version.version_id===active?'true':'false');
+    if(versionSwitching)chip.disabled=true;
+    chip.addEventListener('click',function(){switchAudioVersion(version.version_id);});
+    host.appendChild(chip);
+  });
+}
+function switchAudioVersion(versionId){
+  var track=currentTrack();
+  var target=trackVersions(track).filter(function(v){return v.version_id===versionId;})[0];
+  if(!target||!target.src||versionSwitching)return;
+  if(activeVersionId(track)===versionId)return;
+
+  var position=Number(audio.currentTime)||0;
+  var wasPlaying=!audio.paused;
+
+  /* A crossfade already in flight would fight this handoff. */
+  cancelTransition();
+  versionSwitching=true;
+  activeVersions[track.track_id]=versionId;
+  renderVersionSwitch();
+
+  audio.pause();
+  audio.src=target.src;
+  audio.load();
+
+  var settle=function(){
+    audio.removeEventListener('loadedmetadata',settle);
+    /* Clamp: an alternate take can be a hair shorter than the main, and
+       seeking past the end silently lands at 0 — which would look exactly
+       like the restart this feature exists to avoid. */
+    var duration=Number(audio.duration);
+    audio.currentTime=(isFinite(duration)&&duration>0)?Math.min(position,Math.max(0,duration-0.05)):position;
+    versionSwitching=false;
+    renderVersionSwitch();
+    if(wasPlaying){var promise=audio.play();if(promise&&promise.catch)promise.catch(function(){});}
+    persistPlayback(true);
+  };
+  audio.addEventListener('loadedmetadata',settle);
+}
+
 function renderPlayerTitle(title){
   var el=document.getElementById('p-title'); el.innerHTML='';
   String(title||'Untitled').split(' ').forEach(function(word){
@@ -1248,7 +1369,7 @@ function persistPlayback(force){
     current_disc:currentTrack().disc_number,current_track_id:currentTrack().track_id,
     current_track_position_ms:Math.round((audio.currentTime||0)*1000),complete_release_position_ms:completeReleasePositionMs(),
     completed_tracks:completedTrackIds,release_completed:releaseCompleted||completedTrackIds.length>=releaseTracks.length,
-    journey_moments_visited:visitedMomentIds,last_selected_mode:activeView,playback_mode:playbackSettings.mode||'sequential',shuffle_enabled:shuffleEnabled,repeat_enabled:repeatEnabled,saved_at:new Date().toISOString()
+    journey_moments_visited:visitedMomentIds,active_versions:activeVersions,last_selected_mode:activeView,playback_mode:playbackSettings.mode||'sequential',shuffle_enabled:shuffleEnabled,repeat_enabled:repeatEnabled,saved_at:new Date().toISOString()
   };
   try{localStorage.setItem(resumeKey,JSON.stringify(state));}catch(ignore){}
   try{if(window.parent&&window.parent!==window)window.parent.postMessage({type:'noizes:storage:set',key:resumeKey,value:JSON.stringify(state)},'*');}catch(ignore){}
@@ -1272,7 +1393,12 @@ function loadTrack(index,options){
   if(index<0||index>=releaseTracks.length)return;
   var previousTrack=currentTrack();cancelTransition();audio.pause();plannedNextIndex=-1;activeTrackIndex=index;renderActiveTrack();journeyTrackChanged(previousTrack,currentTrack());
   var track=currentTrack(); pendingPosition=Math.max(0,Number(options.position)||0);pendingAutoplay=Boolean(options.autoplay);
-  if(track.src){audio.src=track.src;audio.load();}else{audio.removeAttribute('src');setPlaying(false);}
+  /* Honour a take the listener chose earlier for this track, so returning to
+     it does not silently drop them back onto the main version. */
+  var chosen=trackVersions(track).filter(function(v){return v.version_id===activeVersionId(track);})[0];
+  var src=(chosen&&chosen.src)||track.src;
+  versionSwitching=false;renderVersionSwitch();
+  if(src){audio.src=src;audio.load();}else{audio.removeAttribute('src');setPlaying(false);}
   preloadFollowing();setProgress(0,0);persistPlayback(true);
 }
 function handoffFromStandby(nextIndex){
@@ -1331,7 +1457,21 @@ audio.addEventListener('error',function(){console.warn('Audio load error. src=',
 function enterObject(destination,shouldPlay){
   var gate=document.getElementById('entry-gate');switchView(destination||'view-player');gate.classList.add('gone');
   setTimeout(function(){gate.style.display='none';},850);journeyStarted=true;
-  if(destination==='view-player'||!destination){queueReleaseMoments('before_first_track','',currentTrack().disc_number);synchronizeTrackJourney(-1,Math.round((audio.currentTime||0)*1000));if(shouldPlay!==false)playCurrent();}
+  if(destination==='view-player'||!destination){
+    queueReleaseMoments('before_first_track','',currentTrack().disc_number);
+    /* journeyTrackChanged only queues before_track when there is a previous
+       track, so the opening track's own before_track moments never fired —
+       on a single-track release they were dropped entirely. */
+    queueReleaseMoments('before_track',currentTrack().track_id,currentTrack().disc_number);
+    /* Only the opening moments hold back the music. Deferring on anything the
+       timed sync queues would stall a resume behind a backlog of moments the
+       listener has not reached yet. */
+    var openingQueued=journeyMomentShowing||journeyMomentQueue.length>0;
+    synchronizeTrackJourney(-1,Math.round((audio.currentTime||0)*1000));
+    if(shouldPlay!==false){
+      if(openingQueued)onJourneyQueueDrained(playCurrent);else playCurrent();
+    }
+  }
 }
 document.getElementById('enter-object').addEventListener('click',function(){enterObject('view-player',true);});
 document.getElementById('begin-again').addEventListener('click',function(){
@@ -1380,6 +1520,7 @@ if(restored&&restored.current_track_id){
   shuffleEnabled=playbackSettings.allow_shuffle===true&&restored.shuffle_enabled===true;
   repeatEnabled=playbackSettings.allow_repeat!==false&&restored.repeat_enabled===true;
   visitedMomentIds=Array.isArray(restored.journey_moments_visited)?restored.journey_moments_visited:[];
+  activeVersions=(restored.active_versions&&typeof restored.active_versions==='object')?restored.active_versions:{};
   loadTrack(restoredIndex>=0?restoredIndex:0,{position:(restored.current_track_position_ms||0)/1000,autoplay:false});
   if(restoredIndex>0||restored.current_track_position_ms>5000){document.getElementById('enter-object').textContent='Resume from Track '+((restoredIndex>=0?restoredIndex:0)+1);document.getElementById('entry-return-actions').style.display='flex';document.getElementById('entry-archive').style.display=window.NZ_ARCHIVE?'':'none';document.getElementById('entry-history').style.display=window.NZ_HISTORY?'':'none';}
 }else loadTrack(0,{autoplay:false});

@@ -19,7 +19,17 @@ jobs:
           cache-dependency-path: studio/package-lock.json
       - run: npm ci
       - run: npm test
+      # SvelteKit resolves $env/static/* at build time, so the build cannot
+      # link without these present. CI only compiles and discards the output —
+      # Netlify builds for real with the real values from its project settings.
+      # Placeholders therefore keep production credentials out of CI entirely,
+      # which is both safer and one less secret to rotate.
       - run: npm run build
+        env:
+          PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
+          PAYSTACK_SECRET_KEY: placeholder-paystack-key
       - run: npm audit --omit=dev
 
   beatsunlimited:

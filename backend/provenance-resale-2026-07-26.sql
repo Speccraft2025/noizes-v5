@@ -199,3 +199,22 @@ alter table public.payment_intents add column if not exists kind text not null d
 alter table public.payment_intents add column if not exists offer_id uuid references public.offers(id) on delete set null;
 alter table public.payment_intents add column if not exists acquisition_id uuid references public.acquisitions(id) on delete set null;
 alter table public.payment_intents add column if not exists seller_id uuid references public.profiles(id) on delete set null;
+
+
+-- ── Migration ledger ─────────────────────────────────────────────────────
+-- Records that this script ran. Without this, "has the migration been
+-- applied?" was answerable only by querying for a column and seeing whether
+-- it errored — which is how a missing multi-track migration went unnoticed
+-- for three days while the Exchange showed an empty catalogue.
+--
+-- The table is created here rather than in a separate bootstrap script so
+-- that any script establishes the ledger whatever order they are pasted in.
+create table if not exists public.schema_migrations (
+  filename   text primary key,
+  applied_at timestamptz not null default now()
+);
+-- No policies: RLS on with none defined means only the service role reads it.
+alter table public.schema_migrations enable row level security;
+
+insert into public.schema_migrations (filename) values ('provenance-resale-2026-07-26.sql')
+  on conflict (filename) do update set applied_at = now();

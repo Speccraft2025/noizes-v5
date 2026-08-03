@@ -1,0 +1,163 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:;script-src 'self' 'unsafe-inline' blob:;style-src 'self' 'unsafe-inline';media-src 'self' blob:;img-src 'self' data: blob:;font-src 'self' data:;connect-src 'none';form-action 'none';base-uri 'none';object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Home, Sweet Home — Sonic Terrain</title>
+<style>/* TRANSCENDENCE_CSS */</style>
+</head><body>
+
+<main id="stage" data-mode="sealed" data-chrome="visible" data-quality="balanced" data-sheet="false">
+
+  <canvas id="world" aria-hidden="true"></canvas>
+  <canvas id="essential" aria-hidden="true" hidden></canvas>
+
+  <!-- Encounter. The object, before there is a clock. -->
+  <section id="threshold" aria-labelledby="threshold-label" data-holding="false">
+    <div class="threshold-inner">
+      <p id="threshold-label" class="threshold-title">A 1902 recording, unlit</p>
+      <button id="threshold-action" type="button">
+        <span class="threshold-ring" aria-hidden="true"></span>
+        <span class="threshold-copy">Press and hold to enter the recording</span>
+      </button>
+      <p id="threshold-hint">Below you is the whole track: time runs to the horizon, frequency runs left to right, elevation is loudness. Holding the gesture begins the flight.</p>
+    </div>
+  </section>
+
+  <!-- Instrument layer. The world is an exhibit, so it carries the apparatus of
+       one: where you are in the recording, what frequency the ground under you
+       is, and what the landmarks are. Everything here is a map, not a transport
+       — playback lives in the utility sheet. -->
+  <div id="hud" data-visible="true" aria-hidden="true">
+
+    <!-- Section timeline. Every mark is a measured musical event. -->
+    <div id="timeline">
+      <ol id="timeline-marks"></ol>
+      <div id="timeline-rail"><span id="timeline-head"></span></div>
+    </div>
+
+    <!-- The frequency axis: what the ground is made of, left to right. -->
+    <div id="freq-axis"><ol id="freq-bands"></ol></div>
+
+    <!-- Landmark callouts, projected from their world anchors each frame. -->
+    <div id="callouts"></div>
+
+    <!-- Identity, kept to the corner. -->
+    <div id="identity">
+      <p class="identity-track">Home, Sweet Home</p>
+      <p class="identity-sub">Track 01 · Sonic Terrain</p>
+      <p class="identity-time"><span id="hud-elapsed">0:00</span> / 1:44</p>
+    </div>
+  </div>
+
+  <!-- Captions for meaningful sound, shown inside the frame. -->
+  <p id="caption" data-visible="false" aria-hidden="true"></p>
+
+  <!-- The single discreet control. Everything conventional lives behind it. -->
+  <button id="utility" type="button" aria-expanded="false" aria-controls="sheet" aria-label="Open controls, lyric and accessibility">
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="5.2" r="1.7" fill="currentColor"/>
+      <circle cx="12" cy="12" r="1.7" fill="currentColor"/>
+      <circle cx="12" cy="18.8" r="1.7" fill="currentColor"/>
+    </svg>
+  </button>
+
+  <aside id="sheet" hidden aria-label="Controls, lyric and accessibility">
+    <header>
+      <div>
+        <small>Track one · Sonic Terrain</small>
+        <h1>Home, Sweet Home</h1>
+        <p class="credit">Harry Macdonough, tenor · Charles D’Almaine, violin · recorded 23 January 1902</p>
+      </div>
+      <button id="sheet-close" type="button" aria-label="Close controls">×</button>
+    </header>
+
+    <section class="sheet-transport">
+      <h2>Recording</h2>
+      <div class="transport-row">
+        <button id="transport" type="button" aria-label="Pause the recording"><b>Pause</b></button>
+        <span id="elapsed">0:00 / 1:44</span>
+      </div>
+      <label class="field" for="sheet-seek">Position
+        <input id="sheet-seek" type="range" min="0" max="104" step="0.05" value="0" aria-label="Position in the recording">
+      </label>
+      <label class="field" for="volume">Volume
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume">
+      </label>
+    </section>
+
+    <section>
+      <h2>Scene</h2>
+      <h3 id="scene-title">The sealed object</h3>
+      <p id="scene-description">The whole recording lies below in the dark, unlit and untravelled.</p>
+    </section>
+
+    <section>
+      <h2>Line being written</h2>
+      <p id="stable-lyric">No line is being cut.</p>
+      <ol id="lyric-list" class="lyric-list"></ol>
+      <p class="note">Line onsets are anchored to measured vocal-phrase starts in the recording. The supplied lyric file carries evenly spaced reference timings; the drift between the two is recorded in the package’s analysis file.</p>
+    </section>
+
+    <section>
+      <h2>What you are taking away</h2>
+      <p id="memory">Nothing has been pressed yet.</p>
+    </section>
+
+    <section class="settings">
+      <h2>Experience</h2>
+      <div class="quality-row" role="group" aria-label="Quality">
+        <button type="button" data-quality-option="cinematic" aria-pressed="false">Cinematic</button>
+        <button type="button" data-quality-option="balanced" aria-pressed="true">Balanced</button>
+        <button type="button" data-quality-option="lite" aria-pressed="false">Lite</button>
+        <button type="button" data-quality-option="essential" aria-pressed="false">Essential</button>
+      </div>
+      <button id="motion-toggle" type="button" aria-pressed="false">Motion <b>Full</b></button>
+      <button id="contrast-toggle" type="button" aria-pressed="false">Contrast <b>Standard</b></button>
+      <button id="caption-toggle" type="button" aria-pressed="true">Captions <b>On</b></button>
+      <button id="world-sound-toggle" type="button" aria-pressed="true">World sound <b>On</b></button>
+      <button id="hud-toggle" type="button" aria-pressed="true">Instrument layer <b>On</b></button>
+    </section>
+
+    <section>
+      <h2>How to be present</h2>
+      <ul class="keys">
+        <li><kbd>Space</kbd> pause and resume</li>
+        <li><kbd>Esc</kbd> close this panel</li>
+        <li><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> aim your attention; hold still and the dust settles</li>
+        <li><kbd>Enter</kbd> hold while a line is being written to press it deeper</li>
+      </ul>
+      <p class="note">Nothing you do changes the recording or the order of the sequence. Attention and pressing change only what you take away at the end.</p>
+    </section>
+
+    <section class="colophon">
+      <h2>This edition</h2>
+      <p id="colophon-text"></p>
+    </section>
+  </aside>
+
+  <!-- Residue. The final state, after the recording stops for breath. -->
+  <div id="residue" hidden role="group" aria-label="The pressed artefact">
+    <p class="residue-label">Pressed copy</p>
+    <strong id="residue-hash">—</strong>
+    <p id="residue-statement"></p>
+    <button id="replay" type="button">Fly it again</button>
+  </div>
+
+  <audio id="audio" preload="auto" crossorigin="anonymous">
+    <source src="audio/track-01.mp3" type="audio/mpeg">
+    <source src="audio/track-01.ogg" type="audio/ogg">
+  </audio>
+
+  <p id="live" class="sr-only" role="status" aria-live="polite"></p>
+  <p id="status" class="sr-only" aria-live="assertive"></p>
+
+  <!-- DEBUG_PANEL -->
+</main>
+
+<script type="application/json" id="analysis-payload">/* ANALYSIS_PAYLOAD */</script>
+<script type="application/json" id="edition-payload">/* EDITION_PAYLOAD */</script>
+<script>/* THREE_RUNTIME */</script>
+<script>/* GSAP_RUNTIME */</script>
+<script>/* TRANSCENDENCE_RUNTIME */</script>
+</body></html>

@@ -4,7 +4,13 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:masterpiece": "node scripts/build-masterpiece.mjs",
     "validate": "node scripts/validate.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "validate:masterpiece": "node scripts/validate-masterpiece.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "build:transcendence": "node scripts/build-transcendence.mjs",
+    "validate:transcendence": "node scripts/validate-transcendence.mjs",
+    "analyze:transcendence": "node scripts/analyze-transcendence.mjs --report",
+    "frames:transcendence": "node scripts/frame-review-transcendence.mjs"
   }
 }

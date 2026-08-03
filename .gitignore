@@ -9,3 +9,10 @@ examples/immersive-reference-album/sources/original/
 examples/immersive-reference-album/.DS_Store
 examples/immersive-reference-album/screenshots/*.png
 !examples/immersive-reference-album/screenshots/09-integrated-viewer-mobile.png
+
+# Transcendence edition: analysis and textures are computed from the source
+# recording by scripts/analyze-transcendence.mjs and
+# scripts/generate-textures-transcendence.mjs. Regenerate rather than commit.
+examples/immersive-reference-album/transcendence/analysis/
+examples/immersive-reference-album/transcendence/assets/
+examples/immersive-reference-album/screenshots/transcendence-review/

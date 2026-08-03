@@ -1,4 +1,5 @@
 <script>
+  import HelpTip from './HelpTip.svelte';
   import { extras, releaseProject } from '$lib/stores/package.js';
   import StepPlay from './StepPlay.svelte';
 
@@ -50,7 +51,7 @@
   </div>
 
   <div>
-    <label class="label-dark" for="artist-story">Artist statement or liner note</label>
+    <label class="label-dark" for="artist-story">Artist statement or liner note<HelpTip field="story" /></label>
     <textarea id="artist-story" class="input-dark resize-none" rows="6" bind:value={$extras.story}
       maxlength="20000" placeholder="Tell listeners what lives behind this work…"></textarea>
     <p class="text-xs mt-1 text-right" style="color: var(--ink-muted);">{$extras.story.length} / 20,000</p>
@@ -59,7 +60,7 @@
   <div class="space-y-3">
     <div class="flex justify-between items-center">
       <div>
-        <p class="label-dark mb-0">Optional online links</p>
+        <p class="label-dark mb-0">Optional online links<HelpTip field="extras_links" /></p>
         <p class="text-xs" style="color: var(--ink-muted);">Collectors are warned before leaving the offline object.</p>
       </div>
       <button type="button" class="btn-ghost text-xs" on:click={addLink}>＋ Add link</button>
@@ -85,7 +86,7 @@
 
   <div class="space-y-3">
     <div>
-      <p class="label-dark mb-0">Note wall</p>
+      <p class="label-dark mb-0">Note wall<HelpTip field="note_wall" /></p>
       <p class="text-xs" style="color: var(--ink-muted);">PDF liner notes and booklets become tactile objects pinned inside the experience.</p>
     </div>
     <label class="glass rounded-xl flex items-center justify-center gap-3 py-5 cursor-pointer" style="border-style: dashed;">

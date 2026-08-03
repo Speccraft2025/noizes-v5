@@ -1,4 +1,5 @@
 <script>
+  import HelpTip from './HelpTip.svelte';
   import { assets, play, releaseProject, template } from '$lib/stores/package.js';
   import { createUuid, orderedTracks } from '$lib/domain/release.js';
   import {
@@ -166,7 +167,7 @@
     </div>
     <div class="grid sm:grid-cols-2 gap-3">
       <div>
-        <label class="label-dark" for="playback-mode">Transition mode</label>
+        <label class="label-dark" for="playback-mode">Transition mode<HelpTip field="playback_mode" /></label>
         <select id="playback-mode" class="input-dark" value={journey.playback_mode}
           on:change={(event) => setPlayback({ playback_mode: event.currentTarget.value })}>
           <option value="sequential">Sequential</option>
@@ -176,7 +177,7 @@
       </div>
       {#if journey.playback_mode === 'crossfade'}
         <div>
-          <label class="label-dark" for="crossfade-duration">Global crossfade (ms)</label>
+          <label class="label-dark" for="crossfade-duration">Global crossfade (ms)<HelpTip field="crossfade_duration" /></label>
           <input id="crossfade-duration" class="input-dark" type="number" min="250" max="12000" step="250"
             value={journey.transitions.find((transition) => !transition.from_track_id && transition.type === 'crossfade')?.duration_ms || 1500}
             on:input={(event) => setCrossfadeDuration(event.currentTarget.value)} />
@@ -189,13 +190,16 @@
     </div>
     <div class="grid sm:grid-cols-2 gap-2 text-xs">
       {#each [
-        ['allow_track_skip', 'Allow track selection'], ['allow_seek', 'Allow seeking'], ['allow_shuffle', 'Allow shuffle'],
-        ['allow_repeat', 'Allow repeat'], ['resume_enabled', 'Remember listening position'],
-        ['allow_archive_during_journey', 'Archive during Journey'],
-      ] as [field, label]}
+        ['allow_track_skip', 'Allow track selection', 'nav_track_skip'],
+        ['allow_seek', 'Allow seeking', 'nav_seek'],
+        ['allow_shuffle', 'Allow shuffle', 'nav_shuffle'],
+        ['allow_repeat', 'Allow repeat', 'nav_repeat'],
+        ['resume_enabled', 'Remember listening position', 'nav_resume'],
+        ['allow_archive_during_journey', 'Archive during Journey', 'nav_archive'],
+      ] as [field, label, help]}
         <label class="flex items-center gap-2 rounded-lg px-3 py-2" style="background:rgba(255,255,255,.03);color:var(--ink-muted);">
           <input type="checkbox" checked={journey.navigation[field]} on:change={(event) => setNavigation(field, event.currentTarget.checked)} />
-          {label}
+          {label}<HelpTip field={help} />
         </label>
       {/each}
     </div>
@@ -204,7 +208,7 @@
     {/if}
     {#if journey.playback_mode === 'crossfade' && tracks.length > 1}
       <div class="pt-3" style="border-top:1px solid rgba(255,255,255,.07);">
-        <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-muted);">Optional transition overrides</p>
+        <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-muted);">Optional transition overrides<HelpTip field="track_crossfade" /></p>
         <div class="space-y-2">
           {#each tracks.slice(0, -1) as track, index (track.track_id)}
             {@const nextTrack = tracks[index + 1]}
@@ -313,7 +317,7 @@
 
           <div class="grid sm:grid-cols-2 gap-3">
             <div>
-              <label class="label-dark" for="moment-type-{moment.moment_id}">Moment type</label>
+              <label class="label-dark" for="moment-type-{moment.moment_id}">Moment type<HelpTip field="moment_type" /></label>
               <select class="input-dark" id="moment-type-{moment.moment_id}" value={moment.type} on:change={(event) => updateMoment(moment.moment_id, { type: event.currentTarget.value })}>
                 {#each activeScope === 'release' ? RELEASE_MOMENT_TYPES : TRACK_MOMENT_TYPES as type}
                   <option value={type}>{LABELS[type] || type.replaceAll('_', ' ')}</option>
@@ -322,14 +326,14 @@
             </div>
             {#if activeScope === 'release'}
               <div>
-                <label class="label-dark" for="moment-placement-{moment.moment_id}">Placement</label>
+                <label class="label-dark" for="moment-placement-{moment.moment_id}">Placement<HelpTip field="moment_placement" /></label>
                 <select class="input-dark" id="moment-placement-{moment.moment_id}" value={moment.placement} on:change={(event) => updateMoment(moment.moment_id, { placement: event.currentTarget.value })}>
                   {#each RELEASE_PLACEMENTS as placement}<option value={placement}>{LABELS[placement]}</option>{/each}
                 </select>
               </div>
             {:else}
               <div>
-                <label class="label-dark" for="moment-time-{moment.moment_id}">Track time (seconds)</label>
+                <label class="label-dark" for="moment-time-{moment.moment_id}">Track time (seconds)<HelpTip field="moment_time" /></label>
                 <input class="input-dark" id="moment-time-{moment.moment_id}" type="number" min="0" step="0.1" value={moment.at_ms / 1000}
                   on:input={(event) => updateMoment(moment.moment_id, { at_ms: Math.round((Number(event.currentTarget.value) || 0) * 1000) })} />
               </div>
@@ -338,7 +342,7 @@
 
           {#if activeScope === 'release' && ['before_track', 'after_track', 'during_transition'].includes(moment.placement)}
             <div>
-              <label class="label-dark" for="moment-anchor-{moment.moment_id}">Anchor track</label>
+              <label class="label-dark" for="moment-anchor-{moment.moment_id}">Anchor track<HelpTip field="moment_anchor" /></label>
               <select class="input-dark" id="moment-anchor-{moment.moment_id}" value={moment.anchor_track_id} on:change={(event) => updateMoment(moment.moment_id, { anchor_track_id: event.currentTarget.value })}>
                 <option value="">Choose a track</option>
                 {#each tracks as track}<option value={track.track_id}>Disc {track.disc_number} · Track {track.track_number} — {track.title}</option>{/each}
@@ -348,30 +352,30 @@
 
           <div class="grid sm:grid-cols-2 gap-3">
             <div>
-              <label class="label-dark" for="moment-title-{moment.moment_id}">Title</label>
+              <label class="label-dark" for="moment-title-{moment.moment_id}">Title<HelpTip field="moment_title" /></label>
               <input class="input-dark" id="moment-title-{moment.moment_id}" value={moment.title} on:input={(event) => updateMoment(moment.moment_id, { title: event.currentTarget.value })} />
             </div>
             <div>
-              <label class="label-dark" for="moment-effect-{moment.moment_id}">Atmosphere</label>
+              <label class="label-dark" for="moment-effect-{moment.moment_id}">Atmosphere<HelpTip field="moment_effect" /></label>
               <select class="input-dark" id="moment-effect-{moment.moment_id}" value={moment.effect} on:change={(event) => updateMoment(moment.moment_id, { effect: event.currentTarget.value })}>
                 {#each MOMENT_EFFECTS as effect}<option value={effect}>{effect.replaceAll('_', ' ')}</option>{/each}
               </select>
             </div>
           </div>
           <div>
-            <label class="label-dark" for="moment-body-{moment.moment_id}">Words or direction</label>
+            <label class="label-dark" for="moment-body-{moment.moment_id}">Words or direction<HelpTip field="moment_body" /></label>
             <textarea class="input-dark min-h-20 resize-y" id="moment-body-{moment.moment_id}" value={moment.body} on:input={(event) => updateMoment(moment.moment_id, { body: event.currentTarget.value })}></textarea>
           </div>
           <div class="grid sm:grid-cols-2 gap-3">
             <div>
-              <label class="label-dark" for="moment-asset-{moment.moment_id}">Visual or document</label>
+              <label class="label-dark" for="moment-asset-{moment.moment_id}">Visual or document<HelpTip field="moment_asset" /></label>
               <select class="input-dark" id="moment-asset-{moment.moment_id}" value={moment.asset_ref} on:change={(event) => updateMoment(moment.moment_id, { asset_ref: event.currentTarget.value })}>
                 <option value="">Cover / automatic</option>
                 {#each scopedAssets as asset}<option value={asset.asset_id}>{asset.title || asset.filename || asset.role}</option>{/each}
               </select>
             </div>
             <div>
-              <label class="label-dark" for="moment-duration-{moment.moment_id}">Display duration (ms)</label>
+              <label class="label-dark" for="moment-duration-{moment.moment_id}">Display duration (ms)<HelpTip field="moment_duration" /></label>
               <input class="input-dark" id="moment-duration-{moment.moment_id}" type="number" min="0" step="250" value={moment.duration_ms}
                 on:input={(event) => updateMoment(moment.moment_id, { duration_ms: Math.max(0, Number(event.currentTarget.value) || 0) })} />
             </div>

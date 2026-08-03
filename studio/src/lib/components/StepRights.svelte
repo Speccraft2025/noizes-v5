@@ -1,4 +1,5 @@
 <script>
+  import HelpTip from './HelpTip.svelte';
   import { onMount } from 'svelte';
   import { extras, identity, releaseProject, rights, LICENSES } from '$lib/stores/package.js';
   import { orderedTracks } from '$lib/domain/release.js';
@@ -197,24 +198,24 @@
       <p class="text-xs mt-1" style="color:var(--ink-muted);">Inherited only where a track says so.</p>
     </div>
     <div>
-      <label class="label-dark" for="copyright">Copyright</label>
+      <label class="label-dark" for="copyright">Copyright<HelpTip field="copyright" /></label>
       <input id="copyright" class="input-dark" type="text" bind:value={$rights.copyright}
         placeholder="© {new Date().getFullYear()} {$identity.artist || 'Artist Name'}" />
     </div>
     <div>
-      <label class="label-dark" for="license">License</label>
+      <label class="label-dark" for="license">License<HelpTip field="license" /></label>
       <select id="license" class="input-dark" bind:value={$rights.license}>
         {#each LICENSES as license}<option value={license}>{license}</option>{/each}
       </select>
     </div>
     <div>
-      <label class="label-dark" for="producer">Producer</label>
+      <label class="label-dark" for="producer">Producer<HelpTip field="producer" /></label>
       <input id="producer" class="input-dark" type="text" bind:value={$rights.producer} placeholder="Producer name(s)" />
     </div>
     <div class="space-y-3">
       <div class="flex items-end justify-between gap-4">
         <div>
-          <p class="label-dark">Release credits</p>
+          <p class="label-dark">Release credits<HelpTip field="release_credits" /></p>
           <p class="text-xs" style="color:var(--ink-muted);">Featured artists from Identity and Tracklist are added automatically. Open a record to match it to songs.</p>
         </div>
         <button type="button" class="btn-spectral text-xs shrink-0" on:click={() => openCredit()}>＋ Add credit</button>
@@ -248,7 +249,7 @@
       {/if}
 
       <div>
-        <label class="label-dark" for="credits">Additional credit notes</label>
+        <label class="label-dark" for="credits">Additional credit notes<HelpTip field="credit_notes" /></label>
         <textarea id="credits" class="input-dark resize-none font-mono text-xs" rows="3" bind:value={$rights.credits}
           placeholder="Legacy or free-form notes&#10;Mastering — Studio X&#10;Artwork — Jane Doe"></textarea>
       </div>
@@ -292,26 +293,26 @@
           {#if !selectedTrack.inherit_release_rights}
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="label-dark" for="master-holder">Master rights holder</label>
+                <label class="label-dark" for="master-holder">Master rights holder<HelpTip field="master_holder" /></label>
                 <input id="master-holder" class="input-dark" type="text" value={trackRights.master?.rights_holder || ''} on:input={(event) => updateTrack('master', { rights_holder: event.currentTarget.value })} />
               </div>
               <div>
-                <label class="label-dark" for="master-copyright">Master copyright</label>
+                <label class="label-dark" for="master-copyright">Master copyright<HelpTip field="master_copyright" /></label>
                 <input id="master-copyright" class="input-dark" type="text" value={trackRights.master?.copyright || ''} on:input={(event) => updateTrack('master', { copyright: event.currentTarget.value })} />
               </div>
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="label-dark" for="composition-holder">Composition rights holder</label>
+                <label class="label-dark" for="composition-holder">Composition rights holder<HelpTip field="composition_holder" /></label>
                 <input id="composition-holder" class="input-dark" type="text" value={trackRights.composition?.rights_holder || ''} on:input={(event) => updateTrack('composition', { rights_holder: event.currentTarget.value })} />
               </div>
               <div>
-                <label class="label-dark" for="publisher">Publisher</label>
+                <label class="label-dark" for="publisher">Publisher<HelpTip field="publisher" /></label>
                 <input id="publisher" class="input-dark" type="text" value={trackRights.composition?.publisher || ''} on:input={(event) => updateTrack('composition', { publisher: event.currentTarget.value })} />
               </div>
             </div>
             <div>
-              <label class="label-dark" for="track-licence">Track licence / permission</label>
+              <label class="label-dark" for="track-licence">Track licence / permission<HelpTip field="track_licence" /></label>
               <textarea id="track-licence" class="input-dark resize-none" rows="3" value={trackRights.licence?.notes || ''} on:input={(event) => updateTrack('licence', { notes: event.currentTarget.value })}></textarea>
             </div>
             <label class="flex items-center gap-2 text-xs" style="color:var(--ink-muted);">
@@ -327,7 +328,7 @@
   {#if permissionAssets.length}
     <section class="space-y-4 border-t pt-6" style="border-color:var(--border-dim);">
       <div>
-        <p class="t-caption">Asset permissions</p>
+        <p class="t-caption">Asset permissions<HelpTip field="asset_permission" /></p>
         <p class="text-xs mt-1" style="color:var(--ink-muted);">Declare authority for every master, alternate, stem, image, video and document in the package.</p>
       </div>
       <div class="space-y-2">
@@ -369,18 +370,18 @@
 
       <div class="grid sm:grid-cols-2 gap-3">
         <div>
-          <label class="label-dark" for="credit-name">Name *</label>
+          <label class="label-dark" for="credit-name">Name *<HelpTip field="credit_name" /></label>
           <input id="credit-name" class="input-dark" type="text" value={creditForm.name} on:input={(event) => updateCreditField('name', event.currentTarget.value)} placeholder="Person, artist or organisation" />
         </div>
         <div>
-          <label class="label-dark" for="credit-role">Role *</label>
+          <label class="label-dark" for="credit-role">Role *<HelpTip field="credit_role" /></label>
           <input id="credit-role" class="input-dark" type="text" list="credit-roles" value={creditForm.role} on:input={(event) => updateCreditField('role', event.currentTarget.value)} placeholder="Featured Artist" />
           <datalist id="credit-roles">{#each CREDIT_ROLES as role}<option value={role}></option>{/each}</datalist>
         </div>
       </div>
 
       <div>
-        <label class="label-dark" for="credit-email">Email invitation</label>
+        <label class="label-dark" for="credit-email">Email invitation<HelpTip field="credit_email" /></label>
         <input id="credit-email" class="input-dark" type="email" value={creditForm.email} on:input={(event) => updateCreditField('email', event.currentTarget.value)} placeholder="collaborator@example.com" />
         <p class="text-[11px] mt-2" style="color:var(--ink-muted);">Sending grants invite-only access and asks this collaborator to finish a Noizes Creator account. Email is not shown in the collector package.</p>
       </div>

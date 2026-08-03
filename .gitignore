@@ -16,3 +16,14 @@ examples/immersive-reference-album/screenshots/*.png
 examples/immersive-reference-album/transcendence/analysis/
 examples/immersive-reference-album/transcendence/assets/
 examples/immersive-reference-album/screenshots/transcendence-review/
+.gstack/
+
+# Android gallery app: Gradle and KSP output, plus machine-local caches.
+# Rebuild with ./gradlew rather than commit — these are ~95 MB of generated
+# binaries (dex, APKs, file hashes) that conflict on every pull.
+noizes-gallery-android/.gradle/
+noizes-gallery-android/.kotlin/
+noizes-gallery-android/build/
+noizes-gallery-android/app/build/
+# Contains the local Android SDK path, which is specific to one machine.
+noizes-gallery-android/local.properties

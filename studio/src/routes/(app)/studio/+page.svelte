@@ -13,6 +13,9 @@
   import StepEdition     from '$lib/components/StepEdition.svelte';
   import StepRights      from '$lib/components/StepRights.svelte';
   import StepExport      from '$lib/components/StepExport.svelte';
+  import StudioCoach     from '$lib/components/StudioCoach.svelte';
+  import { validateReleaseProject } from '$lib/domain/release.js';
+  import { editionErrors } from '$lib/utils/project.js';
 
   export let data;
 
@@ -117,6 +120,14 @@
     draftStatus = 'saving';
     saveTimer = setTimeout(() => void persistDraft(), 650);
   }
+
+  // The coach reads exactly what StepExport reads. If these ever diverge the
+  // helper would be telling the creator something the compiler disagrees with.
+  $: coachValidation = validateReleaseProject({ ...$releaseProject, extras: $extras });
+  $: coachEditionIssues = editionErrors($edition);
+  $: coachHasCover = Boolean(
+    $releaseProject.release_assets.find((asset) => asset.role === 'main_cover')?.file
+  );
 
   function goToStep(step) {
     currentStep = Math.max(1, Math.min(steps.length, Number(step) || 1));
@@ -264,6 +275,16 @@
           </span>
         </div>
       {/if}
+      <StudioCoach
+        step={currentStep}
+        validation={coachValidation}
+        editionIssues={coachEditionIssues}
+        identity={$identity}
+        hasMainCover={coachHasCover}
+        seenPrimer={draftRestored}
+        on:navigate={(event) => goToStep(event.detail.step)}
+      />
+
       {#if currentStep === 1}
         <StepIdentity />
       {:else if currentStep === 2}

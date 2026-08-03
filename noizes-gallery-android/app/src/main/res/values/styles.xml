@@ -1,0 +1,1 @@
+<resources><style name="Theme.Noizes" parent="android:style/Theme.Material.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:windowBackground">#090A0A</item><item name="android:colorAccent">#E6D5B8</item></style></resources>

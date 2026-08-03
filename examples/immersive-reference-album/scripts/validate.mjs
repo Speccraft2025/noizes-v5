@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-const root=fileURLToPath(new URL('..',import.meta.url)), nz=join(root,'dist','The-House-That-Remembered-Us.nz'), temp=join(root,'.validation');
+const root=fileURLToPath(new URL('..',import.meta.url)), nz=join(root,'dist','The-House-That-Remembered-Us-Guided.nz'), temp=join(root,'.validation');
 await rm(temp,{recursive:true,force:true});await mkdir(temp,{recursive:true});execFileSync('unzip',['-q',nz,'-d',temp]);
 const read=async p=>JSON.parse(await readFile(join(temp,p),'utf8')), manifest=await read('manifest.json'), ledger=await read('metadata/asset-rights-ledger.json');const errors=[];
 for(const p of ['manifest.json','experience.html','edition.json','rights.json','credits.json','authenticity.json','technical.json','experience.json','archive.json','history.json'])try{await readFile(join(temp,p))}catch{errors.push(`missing ${p}`)}

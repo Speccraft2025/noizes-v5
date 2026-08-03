@@ -3,6 +3,9 @@
 
   export let data;
   $: ({ featured, feed, resale } = data);
+  // Set when the catalogue could not be read. An empty shelf and a broken
+  // query are different things and must not look the same.
+  $: loadError = data.loadError ?? null;
 
   const colors = ['#7B5CF0', '#4B6BF0', '#F04BD8', '#7B5CF0', '#4B6BF0', '#F04BD8'];
 
@@ -138,7 +141,17 @@
     </section>
   {/if}
 
-  {#if feed.length === 0}
+  {#if loadError}
+    <!-- Never invite someone to publish into a catalogue that is merely
+         unreadable — their release may already be in it. -->
+    <div class="glass rounded-2xl p-16 text-center" style="border-color: rgba(240,201,138,.28);">
+      <p class="t-caption mb-3" style="color:#F0C98A;">Catalogue unavailable</p>
+      <p class="text-base mb-6 mx-auto" style="color: var(--ink-muted); max-width: 34rem;">{loadError.message}</p>
+      <button type="button" class="btn-spectral rounded-full px-6 py-2.5 text-sm" on:click={() => location.reload()}>
+        Try again
+      </button>
+    </div>
+  {:else if feed.length === 0}
     <div class="glass rounded-2xl p-20 text-center">
       <p class="t-caption mb-3">No releases yet</p>
       <p class="text-base mb-6" style="color: var(--ink-muted);">The first releases are being compiled. Check back soon.</p>

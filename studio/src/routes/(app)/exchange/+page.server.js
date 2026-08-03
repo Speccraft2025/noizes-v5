@@ -2,10 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 
+import { firstLoadError } from '$lib/domain/load-errors.js';
+
 export async function load({ locals }) {
   const sb = locals.supabase;
 
-  const { data: releases } = await sb
+  const { data: releases, error: releasesError } = await sb
     .from('releases')
     .select(`
       id, artist_name, title, genre, year, location,
@@ -18,6 +20,10 @@ export async function load({ locals }) {
     .eq('status', 'published')
     .order('votes', { ascending: false });
 
+  // A swallowed error here rendered as "No releases yet", which is a lie the
+  // page told confidently: the releases exist, the query just failed.
+  if (releasesError) console.error('[exchange] release listing failed:', releasesError);
+
   const all = releases ?? [];
   const featured = all.slice(0, 3);
 
@@ -27,7 +33,7 @@ export async function load({ locals }) {
   const admin = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: resaleRows } = await admin
+  const { data: resaleRows, error: resaleError } = await admin
     .from('acquisitions')
     .select('id, edition_number, currency, releases(id, artist_name, title, release_type, track_count, disc_count, edition_type, edition_name, edition_size, cover_path)')
     .eq('accepting_offers', true)
@@ -48,5 +54,14 @@ export async function load({ locals }) {
     edition_size: row.releases?.edition_size ?? null,
   }));
 
-  return { featured, feed: all, resale };
+  if (resaleError) console.error('[exchange] resale listing failed:', resaleError);
+
+  // The main listing is what the page is for, so its failure is reported
+  // first; resale is a secondary shelf but must not fail silently either.
+  return {
+    featured,
+    feed: all,
+    resale,
+    loadError: firstLoadError([releasesError, resaleError], { subject: 'catalogue' }),
+  };
 }

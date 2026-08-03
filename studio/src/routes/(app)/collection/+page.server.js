@@ -1,9 +1,11 @@
+import { describeLoadError } from '$lib/domain/load-errors.js';
+
 export async function load({ locals }) {
   const sb = locals.supabase;
   const userId = locals.user?.id;
   if (!userId) return { collection: [], events: [] };
 
-  const { data: acquisitions } = await sb
+  const { data: acquisitions, error: acquisitionsError } = await sb
     .from('acquisitions')
     .select(`
       id,
@@ -22,6 +24,11 @@ export async function load({ locals }) {
     `)
     .eq('owner_id', userId)
     .order('acquired_at', { ascending: false });
+
+  // Telling a collector their collection is empty when the read merely failed
+  // is the most alarming version of this bug: they paid for these.
+  if (acquisitionsError) console.error('[collection] acquisition listing failed:', acquisitionsError);
+  const loadError = describeLoadError(acquisitionsError, { subject: 'collection' });
 
   const acqs = acquisitions ?? [];
 
@@ -128,5 +135,5 @@ export async function load({ locals }) {
     }))
   ).sort((a, b) => (a.date < b.date ? 1 : -1));
 
-  return { collection, events, myOffers };
+  return { collection, events, myOffers, loadError };
 }

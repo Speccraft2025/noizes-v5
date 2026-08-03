@@ -4,6 +4,9 @@
 
   export let data;
   $: ({ collection, events, myOffers } = data);
+  // A collection that failed to load is not an empty collection. These were
+  // paid for; saying "empty" would be alarming and untrue.
+  $: loadError = data.loadError ?? null;
 
   let openItem = null;   // item whose .nz is being opened (drives the modal)
   function openNz(item) { openItem = item; }
@@ -130,7 +133,17 @@
     <div class="glass rounded-xl px-4 py-3 mb-4 text-sm text-white">{flash}</div>
   {/if}
 
-  {#if collection.length === 0}
+  {#if loadError}
+    <!-- Never send someone to buy their first object when they may already
+         own several and we simply cannot read them. -->
+    <div class="glass rounded-2xl p-16 text-center" style="border-color: rgba(240,201,138,.28);">
+      <p class="t-caption mb-3" style="color:#F0C98A;">Collection unavailable</p>
+      <p class="text-base mb-6 mx-auto" style="color: var(--ink-muted); max-width: 34rem;">{loadError.message}</p>
+      <button type="button" class="btn-spectral rounded-full px-6 py-2.5 text-sm" on:click={() => location.reload()}>
+        Try again
+      </button>
+    </div>
+  {:else if collection.length === 0}
     <div class="glass rounded-2xl p-16 text-center">
       <p class="t-caption mb-3">Empty collection</p>
       <p class="text-base" style="color: var(--ink-muted);">Head to <a href="/exchange" class="text-white underline">Exchange</a> to acquire your first object.</p>

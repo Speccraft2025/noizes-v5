@@ -473,6 +473,28 @@ export async function buildPackage(input) {
   const playbackTracks = trackRecords.map((track) => {
     const primaryComponent = componentById.get(track.primary_audio_component);
     const artworkComponent = componentById.get(track.artwork_ref);
+
+    // Alternate takes — acapella, instrumental, live — so a listener can
+    // change source without losing their place. Matched on version_id, which
+    // writeComponent stamps onto the component when the file is written;
+    // going via the asset id would depend on an alias that may not hold.
+    const versions = components
+      .filter((component) => component.track_id === track.track_id && component.version_id)
+      .map((component) => {
+        const version = (track.audio_versions ?? [])
+          .find((entry) => entry.version_id === component.version_id);
+        return {
+          version_id: component.version_id,
+          role: version?.role || 'alternate',
+          title: version?.title || 'Alternate version',
+          is_primary: Boolean(version?.is_primary),
+          src: component.path,
+          duration_ms: component.duration_ms || 0,
+        };
+      })
+      // The primary leads, so the switcher opens on the take people expect.
+      .sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+
     return {
       track_id: track.track_id,
       position: track.position,
@@ -488,6 +510,8 @@ export async function buildPackage(input) {
       cover_src: artworkComponent?.path || '',
       duration_ms: track.duration_ms || 0,
       lyrics: track.lyrics,
+      // Only worth shipping when there is a genuine choice to make.
+      versions: versions.length > 1 ? versions : [],
     };
   });
   if (!playbackTracks.length) {

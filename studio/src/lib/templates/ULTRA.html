@@ -461,6 +461,7 @@ html,body{
   <div class="p-artist"><span id="p-artist">—</span></div>
   <div class="p-title" id="p-title"></div>
   <div class="p-chips" id="p-chips"></div>
+  <div class="version-switch" id="version-switch" role="group" aria-label="Audio version" hidden></div>
   <div class="p-controls">
     <button class="btn-skip" id="btn-prev" aria-label="Previous track">│‹</button>
     <button class="btn-play-main" id="btn-play">
@@ -583,6 +584,15 @@ html,body{
   background:linear-gradient(110deg,rgba(3,3,3,.9),rgba(3,3,3,.52) 58%,rgba(3,3,3,.82));
   backdrop-filter:blur(34px) saturate(1.25);-webkit-backdrop-filter:blur(34px) saturate(1.25);}
 .guide-drawer.open{opacity:1;pointer-events:auto;transform:scale(1);}
+.version-switch{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:12px 0 2px;}
+.version-chip{border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--muted);
+  border-radius:99px;padding:6px 13px;font:600 10px/1 inherit;letter-spacing:.14em;text-transform:uppercase;
+  cursor:pointer;transition:color .18s,border-color .18s,background .18s;}
+.version-chip:hover{color:var(--text);border-color:var(--primary);}
+.version-chip[aria-pressed="true"]{color:#fff;border-color:var(--primary);background:color-mix(in srgb,var(--primary) 22%,transparent);}
+.version-chip[disabled]{opacity:.45;cursor:progress;}
+.version-chip:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
+@media(max-width:560px){.version-chip{padding:5px 10px;font-size:9px;letter-spacing:.1em;}}
 .guide-title{font-size:10px;letter-spacing:.34em;text-transform:uppercase;color:var(--primary);margin-bottom:28px;}
 .world-menu{display:flex;flex-direction:column;align-items:flex-start;gap:3px;max-width:900px;}
 .world-link{display:flex;align-items:baseline;gap:18px;border:0;background:transparent;color:rgba(255,255,255,.42);cursor:pointer;
@@ -1200,6 +1210,76 @@ function setPlaying(v){
   document.getElementById('btn-play').classList.toggle('playing', v);
   if(C.archive&&playbackSettings.allow_archive_during_journey===false)document.getElementById('menu-archive').hidden=v;
 }
+/* ── Switchable sources ───────────────────────────────────────────────────
+   A track can ship several takes of the same performance — main, acapella,
+   instrumental. They are alignments of one recording, so switching carries
+   the playhead across rather than restarting. */
+var activeVersions = {};      /* track_id -> version_id */
+var versionSwitching = false;
+
+function trackVersions(track){
+  return track&&Array.isArray(track.versions)?track.versions:[];
+}
+function activeVersionId(track){
+  if(!track)return '';
+  if(activeVersions[track.track_id])return activeVersions[track.track_id];
+  var versions=trackVersions(track);
+  var primary=versions.filter(function(v){return v.is_primary;})[0]||versions[0];
+  return primary?primary.version_id:'';
+}
+function renderVersionSwitch(){
+  var host=document.getElementById('version-switch');
+  if(!host)return;
+  var track=currentTrack();
+  var versions=trackVersions(track);
+  /* One take is not a choice; don't show a control that does nothing. */
+  if(versions.length<2){host.hidden=true;host.innerHTML='';return;}
+  var active=activeVersionId(track);
+  host.hidden=false;host.innerHTML='';
+  versions.forEach(function(version){
+    var chip=document.createElement('button');
+    chip.type='button';chip.className='version-chip';
+    chip.textContent=version.title||version.role||'Version';
+    chip.setAttribute('aria-pressed',version.version_id===active?'true':'false');
+    if(versionSwitching)chip.disabled=true;
+    chip.addEventListener('click',function(){switchAudioVersion(version.version_id);});
+    host.appendChild(chip);
+  });
+}
+function switchAudioVersion(versionId){
+  var track=currentTrack();
+  var target=trackVersions(track).filter(function(v){return v.version_id===versionId;})[0];
+  if(!target||!target.src||versionSwitching)return;
+  if(activeVersionId(track)===versionId)return;
+
+  var position=Number(audio.currentTime)||0;
+  var wasPlaying=!audio.paused;
+
+  /* A crossfade already in flight would fight this handoff. */
+  cancelTransition();
+  versionSwitching=true;
+  activeVersions[track.track_id]=versionId;
+  renderVersionSwitch();
+
+  audio.pause();
+  audio.src=target.src;
+  audio.load();
+
+  var settle=function(){
+    audio.removeEventListener('loadedmetadata',settle);
+    /* Clamp: an alternate take can be a hair shorter than the main, and
+       seeking past the end silently lands at 0 — which would look exactly
+       like the restart this feature exists to avoid. */
+    var duration=Number(audio.duration);
+    audio.currentTime=(isFinite(duration)&&duration>0)?Math.min(position,Math.max(0,duration-0.05)):position;
+    versionSwitching=false;
+    renderVersionSwitch();
+    if(wasPlaying){var promise=audio.play();if(promise&&promise.catch)promise.catch(function(){});}
+    persistPlayback(true);
+  };
+  audio.addEventListener('loadedmetadata',settle);
+}
+
 function renderPlayerTitle(title){
   var el=document.getElementById('p-title'); el.innerHTML='';
   String(title||'Untitled').split(' ').forEach(function(word){
@@ -1289,7 +1369,7 @@ function persistPlayback(force){
     current_disc:currentTrack().disc_number,current_track_id:currentTrack().track_id,
     current_track_position_ms:Math.round((audio.currentTime||0)*1000),complete_release_position_ms:completeReleasePositionMs(),
     completed_tracks:completedTrackIds,release_completed:releaseCompleted||completedTrackIds.length>=releaseTracks.length,
-    journey_moments_visited:visitedMomentIds,last_selected_mode:activeView,playback_mode:playbackSettings.mode||'sequential',shuffle_enabled:shuffleEnabled,repeat_enabled:repeatEnabled,saved_at:new Date().toISOString()
+    journey_moments_visited:visitedMomentIds,active_versions:activeVersions,last_selected_mode:activeView,playback_mode:playbackSettings.mode||'sequential',shuffle_enabled:shuffleEnabled,repeat_enabled:repeatEnabled,saved_at:new Date().toISOString()
   };
   try{localStorage.setItem(resumeKey,JSON.stringify(state));}catch(ignore){}
   try{if(window.parent&&window.parent!==window)window.parent.postMessage({type:'noizes:storage:set',key:resumeKey,value:JSON.stringify(state)},'*');}catch(ignore){}
@@ -1313,7 +1393,12 @@ function loadTrack(index,options){
   if(index<0||index>=releaseTracks.length)return;
   var previousTrack=currentTrack();cancelTransition();audio.pause();plannedNextIndex=-1;activeTrackIndex=index;renderActiveTrack();journeyTrackChanged(previousTrack,currentTrack());
   var track=currentTrack(); pendingPosition=Math.max(0,Number(options.position)||0);pendingAutoplay=Boolean(options.autoplay);
-  if(track.src){audio.src=track.src;audio.load();}else{audio.removeAttribute('src');setPlaying(false);}
+  /* Honour a take the listener chose earlier for this track, so returning to
+     it does not silently drop them back onto the main version. */
+  var chosen=trackVersions(track).filter(function(v){return v.version_id===activeVersionId(track);})[0];
+  var src=(chosen&&chosen.src)||track.src;
+  versionSwitching=false;renderVersionSwitch();
+  if(src){audio.src=src;audio.load();}else{audio.removeAttribute('src');setPlaying(false);}
   preloadFollowing();setProgress(0,0);persistPlayback(true);
 }
 function handoffFromStandby(nextIndex){
@@ -1435,6 +1520,7 @@ if(restored&&restored.current_track_id){
   shuffleEnabled=playbackSettings.allow_shuffle===true&&restored.shuffle_enabled===true;
   repeatEnabled=playbackSettings.allow_repeat!==false&&restored.repeat_enabled===true;
   visitedMomentIds=Array.isArray(restored.journey_moments_visited)?restored.journey_moments_visited:[];
+  activeVersions=(restored.active_versions&&typeof restored.active_versions==='object')?restored.active_versions:{};
   loadTrack(restoredIndex>=0?restoredIndex:0,{position:(restored.current_track_position_ms||0)/1000,autoplay:false});
   if(restoredIndex>0||restored.current_track_position_ms>5000){document.getElementById('enter-object').textContent='Resume from Track '+((restoredIndex>=0?restoredIndex:0)+1);document.getElementById('entry-return-actions').style.display='flex';document.getElementById('entry-archive').style.display=window.NZ_ARCHIVE?'':'none';document.getElementById('entry-history').style.display=window.NZ_HISTORY?'':'none';}
 }else loadTrack(0,{autoplay:false});

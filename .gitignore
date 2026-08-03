@@ -1,12 +1,62 @@
-# Local Netlify folder
-.netlify
+# ─────────────────────────────────────────────────────────────────────────────
+# Applies to every subproject, present and future
+#
+# This repository holds four separate apps (studio, beatsunlimited-app,
+# noizes-gallery-android, noizes-gallery-pwa). Until now the ignore file named
+# none of them: three arrived after it was written, and each brought its own
+# dependency and output directories with no coverage.
+#
+# The cost of that gap: a plain `git add` on a newly dropped-in subproject
+# staged 980 files and 95 MB of Gradle output — a debug APK, merged dex, file
+# hash caches. It was caught by hand and never pushed, but only because
+# someone happened to look.
+#
+# These patterns are deliberately unanchored, so a fifth app added tomorrow is
+# covered before anyone thinks about it.
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Reproducible immersive-reference-album outputs and preserved source downloads.
-# Run examples/immersive-reference-album/npm run build to recreate build/ and dist/.
+# Dependencies
+**/node_modules/
+
+# Build output
+**/dist/
+**/out/
+**/target/
+**/.next/
+**/.svelte-kit/
+**/.turbo/
+
+# NOTE: `build/` is deliberately NOT ignored globally. It is an output
+# directory in most projects but a source directory in others —
+# noizes-gallery-pwa/build/ holds sites-vite-plugin.ts, which its vite.config
+# imports at line 4. A blanket rule would silently delete a file the build
+# depends on from the index. Ignore build/ per project, below, where it really
+# is output.
+
+# Tooling and machine-local state
+**/.gradle/
+**/.kotlin/
+**/.wrangler/
+**/.vinext/
+**/coverage/
+**/.DS_Store
+**/local.properties
+.netlify
+.gstack/
+
+# Secrets. Never commit a real .env; the .example files are the contract.
+**/.env
+**/.env.*
+!**/.env.example
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Project-specific
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Reproducible immersive-reference-album outputs and preserved source
+# downloads. Run `npm run build` in that directory to recreate build/ and dist/.
 examples/immersive-reference-album/build/
-examples/immersive-reference-album/dist/
 examples/immersive-reference-album/sources/original/
-examples/immersive-reference-album/.DS_Store
 examples/immersive-reference-album/screenshots/*.png
 !examples/immersive-reference-album/screenshots/09-integrated-viewer-mobile.png
 
@@ -16,26 +66,8 @@ examples/immersive-reference-album/screenshots/*.png
 examples/immersive-reference-album/transcendence/analysis/
 examples/immersive-reference-album/transcendence/assets/
 examples/immersive-reference-album/screenshots/transcendence-review/
-.gstack/
 
-# Android gallery app: Gradle and KSP output, plus machine-local caches.
-# Rebuild with ./gradlew rather than commit — these are ~95 MB of generated
-# binaries (dex, APKs, file hashes) that conflict on every pull.
-noizes-gallery-android/.gradle/
-noizes-gallery-android/.kotlin/
+# Android gallery app: Gradle and KSP output. Here build/ genuinely is output —
+# ~95 MB of dex, APKs and hash caches. Rebuild with ./gradlew.
 noizes-gallery-android/build/
 noizes-gallery-android/app/build/
-# Contains the local Android SDK path, which is specific to one machine.
-noizes-gallery-android/local.properties
-
-# Gallery TV PWA (Next.js + Vite on Cloudflare Workers). Dependencies and
-# build output only — node_modules alone is ~759 MB. Rebuild with npm install
-# and npm run build rather than commit.
-noizes-gallery-pwa/node_modules/
-noizes-gallery-pwa/dist/
-noizes-gallery-pwa/.next/
-# NB: build/ is NOT output here — it holds sites-vite-plugin.ts, which the
-# Vite config imports. Ignoring it by name would break the build.
-# Local Wrangler and vinext dev state, specific to one machine.
-noizes-gallery-pwa/.vinext/
-noizes-gallery-pwa/.wrangler/

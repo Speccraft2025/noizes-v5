@@ -27,3 +27,15 @@ noizes-gallery-android/build/
 noizes-gallery-android/app/build/
 # Contains the local Android SDK path, which is specific to one machine.
 noizes-gallery-android/local.properties
+
+# Gallery TV PWA (Next.js + Vite on Cloudflare Workers). Dependencies and
+# build output only — node_modules alone is ~759 MB. Rebuild with npm install
+# and npm run build rather than commit.
+noizes-gallery-pwa/node_modules/
+noizes-gallery-pwa/dist/
+noizes-gallery-pwa/.next/
+# NB: build/ is NOT output here — it holds sites-vite-plugin.ts, which the
+# Vite config imports. Ignoring it by name would break the build.
+# Local Wrangler and vinext dev state, specific to one machine.
+noizes-gallery-pwa/.vinext/
+noizes-gallery-pwa/.wrangler/

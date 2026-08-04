@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  describePackageContents, describeExperienceSections, describeTrustIndicators,
+  describePackageContents, describeExperienceSections, describeTrustIndicators, describeVerificationStatus,
   summarizeExperience, formatDuration, formatBytes,
 } from './drop-contents.js';
 
@@ -145,27 +145,86 @@ describe('summarizeExperience', () => {
   });
 });
 
-describe('describeTrustIndicators', () => {
-  it('always states what is true of every package', () => {
-    const keys = describeTrustIndicators({}).map((item) => item.key);
-    expect(keys).toEqual(['offline', 'portable']);
+describe('describeVerificationStatus', () => {
+  const status = (input) => describeVerificationStatus(input);
+
+  it('separates a signature that failed from one that was never checked', () => {
+    // The distinction the whole function exists for: "we looked and it is
+    // wrong" must never render as "we have not looked".
+    expect(status({ authenticity: { verification_status: 'failed', signature: 'abc' } }).signature)
+      .toMatchObject({ state: 'failed', tone: 'bad' });
+    expect(status({ authenticity: { signature: 'abc' } }).signature)
+      .toMatchObject({ state: 'unchecked', tone: 'unknown' });
   });
 
-  it('claims a signature only when a signature and a key are both present', () => {
-    const unsigned = describeTrustIndicators({ authenticity: { signature: 'abc' } });
-    expect(unsigned.map((item) => item.key)).not.toContain('signed');
+  it('separates an absent signature from a broken one', () => {
+    expect(status({ authenticity: {} }).signature).toMatchObject({ state: 'absent', label: 'Not signed' });
+    expect(status({}).signature).toMatchObject({ state: 'absent' });
+  });
 
-    const signed = describeTrustIndicators({
-      authenticity: { signature: 'abc', signer_public_key: 'key' },
-    });
-    expect(signed.map((item) => item.key)).toContain('signed');
+  it('reports a verified signature', () => {
+    expect(status({ authenticity: { verification_status: 'verified', signature: 'abc' } }).signature)
+      .toMatchObject({ state: 'verified', tone: 'good' });
+  });
+
+  it('separates a failed validation from an unrun one', () => {
+    expect(status({ packageRecord: { validation_status: 'invalid' } }).validation)
+      .toMatchObject({ state: 'invalid', tone: 'bad', label: 'Package failed validation' });
+    expect(status({ packageRecord: { validation_status: 'unvalidated' } }).validation)
+      .toMatchObject({ state: 'unknown', tone: 'unknown', label: 'Package not yet validated' });
+    expect(status({}).validation).toMatchObject({ state: 'unknown' });
+  });
+
+  it('carries a non-colour indicator for every state', () => {
+    for (const input of [
+      { authenticity: { verification_status: 'verified' }, packageRecord: { validation_status: 'valid' } },
+      { authenticity: { verification_status: 'failed' }, packageRecord: { validation_status: 'invalid' } },
+      {},
+    ]) {
+      const { signature, validation } = status(input);
+      expect(signature.icon).toBeTruthy();
+      expect(validation.icon).toBeTruthy();
+      expect(signature.label).toBeTruthy();
+      expect(validation.label).toBeTruthy();
+    }
+  });
+});
+
+describe('describeTrustIndicators', () => {
+  const keysFor = (input) => describeTrustIndicators(input).map((item) => item.key);
+
+  it('claims only what is true of a package by construction', () => {
+    expect(keysFor({})).toEqual(['portable']);
+  });
+
+  it('does not claim a package works offline until that has been checked', () => {
+    // A package can genuinely fail this — the validator's offline-runtime
+    // check catches an experience.html that pulls an external script or
+    // stylesheet, and one in the live catalogue does exactly that. Asserting
+    // it by default would put the load-bearing Noizes claim on the one page
+    // already proven wrong.
+    expect(keysFor({ packageRecord: { validation_status: 'invalid' } })).not.toContain('offline');
+    expect(keysFor({ packageRecord: { validation_status: 'unvalidated' } })).not.toContain('offline');
+    expect(keysFor({ packageRecord: { validation_status: 'valid' } })).toContain('offline');
+  });
+
+  it('claims a signature only once it has actually verified', () => {
+    // Presence of a signature is the package asserting something about
+    // itself; verification is us having checked it.
+    expect(keysFor({ authenticity: { signature: 'abc', signer_public_key: 'key' } })).not.toContain('signed');
+    expect(keysFor({ authenticity: { verification_status: 'failed', signature: 'abc' } })).not.toContain('signed');
+    expect(keysFor({ authenticity: { verification_status: 'verified', signature: 'abc' } })).toContain('signed');
   });
 
   it('claims validation only when the package record says valid', () => {
-    expect(describeTrustIndicators({ packageRecord: { validation_status: 'unvalidated' } })
-      .map((item) => item.key)).not.toContain('validated');
-    expect(describeTrustIndicators({ packageRecord: { validation_status: 'valid' } })
-      .map((item) => item.key)).toContain('validated');
+    expect(keysFor({ packageRecord: { validation_status: 'unvalidated' } })).not.toContain('validated');
+    expect(keysFor({ packageRecord: { validation_status: 'invalid' } })).not.toContain('validated');
+    expect(keysFor({ packageRecord: { validation_status: 'valid' } })).toContain('validated');
+  });
+
+  it('claims transferability from the release, not the package', () => {
+    expect(keysFor({ release: { transferable: false } })).not.toContain('transferable');
+    expect(keysFor({ release: { transferable: true } })).toContain('transferable');
   });
 });
 

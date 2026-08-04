@@ -236,21 +236,57 @@ export function describeExperienceSections(manifest, summary = {}) {
 }
 
 /**
+ * The signature and validation verdicts, as words rather than booleans.
+ *
+ * Three states each, because two is not enough to be honest. A package that
+ * was checked and failed is not in the same position as one nobody has looked
+ * at, and a signature that is present but does not verify is a *stronger*
+ * statement than no signature at all — collapsing either pair into "not
+ * verified" throws away the part the reader most needs.
+ */
+export function describeVerificationStatus({ authenticity, packageRecord } = {}) {
+  const signature = authenticity?.verification_status === 'verified'
+    ? { state: 'verified', tone: 'good', icon: '◈', label: 'Signature verified' }
+    : authenticity?.verification_status === 'failed'
+      ? { state: 'failed', tone: 'bad', icon: '▲', label: 'Signature did not verify' }
+      : authenticity?.signature
+        ? { state: 'unchecked', tone: 'unknown', icon: '○', label: 'Signed · not yet verified' }
+        : { state: 'absent', tone: 'unknown', icon: '○', label: 'Not signed' };
+
+  const validation = packageRecord?.validation_status === 'valid'
+    ? { state: 'valid', tone: 'good', icon: '◎', label: 'Package validated' }
+    : packageRecord?.validation_status === 'invalid'
+      ? { state: 'invalid', tone: 'bad', icon: '▲', label: 'Package failed validation' }
+      : { state: 'unknown', tone: 'unknown', icon: '○', label: 'Package not yet validated' };
+
+  return { signature, validation };
+}
+
+/**
  * Trust indicators the release data actually supports. Each entry is a claim
  * with evidence behind it; a claim without evidence is simply absent rather
  * than shown greyed out, because a greyed-out "Verified authentic" still reads
  * as a badge at a glance.
+ *
+ * "Works offline" is evidence-gated like everything else, and that is not
+ * pedantry: the validator's offline-runtime check exists precisely because a
+ * package *can* fail it by referencing an external script or stylesheet, and
+ * one in the live catalogue does. Asserting it by default would put the single
+ * most load-bearing Noizes claim on the one page that has been proven wrong.
  */
 export function describeTrustIndicators({ authenticity, release, packageRecord } = {}) {
+  const { signature, validation } = describeVerificationStatus({ authenticity, packageRecord });
+
+  // True by construction: one file, opened by the viewer, no installer.
   const out = [
-    { key: 'offline', label: 'Works offline', detail: 'The package plays with no connection' },
     { key: 'portable', label: 'Portable', detail: 'One file, no installer, no account required to open' },
   ];
 
-  if (packageRecord?.validation_status === 'valid') {
-    out.push({ key: 'validated', label: 'Package validated', detail: 'Structure and checksums checked at publish' });
+  if (validation.state === 'valid') {
+    out.push({ key: 'offline', label: 'Works offline', detail: 'No external code or styles — checked, not assumed' });
+    out.push({ key: 'validated', label: 'Package validated', detail: 'Structure and every component checksum verified' });
   }
-  if (authenticity?.signature && authenticity?.signer_public_key) {
+  if (signature.state === 'verified') {
     out.push({ key: 'signed', label: 'Artist-signed', detail: 'Ed25519 signature over the component inventory' });
   }
   if (release?.transferable) {

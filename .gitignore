@@ -1,17 +1,17 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Applies to every subproject, present and future
 #
-# This repository holds four separate apps (studio, beatsunlimited-app,
-# noizes-gallery-android, noizes-gallery-pwa). Until now the ignore file named
-# none of them: three arrived after it was written, and each brought its own
-# dependency and output directories with no coverage.
+# This repository holds three separate apps (studio, noizes-gallery-android,
+# noizes-gallery-pwa). Until now the ignore file named none of them: they
+# arrived after it was written, and each brought its own dependency and
+# output directories with no coverage.
 #
 # The cost of that gap: a plain `git add` on a newly dropped-in subproject
 # staged 980 files and 95 MB of Gradle output — a debug APK, merged dex, file
 # hash caches. It was caught by hand and never pushed, but only because
 # someone happened to look.
 #
-# These patterns are deliberately unanchored, so a fifth app added tomorrow is
+# These patterns are deliberately unanchored, so a fourth app added tomorrow is
 # covered before anyone thinks about it.
 # ─────────────────────────────────────────────────────────────────────────────
 

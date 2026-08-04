@@ -96,8 +96,32 @@ it — splitting it would fork the sellout logic in `$lib/server/acquire.js`).
 Apply the migration before deploying:
 
 ```bash
-cd studio && npm run check:schema
+npm run check:schema
 ```
+
+### Backfilling releases published before Drop Pages
+
+The migration gives every existing release an address, but not a package
+record — those releases have a `.nz` in storage and no row describing it. The
+consequence is worse than a thin page: the authenticity panel reads "Not
+signed" for a package whose `authenticity.json` is signed.
+
+```bash
+node scripts/backfill-drop-packages.mjs --dry-run   # inspect first
+node scripts/backfill-drop-packages.mjs
+```
+
+It reads each package, records the manifest, hashes, experience summary and
+signature, and links it to the release. Safe to re-run — a package already
+recorded for the same bytes is skipped. `validation_status` is left
+`unvalidated` because the script does not run the validator, and claiming a
+check that never happened is the failure the page exists to avoid.
+
+Provenance is deliberately **not** backfilled. Chain events are signed
+attestations carrying dates; emitting a `published` event dated today for a
+release published in July would attest to something untrue. Old releases keep
+the copy chains their acquisitions already created and start with an empty
+release chain.
 
 ### Provenance
 

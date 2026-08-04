@@ -13,15 +13,21 @@ export const MAX_EDITION_ATTEMPTS = 5;
 // seq 0 'created' (minted by the artist) and seq 1 'acquired' (to the buyer).
 // Called only after a winning insert, so duplicate webhooks never double-emit.
 async function openProvenanceChain(sb, { release, acquisition, intent }) {
-  const { appendEvent } = await import('./provenance.js');
+  const { appendEvent, loadChain } = await import('./provenance.js');
   const editionNumber = acquisition.edition_number;
-  await appendEvent(sb, {
-    releaseId: release.id,
-    editionNumber,
-    kind: 'created',
-    toOwnerId: release.artist_id ?? null,
-    acquisitionId: acquisition.id,
-  });
+  // An open edition is unnumbered, so every copy of it shares one chain. Its
+  // genesis therefore belongs to the first sale only — emitting 'created'
+  // again for the second buyer would claim the work was made twice.
+  const existing = await loadChain(sb, release.id, editionNumber);
+  if (existing.length === 0) {
+    await appendEvent(sb, {
+      releaseId: release.id,
+      editionNumber,
+      kind: 'created',
+      toOwnerId: release.artist_id ?? null,
+      acquisitionId: acquisition.id,
+    });
+  }
   await appendEvent(sb, {
     releaseId: release.id,
     editionNumber,

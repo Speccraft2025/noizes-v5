@@ -31,6 +31,30 @@ function isIgnored(path) {
   }
 }
 
+/**
+ * Which of these paths git would ignore, in ONE git process.
+ *
+ * Checking a few hundred tracked files one process at a time took long enough
+ * to time out the suite as soon as the repository grew — the check got slower
+ * precisely as the thing it protects got more valuable. `--stdin` does the
+ * whole set in a single call. It exits 1 when nothing matches, which is a
+ * result and not a failure.
+ */
+function ignoredAmong(paths) {
+  try {
+    const out = execFileSync('git', ['check-ignore', '--no-index', '--stdin'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      input: paths.join('\n'),
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    return out.split('\n').filter(Boolean);
+  } catch (cause) {
+    if (cause.status === 1) return [];
+    throw cause;
+  }
+}
+
 describe('ignore rules do not hide real work', () => {
   it('leaves every tracked file visible', () => {
     // The single most important property. A rule that shadows a tracked file
@@ -38,8 +62,7 @@ describe('ignore rules do not hide real work', () => {
     const tracked = git(['ls-files']).split('\n').filter(Boolean);
     expect(tracked.length).toBeGreaterThan(100);
 
-    const shadowed = tracked.filter(isIgnored);
-    expect(shadowed, 'tracked files matched by an ignore rule').toEqual([]);
+    expect(ignoredAmong(tracked), 'tracked files matched by an ignore rule').toEqual([]);
   });
 
   it('keeps build directories that are actually source', () => {

@@ -5,11 +5,13 @@
   import { validateReleaseProject } from '$lib/domain/release.js';
   import { estimatePackageSize, formatBytes } from '$lib/domain/package-size.js';
   import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
+  import { goto } from '$app/navigation';
 
   let exporting = false;
   let exported = false;
   let published = false;
   let publishError = '';
+  let dropPath = '';
   let exportedFilename = '';
   let error = '';
   let progress = 0;
@@ -178,7 +180,20 @@
         }),
       });
       if (res.ok) {
+        const body = await res.json().catch(() => ({}));
         published = true;
+        dropPath = body.drop_path || '';
+        progress = 100;
+        exporting = false;
+        // Publishing ends on the release's public page, not in the tool that
+        // built it. That page is the thing the creator is about to send to
+        // people, so landing there is what makes it real — and it is where the
+        // share controls live.
+        if (dropPath) {
+          statusLabel = 'Opening your Drop Page…';
+          await goto(dropPath);
+          return;
+        }
       } else {
         const body = await res.json().catch(() => ({}));
         publishError = body.message || `Publish failed (${res.status})`;
@@ -314,7 +329,14 @@
       {#if published}
         <div class="flex items-center gap-2 pt-2 border-t" style="border-color: rgba(123,92,240,0.2);">
           <span style="color: #7B5CF0;">✓</span>
-          <p class="text-xs text-white">Published to Exchange — <a href="/exchange" class="underline" style="color: #7B5CF0;">view it live</a></p>
+          <p class="text-xs text-white">
+            Published —
+            {#if dropPath}
+              <a href={dropPath} class="underline" style="color: #7B5CF0;">open your Drop Page</a>
+            {:else}
+              <a href="/exchange" class="underline" style="color: #7B5CF0;">view it live</a>
+            {/if}
+          </p>
         </div>
       {:else if publishError}
         <div class="pt-2 border-t" style="border-color: rgba(239,68,68,0.2);">

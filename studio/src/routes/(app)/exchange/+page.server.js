@@ -14,10 +14,13 @@ export async function load({ locals }) {
       release_type, track_count, disc_count, total_duration_ms,
       featured_artists, compilation_artists, explicit, package_size,
       edition_type, edition_name, edition_size, price, currency,
-      acquired_count, votes, cover_path, status,
+      acquired_count, votes, cover_path, status, slug, artist_slug, visibility,
       tracks (id, position, disc_number, track_number, title, primary_artist, featured_artists, explicit, hidden)
     `)
     .eq('status', 'published')
+    // Unlisted releases are published and reachable by their link; keeping
+    // them off the shelves is the whole meaning of the setting.
+    .eq('visibility', 'public')
     .order('votes', { ascending: false });
 
   // A swallowed error here rendered as "No releases yet", which is a lie the
@@ -35,7 +38,7 @@ export async function load({ locals }) {
   });
   const { data: resaleRows, error: resaleError } = await admin
     .from('acquisitions')
-    .select('id, edition_number, currency, releases(id, artist_name, title, release_type, track_count, disc_count, edition_type, edition_name, edition_size, cover_path)')
+    .select('id, edition_number, currency, releases(id, artist_name, title, release_type, track_count, disc_count, edition_type, edition_name, edition_size, cover_path, slug, artist_slug)')
     .eq('accepting_offers', true)
     .order('acquired_at', { ascending: false })
     .limit(50);
@@ -52,6 +55,9 @@ export async function load({ locals }) {
     edition_type: row.releases?.edition_type ?? '',
     edition_name: row.releases?.edition_name ?? '',
     edition_size: row.releases?.edition_size ?? null,
+    drop_path: row.releases?.artist_slug && row.releases?.slug
+      ? `/drop/${row.releases.artist_slug}/${row.releases.slug}`
+      : null,
   }));
 
   if (resaleError) console.error('[exchange] resale listing failed:', resaleError);

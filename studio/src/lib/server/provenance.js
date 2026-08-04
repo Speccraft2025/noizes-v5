@@ -23,6 +23,19 @@ import { verifySignature } from './crypto-verify.js';
 // outside this set (db id, created timestamps we don't attest, etc.) is NOT
 // part of the hash. Keep this list stable across versions — changing it
 // changes every hash.
+/**
+ * Edition number reserved for the release's OWN chain, as distinct from the
+ * chain of any one copy.
+ *
+ * A release is created and published before a single copy exists, and that
+ * history belongs to the work rather than to whoever happens to buy number 7.
+ * Copy chains use null (open editions) or 1..N (numbered ones) — allocation
+ * starts at 1, see editionCandidates — so 0 can never collide with a copy
+ * while still getting the unique(release_id, edition_number, seq) constraint's
+ * append-only and concurrency guarantees for free.
+ */
+export const RELEASE_CHAIN_EDITION = 0;
+
 const EVENT_FIELDS = [
   'release_id',
   'edition_number',

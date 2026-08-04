@@ -7,6 +7,7 @@ import JSZip from 'jszip';
 import { signHash } from '$lib/server/signing.js';
 import { validateNzArchive } from '$lib/domain/package-validation.js';
 import { findPublishSchemaError, publishSchemaMessage } from '$lib/server/publish-schema.js';
+import { PACKAGE_BUCKET, COVER_BUCKET } from '$lib/server/storage.js';
 import { finalizePublication, PublishError } from '$lib/server/publish-release.js';
 import { summarizeExperience } from '$lib/domain/drop-contents.js';
 
@@ -44,24 +45,27 @@ export async function POST({ request, locals }) {
   // publish paths under another user's prefix.
   const basePath = `${locals.user.id}/${releaseId}`;
 
-  const { data: objects, error: listErr } = await sb.storage.from('releases').list(basePath);
+  // The package and the cover now live in different buckets — private and
+  // public respectively — so each is confirmed where it actually belongs.
+  const [{ data: packageObjects, error: listErr }, { data: coverObjects, error: coverListErr }] = await Promise.all([
+    sb.storage.from(PACKAGE_BUCKET).list(basePath),
+    sb.storage.from(COVER_BUCKET).list(basePath),
+  ]);
   if (listErr) throw error(500, `Storage list failed: ${listErr.message}`);
-  const names = (objects || []).map(o => o.name);
+  if (coverListErr) throw error(500, `Cover storage list failed: ${coverListErr.message}`);
 
-  if (!names.includes('package.nz')) {
+  if (!(packageObjects || []).some((object) => object.name === 'package.nz')) {
     throw error(400, 'package.nz not found in storage — upload it via upload-urls before finalizing');
   }
   const nz_path = `${basePath}/package.nz`;
-  const audioName = names.find(n => n.startsWith('audio.'));
-  const coverName = names.find(n => n.startsWith('cover.'));
-  const audio_path = audioName ? `${basePath}/${audioName}` : null;
+  const coverName = (coverObjects || []).map((object) => object.name).find((name) => name.startsWith('cover.'));
   const cover_path = coverName ? `${basePath}/${coverName}` : null;
 
   // Re-derive the integrity hash from the audio inside the package (the
   // validator hashes the zip's audio/ entry — never trust the client's
   // declared hash), sign it with the creator's custodial key, and embed the
   // finalized record in the package.
-  const { data: nzBlob, error: dlErr } = await sb.storage.from('releases').download(nz_path);
+  const { data: nzBlob, error: dlErr } = await sb.storage.from(PACKAGE_BUCKET).download(nz_path);
   if (dlErr) throw error(500, `.nz download failed: ${dlErr.message}`);
 
   let nzBytes = Buffer.from(await nzBlob.arrayBuffer());
@@ -154,7 +158,7 @@ export async function POST({ request, locals }) {
     // describes the manifest that shipped.
     const nzBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
-    const { error: upErr } = await sb.storage.from('releases').upload(nz_path, nzBuffer, {
+    const { error: upErr } = await sb.storage.from(PACKAGE_BUCKET).upload(nz_path, nzBuffer, {
       contentType: 'application/zip',
       upsert: true
     });
@@ -226,7 +230,7 @@ export async function POST({ request, locals }) {
       price: parseFloat(meta.price) || 0,
       currency: meta.currency,
       cover_path,
-      audio_path,
+      audio_path: null,
       nz_path,
   };
 

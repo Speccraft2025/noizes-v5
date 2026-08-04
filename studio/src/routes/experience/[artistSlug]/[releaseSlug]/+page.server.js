@@ -5,6 +5,12 @@ import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 
 import { resolveDropAddress, bumpDropAnalytics } from '$lib/server/drop-page.js';
 import { dropPath } from '$lib/domain/drop-slug.js';
+import { signedPackageUrl } from '$lib/server/storage.js';
+
+// The viewer fetches the whole package before it can start, so this window has
+// to cover a large download beginning on a slow connection — longer than the
+// download endpoint's, which hands off to the browser immediately.
+const EXPERIENCE_URL_TTL_SECONDS = 300;
 
 // The web viewer for a published release.
 //
@@ -33,11 +39,28 @@ export async function load({ params, locals, url }) {
     throw error(409, 'This release has no package to open yet.');
   }
 
-  // The package URL is public — the releases bucket is public, and the .nz is
-  // meant to be portable — so the viewer streams it directly. Entitlement
-  // gates the *download endpoint's* named file, not this playback convenience.
-  const { data: object } = sb.storage.from('releases').getPublicUrl(release.nz_path);
-  if (!object?.publicUrl) throw error(500, 'The package location could not be resolved.');
+  // Opening the experience is deliberately not entitlement-gated: previewing
+  // the release is what makes a Drop Page worth sharing, and the spec offers
+  // "Preview experience" to visitors who do not own a copy. So this route will
+  // mint a package URL for anyone who can see the release.
+  //
+  // Be precise about what that does and does not buy. It is NOT secrecy of the
+  // audio — a determined visitor can load this page and take the bytes, and
+  // that is the intended product behaviour. What the private bucket buys is
+  // everything else: packages are no longer enumerable by guessing two UUIDs,
+  // links cannot be hotlinked or pasted to outlive the session, and — most
+  // importantly — a package belonging to a DRAFT or withdrawn release is no
+  // longer reachable at all, which under the public bucket it always was.
+  //
+  // The status checks above are what decide whether a URL gets minted; this
+  // call is what makes that decision load-bearing.
+  let packageUrl;
+  try {
+    packageUrl = await signedPackageUrl(sb, release.nz_path, { expiresIn: EXPERIENCE_URL_TTL_SECONDS });
+  } catch (cause) {
+    console.error(`[experience] could not sign package for ${release.id}: ${cause.message}`);
+    throw error(500, 'The package location could not be resolved.');
+  }
 
   await bumpDropAnalytics(sb, release.id, 'experience_open');
 
@@ -50,7 +73,7 @@ export async function load({ params, locals, url }) {
       slug: release.slug,
       experience_entry: release.experience_entry || 'experience.html',
     },
-    packageUrl: object.publicUrl,
+    packageUrl,
     dropPath: dropPath(release.artist_slug, release.slug),
   };
 }

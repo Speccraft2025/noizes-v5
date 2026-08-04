@@ -66,10 +66,18 @@ export async function GET({ params, locals }) {
     editionNumber,
   });
 
-  const { data } = sb.storage.from('releases').getPublicUrl(release.nz_path, { download: filename });
-  if (!data?.publicUrl) throw error(500, 'The download URL could not be resolved.');
+  // The entitlement verdict above is the only thing standing between a visitor
+  // and this URL, so the URL has to be one that cannot be reached any other
+  // way: signed, short-lived, into the private package bucket.
+  let url;
+  try {
+    url = await signedPackageUrl(sb, release.nz_path, { download: filename });
+  } catch (cause) {
+    console.error(`[drop] could not sign download for ${release.id}: ${cause.message}`);
+    throw error(500, 'The download URL could not be resolved.');
+  }
 
   await bumpDropAnalytics(sb, release.id, 'download');
 
-  return json({ url: data.publicUrl, filename, entitlement: verdict.reason });
+  return json({ url, filename, entitlement: verdict.reason });
 }

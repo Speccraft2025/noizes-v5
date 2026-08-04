@@ -42,6 +42,10 @@ import { summarizeExperience } from '../src/lib/domain/drop-contents.js';
 import { validateNzArchive } from '../src/lib/domain/package-validation.js';
 import { verifySignature } from '../src/lib/server/crypto-verify.js';
 
+// Packages live in the private bucket; this script reads them with the service
+// role, which bypasses RLS by design.
+const PACKAGE_BUCKET = 'release-packages';
+
 function loadEnvFile() {
   const path = fileURLToPath(new URL('../.env', import.meta.url));
   const out = {};
@@ -114,7 +118,7 @@ async function readJson(zip, path) {
 async function backfill(release) {
   if (!release.nz_path) return { skipped: 'no package in storage' };
 
-  const { data: blob, error: downloadError } = await sb.storage.from('releases').download(release.nz_path);
+  const { data: blob, error: downloadError } = await sb.storage.from(PACKAGE_BUCKET).download(release.nz_path);
   if (downloadError) throw new Error(`download failed: ${downloadError.message}`);
 
   const bytes = Buffer.from(await blob.arrayBuffer());

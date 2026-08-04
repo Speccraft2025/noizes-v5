@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
  *
  * Two failures motivate this. A plain `git add` on a newly dropped-in
  * subproject once staged 980 files and 95 MB of Gradle output, because the
- * ignore file named none of the four apps in here. And while fixing that, a
+ * ignore file named none of the apps in here. And while fixing that, a
  * blanket `build/` rule was nearly added — which would have silently dropped
  * noizes-gallery-pwa/build/sites-vite-plugin.ts, a source file its
  * vite.config imports, from the index.
@@ -73,7 +73,8 @@ describe('ignore rules do not hide real work', () => {
 
   it('keeps .env.example while ignoring real .env files', () => {
     expect(isIgnored('studio/.env.example')).toBe(false);
-    expect(isIgnored('beatsunlimited-app/.env.example')).toBe(false);
+    // The contract has to hold beyond the app that happens to have one today.
+    expect(isIgnored('noizes-gallery-android/.env.example')).toBe(false);
     expect(isIgnored('studio/.env')).toBe(true);
     expect(isIgnored('studio/.env.local')).toBe(true);
   });
@@ -83,7 +84,6 @@ describe('ignore rules catch generated output', () => {
   it('ignores dependencies and build output in every existing subproject', () => {
     const cases = [
       'studio/node_modules/x.js',
-      'beatsunlimited-app/node_modules/x.js',
       'noizes-gallery-pwa/node_modules/x.js',
       'noizes-gallery-pwa/dist/server/index.js',
       'noizes-gallery-pwa/.vinext/state.json',

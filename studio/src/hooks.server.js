@@ -61,7 +61,8 @@ export async function handle({ event, resolve }) {
       throw redirect(303, '/auth/login?notice=not_invited');
     }
   }
-  // Preserve query params (e.g. the beatsunlimited deal handoff) through login
+  // Preserve query params through login — a deep link that carries state in
+  // its query string must survive the auth round trip, not arrive stripped.
   const nextTarget = encodeURIComponent(path + event.url.search);
 
   // Guard creator-only routes

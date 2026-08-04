@@ -1,4 +1,6 @@
 <script>
+  import { describeVerificationStatus } from '$lib/domain/drop-contents.js';
+
   // Authenticity here means one specific, checkable thing: the creator signed
   // a hash of the package's component inventory, and the signature verifies.
   // It is not a claim about who owns the copyright, and the page says so —
@@ -15,8 +17,11 @@
     return text.length > head + tail + 1 ? `${text.slice(0, head)}…${text.slice(-tail)}` : text;
   }
 
-  $: signed = Boolean(authenticity?.signed);
-  $: validated = packageRecord?.validation_status === 'valid';
+  // Derived in $lib/domain/drop-contents.js so the trust strip and this panel
+  // cannot drift into disagreeing about the same package.
+  $: ({ signature, validation } = describeVerificationStatus({ authenticity, packageRecord }));
+
+  const TONE = { good: '#7B5CF0', bad: '#F0A0A0', unknown: 'var(--ink-muted)' };
   $: rows = [
     ['Release ID', release.id, release.id],
     ['Package ID', packageRecord?.id, packageRecord?.id],
@@ -41,17 +46,23 @@
     <!-- Status is stated in words and backed by an icon, never by colour
          alone. -->
     <div class="flex flex-wrap gap-3">
-      <p class="inline-flex items-center gap-2 text-sm font-bold"
-        style="color: {signed ? '#7B5CF0' : 'var(--ink-muted)'};">
-        <span aria-hidden="true">{signed ? '◈' : '○'}</span>
-        {signed ? 'Signed by the creator' : 'Not signed'}
-      </p>
-      <p class="inline-flex items-center gap-2 text-sm font-bold"
-        style="color: {validated ? '#7B5CF0' : 'var(--ink-muted)'};">
-        <span aria-hidden="true">{validated ? '◎' : '○'}</span>
-        {validated ? 'Package validated' : 'Package not validated'}
-      </p>
+      {#each [signature, validation] as status}
+        <p class="inline-flex items-center gap-2 text-sm font-bold" style="color: {TONE[status.tone]};">
+          <span aria-hidden="true">{status.icon}</span>
+          {status.label}
+        </p>
+      {/each}
     </div>
+
+    {#if validation.tone === 'bad'}
+      <!-- A failed check is worth a sentence, not just a label: the reader's
+           next question is whether the object is safe to acquire. -->
+      <p class="text-xs leading-relaxed rounded-xl px-4 py-3"
+        style="background: rgba(240,160,160,.07); border: 1px solid rgba(240,160,160,.2); color: var(--ink-secondary);">
+        This package did not pass every structural check. Its contents and signature are recorded above and can still be
+        inspected, but it is not certified as a clean Noizes package. Ask the creator to republish it before relying on it.
+      </p>
+    {/if}
 
     {#if rows.length}
       <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-2.5">

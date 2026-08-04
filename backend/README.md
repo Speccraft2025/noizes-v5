@@ -7,7 +7,14 @@ For a new project, run these files in the Supabase SQL Editor in this order:
 1. `supabase_schema.sql`
 2. `provenance-resale-2026-07-26.sql`
 3. `multi-track-phase-1-2026-07-31.sql`
-4. Any later dated hardening scripts not already folded into the base schema
+4. `drop-pages-2026-08-03.sql`
+5. Any later dated hardening scripts not already folded into the base schema
+
+`drop-pages-2026-08-03.sql` adds Drop Page routing, package version history,
+the authenticity index, creator links and aggregate analytics. It backfills a
+permanent address for every release published before it ran, so no existing
+release loses its page. Until it is applied, Drop Pages report a fault and the
+Exchange is empty — it filters on `visibility`. See `studio/DROP_PAGES.md`.
 
 `multi-track-phase-1-2026-07-31.sql` creates the normalized release/track/audio-version/audio-asset foundation and safely converts existing release rows to one-track Singles. It does not change acquisition semantics: an acquisition remains one authenticated copy of a complete release edition.
 

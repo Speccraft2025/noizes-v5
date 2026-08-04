@@ -7,6 +7,8 @@ import JSZip from 'jszip';
 import { signHash } from '$lib/server/signing.js';
 import { validateNzArchive } from '$lib/domain/package-validation.js';
 import { findPublishSchemaError, publishSchemaMessage } from '$lib/server/publish-schema.js';
+import { finalizePublication, PublishError } from '$lib/server/publish-release.js';
+import { summarizeExperience } from '$lib/domain/drop-contents.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -62,7 +64,8 @@ export async function POST({ request, locals }) {
   const { data: nzBlob, error: dlErr } = await sb.storage.from('releases').download(nz_path);
   if (dlErr) throw error(500, `.nz download failed: ${dlErr.message}`);
 
-  const zip = await JSZip.loadAsync(Buffer.from(await nzBlob.arrayBuffer()));
+  let nzBytes = Buffer.from(await nzBlob.arrayBuffer());
+  const zip = await JSZip.loadAsync(nzBytes);
   const packageValidation = await validateNzArchive(zip);
   if (!packageValidation.valid) {
     const failed = packageValidation.checks.find((check) => check.status === 'fail');
@@ -71,10 +74,13 @@ export async function POST({ request, locals }) {
   let packageManifest = null;
   let packageCredits = {};
   let declaredComponents = [];
+  let manifestHash = null;
   const manifestEntry = zip.file('manifest.json');
   if (manifestEntry) {
+    const manifestBytes = await manifestEntry.async('nodebuffer');
+    manifestHash = nodeCrypto.createHash('sha256').update(manifestBytes).digest('hex');
     try {
-      packageManifest = JSON.parse(await manifestEntry.async('string'));
+      packageManifest = JSON.parse(manifestBytes.toString('utf8'));
       declaredComponents = packageManifest.components || [];
     } catch {
       throw error(400, 'Package manifest.json is not valid JSON');
@@ -100,6 +106,7 @@ export async function POST({ request, locals }) {
           || path.startsWith('release/audio/')
         )
       );
+  let signedAuthenticity = null;
   if (inventoryEntries.length) {
     const components = [];
     for (const path of [...new Set(inventoryEntries)].sort()) {
@@ -122,7 +129,7 @@ export async function POST({ request, locals }) {
     const hash = nodeCrypto.createHash('sha256').update(inventory).digest('hex');
     const { signature, publicKey } = await signHash(sb, locals.user.id, Buffer.from(hash, 'hex'));
 
-    const signedAuthenticity = {
+    signedAuthenticity = {
       method: 'sha256-component-inventory',
       hash,
       components,
@@ -142,6 +149,9 @@ export async function POST({ request, locals }) {
     if (zip.file('experience.html')) {
       zip.file('experience.html', updateExperienceAuthenticity(await zip.file('experience.html').async('string'), signedAuthenticity));
     }
+    // The manifest is rewritten only through the packager; the signing step
+    // adds authenticity.json, so the manifest hash recorded below still
+    // describes the manifest that shipped.
     const nzBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
     const { error: upErr } = await sb.storage.from('releases').upload(nz_path, nzBuffer, {
@@ -149,13 +159,43 @@ export async function POST({ request, locals }) {
       upsert: true
     });
     if (upErr) throw error(500, `.nz upload failed: ${upErr.message}`);
+    nzBytes = nzBuffer;
   }
 
-  const { data: release, error: dbErr } = await sb
-    .from('releases')
-    .upsert({
-      id: releaseId,
-      artist_id: locals.user.id,
+  // Hashed AFTER the signature is embedded, so this identifies the exact bytes
+  // a collector downloads rather than an intermediate build nobody ever holds.
+  const packageHash = nodeCrypto.createHash('sha256').update(nzBytes).digest('hex');
+
+  // Parsed once, used by both the experience summary below and the normalized
+  // inventory written during publication.
+  const trackRecords = [];
+  for (const path of Object.keys(zip.files).filter((name) => /^tracks\/[^/]+\/track\.json$/.test(name)).sort()) {
+    try {
+      trackRecords.push(JSON.parse(await zip.files[path].async('string')));
+    } catch {
+      throw error(400, `Invalid track record: ${path}`);
+    }
+  }
+
+  // The Drop Page must be able to describe the experience without opening a
+  // package that may be hundreds of megabytes, so the handful of facts it
+  // needs are distilled here, once, at publish.
+  let experienceDoc = {};
+  const experienceEntry = zip.file('experience.json');
+  if (experienceEntry) {
+    try {
+      experienceDoc = JSON.parse(await experienceEntry.async('string'));
+    } catch {
+      throw error(400, 'Package experience.json is not valid JSON');
+    }
+  }
+  const experienceSummary = summarizeExperience(experienceDoc, trackRecords);
+
+  // One staged, idempotent publication: release row (invisible until the last
+  // step), Drop Page address, package version, authenticity record, provenance
+  // chain, then visibility. A failure anywhere leaves a draft, never a
+  // half-published release on the Exchange.
+  const releaseRow = {
       artist_name: meta.artist || 'Various Artists',
       title: meta.title,
       release_type: meta.release_type || 'single',
@@ -175,7 +215,7 @@ export async function POST({ request, locals }) {
       disc_count: Number(meta.disc_count) || 1,
       total_duration_ms: Number(meta.total_duration_ms) || 0,
       explicit: Boolean(meta.explicit),
-      package_size: Number(meta.package_size) || nzBlob.size || 0,
+      package_size: nzBytes.byteLength || Number(meta.package_size) || 0,
       genre: meta.genre,
       year: meta.year,
       location: meta.location,
@@ -188,26 +228,43 @@ export async function POST({ request, locals }) {
       cover_path,
       audio_path,
       nz_path,
-      status: 'published',
-    }, { onConflict: 'id' })
-    .select()
-    .single();
+  };
 
-  if (dbErr) throw error(500, `DB insert failed: ${dbErr.message}`);
+  let publication;
+  try {
+    publication = await finalizePublication(sb, {
+      releaseId,
+      artistId: locals.user.id,
+      releaseRow,
+      packageFacts: {
+        storagePath: nz_path,
+        filename: `${meta.title}.nz`,
+        fileSize: nzBytes.byteLength,
+        manifest: packageManifest ?? {},
+        manifestHash,
+        packageHash,
+        packageVersion: packageManifest?.noizes_version ?? null,
+        experienceEntry: packageManifest?.experience?.entry || 'experience.html',
+        experienceSummary,
+        validationStatus: packageValidation.valid ? 'valid' : 'invalid',
+      },
+      authenticity: signedAuthenticity,
+      // Runs while the release is still invisible: an Exchange card that
+      // appears before its tracklist has been written is a release nobody can
+      // describe, and briefly a purchasable one.
+      onStaged: writeNormalizedInventory,
+    });
+  } catch (cause) {
+    if (cause instanceof PublishError) throw error(cause.status, cause.message);
+    throw cause;
+  }
+  const release = publication.release;
 
   // The package manifest and track.json records are authoritative. Replace the
   // normalized rows from the service-role publish boundary; acquisitions
   // remain linked only to the complete release row.
+  async function writeNormalizedInventory() {
   if (packageManifest?.package_type === 'music_release') {
-    const trackRecords = [];
-    for (const path of Object.keys(zip.files).filter((name) => /^tracks\/[^/]+\/track\.json$/.test(name)).sort()) {
-      try {
-        trackRecords.push(JSON.parse(await zip.files[path].async('string')));
-      } catch {
-        throw error(400, `Invalid track record: ${path}`);
-      }
-    }
-
     // Clear release-scoped audio explicitly before replacing tracks. Track
     // deletion cascades track versions/assets, but intentionally cannot remove
     // a continuous release master. This also makes re-publish idempotent.
@@ -293,6 +350,14 @@ export async function POST({ request, locals }) {
       if (assetErr) throw error(500, `Could not publish audio assets: ${assetErr.message}`);
     }
   }
+  }
 
-  return json({ success: true, release_id: release.id });
+  return json({
+    success: true,
+    release_id: release.id,
+    // The creator's destination after publishing: their release's permanent
+    // public address, ready to share.
+    drop_path: publication.dropPath,
+    package_version: publication.packageRecord.version,
+  });
 }

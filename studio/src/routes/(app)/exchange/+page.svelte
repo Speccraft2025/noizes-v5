@@ -96,6 +96,16 @@
     const minutes = Math.round((Number(ms) || 0) / 60000);
     return minutes ? `${minutes} min` : '';
   }
+
+  // Every card leads to the release's Drop Page — its permanent public
+  // address, and the thing people share. Releases published before Drop Pages
+  // existed are backfilled by the migration; the fallback keeps a card
+  // clickable rather than dead if one is ever missing.
+  function dropHref(release) {
+    return release.artist_slug && release.slug
+      ? `/drop/${release.artist_slug}/${release.slug}`
+      : null;
+  }
 </script>
 
 <div class="max-w-7xl mx-auto px-6 py-8">
@@ -124,7 +134,13 @@
           {@const color = colors[i % colors.length]}
           <article class="glass rounded-xl p-5">
             <p class="text-xs font-bold uppercase tracking-widest" style="color: {color};">{item.artist_name}</p>
-            <h3 class="text-lg font-black text-white">{item.title}</h3>
+            <h3 class="text-lg font-black text-white">
+              {#if item.drop_path}
+                <a href={item.drop_path} class="hover:underline">{item.title}</a>
+              {:else}
+                {item.title}
+              {/if}
+            </h3>
             <p class="text-xs mt-1 mb-4" style="color: var(--ink-muted);">
               {formatType(item.release_type)} · {item.track_count || 1} track{item.track_count === 1 ? '' : 's'} · {item.edition_name || item.edition_type}{item.edition_number ? ` #${item.edition_number}` : ''}{item.edition_size ? ` / ${item.edition_size}` : ''}
             </p>
@@ -165,7 +181,15 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           {#each featured as ed, i}
             {@const color = colors[i % 6]}
-            <div class="glass rounded-2xl overflow-hidden group cursor-pointer transition-all duration-300" style="border-color: {color}30;">
+            <div class="glass rounded-2xl overflow-hidden group relative transition-all duration-300" style="border-color: {color}30;">
+              {#if dropHref(ed)}
+                <!-- Covers the card so the artwork, title and metadata are all
+                     one link, while the Acquire button below stays above it
+                     and keeps its own action. -->
+                <a href={dropHref(ed)} class="absolute inset-0 z-10">
+                  <span class="sr-only">Open the drop page for {ed.title} by {ed.artist_name}</span>
+                </a>
+              {/if}
               <div class="w-full aspect-square relative flex items-end p-5"
                 style="background: radial-gradient(ellipse at top, {color}30 0%, transparent 70%), var(--charcoal);">
                 <div class="absolute inset-0 flex items-center justify-center">
@@ -186,7 +210,7 @@
                     {ed.edition_name || ed.edition_type} · {available(ed) !== null ? `${available(ed)} left` : 'Open edition'}
                   </p>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 relative z-20">
                   <span class="text-sm font-black text-white">{fmt(ed.price, ed.currency)}</span>
                   <button
                     class="btn-spectral py-1.5 px-4 text-xs rounded-full disabled:opacity-40"
@@ -209,11 +233,16 @@
         {#each feed as ed, i}
           {@const color = colors[i % 6]}
           {@const avail = available(ed)}
-          <div class="glass rounded-xl p-4 group cursor-pointer transition-all duration-200" style="border-color: rgba(255,255,255,0.06);">
+          <div class="glass rounded-xl p-4 group relative transition-all duration-200" style="border-color: rgba(255,255,255,0.06);">
+            {#if dropHref(ed)}
+              <a href={dropHref(ed)} class="absolute inset-0 z-10">
+                <span class="sr-only">Open the drop page for {ed.title} by {ed.artist_name}</span>
+              </a>
+            {/if}
             <div class="flex items-center gap-3">
 
-              <div class="flex flex-col items-center shrink-0 w-8">
-                <button class="text-xs font-black leading-none" style="color: var(--ink-muted);">▲</button>
+              <div class="flex flex-col items-center shrink-0 w-8 relative z-20">
+                <button class="text-xs font-black leading-none" style="color: var(--ink-muted);" aria-label="Upvote {ed.title}">▲</button>
                 <span class="text-xs font-black text-white mt-0.5">{ed.votes ?? 0}</span>
               </div>
 
@@ -231,7 +260,7 @@
                 {/if}
               </div>
 
-              <div class="shrink-0 text-right">
+              <div class="shrink-0 text-right relative z-20">
                 <p class="text-sm font-black text-white">{fmt(ed.price, ed.currency)}</p>
                 <button
                   class="mt-1.5 text-xs font-semibold px-3 py-1 rounded-full disabled:opacity-40"

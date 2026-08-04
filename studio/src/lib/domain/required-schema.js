@@ -10,20 +10,33 @@
  * a health endpoint, or a test without dragging the app in with it.
  */
 
+const MULTI_TRACK = 'multi-track-phase-1-2026-07-31.sql';
+const DROP_PAGES = 'drop-pages-2026-08-03.sql';
+
 /**
  * Tables the app cannot function without, each with the columns that a
  * migration is known to have added. Listing columns matters: a table can
  * exist while a later migration that widened it has not run, which is exactly
  * how `releases` looked while `release_type` was missing.
+ *
+ * Each column names its OWN migration. A table now accumulates columns from
+ * several scripts, and reporting "apply the multi-track migration" for a
+ * missing Drop Page column would send someone to run SQL that cannot fix it.
  */
 export const REQUIRED_SCHEMA = {
   releases: {
     migration: 'supabase_schema.sql',
     columns: [
       // Added by multi-track-phase-1. Their absence emptied the Exchange.
-      'release_type', 'track_count', 'disc_count', 'total_duration_ms',
-      'featured_artists', 'compilation_artists', 'explicit', 'package_size',
-      'genres', 'catalogue_number',
+      ['release_type', MULTI_TRACK], ['track_count', MULTI_TRACK],
+      ['disc_count', MULTI_TRACK], ['total_duration_ms', MULTI_TRACK],
+      ['featured_artists', MULTI_TRACK], ['compilation_artists', MULTI_TRACK],
+      ['explicit', MULTI_TRACK], ['package_size', MULTI_TRACK],
+      ['genres', MULTI_TRACK], ['catalogue_number', MULTI_TRACK],
+      // Added by drop-pages. Their absence breaks every shared Drop Page link
+      // and empties the Exchange, which now filters on visibility.
+      ['slug', DROP_PAGES], ['artist_slug', DROP_PAGES], ['visibility', DROP_PAGES],
+      ['published_at', DROP_PAGES], ['allow_public_download', DROP_PAGES],
     ],
   },
   acquisitions: { migration: 'supabase_schema.sql', columns: [] },
@@ -42,6 +55,14 @@ export const REQUIRED_SCHEMA = {
   tracks: { migration: 'multi-track-phase-1-2026-07-31.sql', columns: [] },
   audio_versions: { migration: 'multi-track-phase-1-2026-07-31.sql', columns: [] },
   audio_assets: { migration: 'multi-track-phase-1-2026-07-31.sql', columns: [] },
+
+  // Drop Pages: routing, package version history, authenticity index, links
+  // and aggregate counters.
+  release_slugs: { migration: DROP_PAGES, columns: [] },
+  release_packages: { migration: DROP_PAGES, columns: [] },
+  release_authenticity: { migration: DROP_PAGES, columns: [] },
+  release_links: { migration: DROP_PAGES, columns: [] },
+  drop_analytics: { migration: DROP_PAGES, columns: [] },
 };
 
 /** Postgres / PostgREST codes meaning "the schema is not what we expect". */
@@ -83,8 +104,8 @@ export function schemaProbes() {
   const probes = [];
   for (const [table, spec] of Object.entries(REQUIRED_SCHEMA)) {
     probes.push({ table, select: 'count', target: table, migration: spec.migration });
-    for (const column of spec.columns) {
-      probes.push({ table, select: column, target: `${table}.${column}`, migration: 'multi-track-phase-1-2026-07-31.sql' });
+    for (const [column, migration] of spec.columns) {
+      probes.push({ table, select: column, target: `${table}.${column}`, migration });
     }
   }
   return probes;

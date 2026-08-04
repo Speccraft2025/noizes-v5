@@ -2,14 +2,18 @@ import { json, error } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { signedPackageUrl } from '$lib/server/storage.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Returns a direct download URL for the .nz of an edition the caller owns.
-// Ownership-gated: only the current custodian gets the link. Bytes are served
-// straight from Supabase Storage (never proxied through this endpoint) so we
-// don't hit the SvelteKit/Netlify body-size ceiling. The ?download param makes
-// storage send Content-Disposition: attachment so the browser saves the file.
+// Returns a download URL for the .nz of an edition the caller owns.
+// Ownership-gated: only the current custodian gets a link, and the link is a
+// short-lived signed URL into the private package bucket — the check and the
+// bytes are the same gate now, where they used to be a check standing in front
+// of a permanently public object. Bytes are served straight from Supabase
+// Storage (never proxied through this endpoint) so we don't hit the
+// SvelteKit/Netlify body-size ceiling; the signed URL's download parameter
+// makes storage send Content-Disposition: attachment.
 export async function GET({ params, locals }) {
   if (!locals.user) throw error(401, 'Log in');
   const { acquisitionId } = params;
@@ -32,8 +36,15 @@ export async function GET({ params, locals }) {
   const ed = acq.edition_number == null ? '' : `_ed${acq.edition_number}`;
   const filename = `${base}${ed}.nz`;
 
-  const { data } = sb.storage.from('releases').getPublicUrl(nzPath, { download: filename });
-  if (!data?.publicUrl) throw error(500, 'Could not resolve download URL');
+  // Signed and short-lived. The ownership check above used to guard a public
+  // URL, which made it advisory — the bytes were reachable without it.
+  let signedUrl;
+  try {
+    signedUrl = await signedPackageUrl(sb, nzPath, { download: filename });
+  } catch (cause) {
+    console.error(`[collection] could not sign download for ${acq.id}: ${cause.message}`);
+    throw error(500, 'Could not resolve download URL');
+  }
 
   let eventQuery = sb.from('provenance_events')
     .select('seq, kind, price, currency, note, occurred_at')
@@ -52,7 +63,7 @@ export async function GET({ params, locals }) {
   ]);
 
   return json({
-    url: data.publicUrl,
+    url: signedUrl,
     filename,
     snapshot: {
       copy_id: acq.id,

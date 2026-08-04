@@ -110,7 +110,6 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           release_id: $identity.release_id,
-          audio_ext: ext(result.audioFile?.name),
           cover_ext: ext(result.coverFile?.name),
         }),
       });
@@ -131,9 +130,6 @@
 
       await putFile(uploads.nz, result.blob, 'application/zip');
       progress = 94;
-      if (uploads.audio && result.audioFile) {
-        await putFile(uploads.audio, result.audioFile, result.audioFile.type || 'audio/mpeg');
-      }
       if (uploads.cover && result.coverFile) {
         await putFile(uploads.cover, result.coverFile, result.coverFile.type || 'image/jpeg');
       }

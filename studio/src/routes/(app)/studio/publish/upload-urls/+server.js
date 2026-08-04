@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 import { findPublishSchemaError, publishSchemaMessage } from '$lib/server/publish-schema.js';
+import { PACKAGE_BUCKET, COVER_BUCKET } from '$lib/server/storage.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -20,7 +21,7 @@ export async function POST({ request, locals }) {
     throw error(403, 'Identity verification required before publishing. Complete KYC at /verify first.');
   }
 
-  const { release_id, audio_ext, cover_ext } = await request.json();
+  const { release_id, cover_ext } = await request.json();
   // releases.id is a uuid column; human-readable ids like "nz-123456" live in
   // the package manifest only.
   const releaseId = UUID_RE.test(release_id || '') ? release_id : crypto.randomUUID();
@@ -30,14 +31,25 @@ export async function POST({ request, locals }) {
   if (schemaFailure) throw error(503, publishSchemaMessage(schemaFailure));
   const basePath = `${locals.user.id}/${releaseId}`;
 
-  const targets = { nz: `${basePath}/package.nz` };
-  if (audio_ext) targets.audio = `${basePath}/audio.${safeExt(audio_ext)}`;
-  if (cover_ext) targets.cover = `${basePath}/cover.${safeExt(cover_ext)}`;
+  // The package goes to the private bucket; the cover stays public because
+  // og:image is fetched by social crawlers long after any signed URL expires.
+  //
+  // The primary audio master is deliberately NOT uploaded. It used to be
+  // written to `<base>/audio.<ext>` in the public bucket, where it sat as a
+  // 2.5MB unprotected copy of the paid master that no code ever read — the
+  // audio the experience plays comes from inside the .nz. An asset nothing
+  // consumes cannot justify the exposure, so the target is gone.
+  const targets = [
+    { key: 'nz', bucket: PACKAGE_BUCKET, path: `${basePath}/package.nz` },
+  ];
+  if (cover_ext) {
+    targets.push({ key: 'cover', bucket: COVER_BUCKET, path: `${basePath}/cover.${safeExt(cover_ext)}` });
+  }
 
   const uploads = {};
-  for (const [key, path] of Object.entries(targets)) {
+  for (const { key, bucket, path } of targets) {
     const { data, error: e } = await sb.storage
-      .from('releases')
+      .from(bucket)
       .createSignedUploadUrl(path, { upsert: true });
     if (e) throw error(500, `Could not create upload URL for ${key}: ${e.message}`);
     uploads[key] = { path, signedUrl: data.signedUrl };

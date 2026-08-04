@@ -18,8 +18,14 @@ create table if not exists public.schema_migrations (
   filename   text primary key,
   applied_at timestamptz not null default now()
 );
--- No policies: RLS on with none defined means only the service role reads it.
+-- Operational metadata: RLS on with no policies, and readable only by the
+-- service role. Collectors and creators have no business reading deployment
+-- history. The grant is required as well as the policy stance — PostgREST
+-- does not expose a table its roles hold no privileges on, and a ledger the
+-- API cannot see is a ledger nobody checks.
 alter table public.schema_migrations enable row level security;
+revoke all on public.schema_migrations from anon, authenticated;
+grant select, insert, update on public.schema_migrations to service_role;
 
 -- Base schema — the releases table is its foundation.
 insert into public.schema_migrations (filename)
@@ -82,8 +88,14 @@ create table if not exists public.schema_migrations (
   filename   text primary key,
   applied_at timestamptz not null default now()
 );
--- No policies: RLS on with none defined means only the service role reads it.
+-- Operational metadata: RLS on with no policies, and readable only by the
+-- service role. Collectors and creators have no business reading deployment
+-- history. The grant is required as well as the policy stance — PostgREST
+-- does not expose a table its roles hold no privileges on, and a ledger the
+-- API cannot see is a ledger nobody checks.
 alter table public.schema_migrations enable row level security;
+revoke all on public.schema_migrations from anon, authenticated;
+grant select, insert, update on public.schema_migrations to service_role;
 
 insert into public.schema_migrations (filename) values ('000-backfill-migration-ledger.sql')
   on conflict (filename) do update set applied_at = now();

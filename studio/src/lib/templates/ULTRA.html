@@ -75,13 +75,28 @@ window.NZ_CONFIG = {
 
 <style>
 :root{
+  /* Seed values only. The cover art overwrites every one of these at boot
+     (see "PALETTE" below) so the object wears the record's colours, not the
+     Noizes brand's. They are the fallback for a package with no artwork. */
   --primary:#7B5CF0; --accent:#F04BD8; --bg:#030303;
+  --primary-soft:rgba(123,92,240,.16);
+  --primary-glow:rgba(123,92,240,.42);
+  --on-primary:#ffffff;
   --surface:rgba(255,255,255,.04);
   --border:rgba(255,255,255,.08);
   --text:#f5f2ec; --muted:rgba(245,242,236,.45);
   --tab-h:0px;
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-t:env(safe-area-inset-top,0px);
+
+  /* ── MOTION ──
+     One easing vocabulary for the whole object. --ease-out is the house
+     curve: fast departure, long settle — the thing that reads as "premium"
+     rather than "animated". Nothing linear except progress fills. */
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --ease-in-out:cubic-bezier(.65,0,.35,1);
+  --ease-spring:cubic-bezier(.34,1.28,.42,1);
+  --t-fast:.26s; --t-mid:.55s; --t-slow:1.1s; --t-cine:1.6s;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{
@@ -128,14 +143,16 @@ html,body{
 .view{
   position:fixed;inset:0;
   opacity:0;pointer-events:none;
-  transition:opacity .3s;
+  transform:scale(1.015);filter:blur(6px);
+  transition:opacity var(--t-mid) var(--ease-out),transform var(--t-mid) var(--ease-out),filter var(--t-mid) var(--ease-out);
   z-index:5;
   overflow-y:auto;-webkit-overflow-scrolling:touch;
+  will-change:opacity,transform;
   /* default padding: safe top + tab bar */
   padding-top:calc(var(--safe-t) + 16px);
   padding-bottom:calc(var(--tab-h) + var(--safe-b) + 12px);
 }
-.view.active{opacity:1;pointer-events:all;}
+.view.active{opacity:1;pointer-events:all;transform:none;filter:none;}
 
 /* ── TAB BAR ── */
 .tabs{
@@ -161,144 +178,305 @@ html,body{
 .tab.active .tab-icon{text-shadow:0 0 14px var(--primary);}
 
 /* ═══════════════════════════════
-   VIEW 1: PLAYER
+   THE STAGE — playback and lyrics
+   are one screen, not two tabs. This
+   is the experience; everything else
+   is a room you visit and come back
+   from.
    ═══════════════════════════════ */
 #view-player{
-  display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
-  padding-left:28px;padding-right:28px;
-  padding-bottom:calc(var(--safe-b) + 24px);
+  display:block;overflow:hidden;
+  padding:0;
 }
+.stage{
+  position:absolute;inset:0;
+  display:grid;
+  grid-template-rows:minmax(0,1fr) auto;
+  padding:calc(var(--safe-t) + 74px) clamp(20px,5vw,44px) calc(var(--safe-b) + 18px);
+  gap:clamp(12px,2.4vh,26px);
+  transition:padding var(--t-mid) var(--ease-out);
+}
+.stage-main{
+  min-height:0;display:grid;gap:clamp(14px,3vh,34px);
+  grid-template-rows:minmax(0,auto) minmax(0,1fr);
+  align-content:center;justify-items:center;text-align:center;
+  transition:padding-bottom var(--t-mid) var(--ease-out);
+}
+/* A moment timed inside a track annotates the words rather than replacing
+   them, so the stage makes room for it instead of letting it land on top. */
+.stage[data-moment="on"] .stage-main{padding-bottom:clamp(92px,15vh,136px);}
+/* With lyrics the artwork yields the middle of the screen to the words.
+   Without them it takes the room back rather than leaving a hole. */
+.stage[data-lyrics="off"] .stage-main{grid-template-rows:minmax(0,1fr) auto;}
+.stage[data-lyrics="off"] .stage-lyrics{display:none;}
 
-/* Cover art thumbnail */
+.stage-art{min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:clamp(8px,1.6vh,16px);}
+
+/* Cover art */
 .p-cover-thumb{
-  width:min(68vw,52vh,560px);height:min(68vw,52vh,560px);border-radius:22px;
-  overflow:hidden;margin-bottom:22px;
-  box-shadow:0 32px 100px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.12),0 0 80px color-mix(in srgb,var(--primary) 22%,transparent);
-  flex-shrink:1;display:none; /* shown when src loads */
+  width:min(62vw,34vh,420px);aspect-ratio:1;border-radius:20px;
+  overflow:hidden;position:relative;
+  box-shadow:0 32px 100px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.1),0 0 90px var(--primary-soft);
+  /* Never shrink on one axis only — a squeezed square crops the sleeve. It
+     changes size by rule below, always staying square. */
+  flex-shrink:0;display:none; /* shown when src loads */
+  transition:width var(--t-slow) var(--ease-out),box-shadow var(--t-slow) var(--ease-out),transform var(--t-slow) var(--ease-out);
+  will-change:transform;
 }
+.stage[data-lyrics="off"] .p-cover-thumb{width:min(70vw,46vh,520px);}
+/* Room for an in-track moment comes out of the artwork, which returns to size
+   when the moment passes. */
+.stage[data-moment="on"] .p-cover-thumb{width:min(44vw,22vh,280px);}
+/* A breathing scale while the record plays — slow enough to feel like light
+   moving over a sleeve rather than an animation. */
+.p-cover-thumb.playing{animation:sleeveBreathe 9s var(--ease-in-out) infinite;}
+@keyframes sleeveBreathe{50%{transform:scale(1.018)}}
 .p-cover-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.p-cover-thumb:after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(150deg,rgba(255,255,255,.14),transparent 46%);
+  mix-blend-mode:overlay;
+}
 
-.p-artist{font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;overflow:hidden;}
+.p-artist{font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;overflow:hidden;}
 .p-artist span{display:block;}
 .p-title{
   font-family:'Bebas Neue',sans-serif;
-  font-size:clamp(34px,8vw,66px);line-height:.9;
-  letter-spacing:.01em;color:var(--text);margin-bottom:12px;
+  font-size:clamp(26px,5.4vw,52px);line-height:.92;
+  letter-spacing:.01em;color:var(--text);
 }
 .p-title-line{display:block;overflow:hidden;}
-.p-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;}
+.p-title-inner{display:block;animation:titleRise .85s var(--ease-out) both;}
+@keyframes titleRise{from{transform:translateY(105%)}to{transform:translateY(0)}}
+.p-chips{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-top:9px;}
 .chip{
   font-size:9px;letter-spacing:.14em;text-transform:uppercase;
   color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.15);
   padding:5px 12px;border-radius:99px;
 }
 
-/* Controls card */
-.p-controls{
-  display:flex;align-items:center;gap:16px;
-  background:rgba(255,255,255,.07);
-  border:1px solid rgba(255,255,255,.13);
-  border-radius:18px;padding:14px 16px;width:min(100%,620px);
-  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+/* ── Live lyric, centre stage ── */
+.stage-lyrics{
+  position:relative;min-height:0;width:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:clamp(6px,1.2vh,14px);overflow:hidden;
 }
-.btn-play-main{
-  width:52px;height:52px;border-radius:50%;
-  border:1.5px solid rgba(255,255,255,.85);background:rgba(255,255,255,.06);
-  color:var(--text);display:flex;align-items:center;justify-content:center;
-  cursor:pointer;flex-shrink:0;
-  transition:background .2s,transform .1s;
-  -webkit-tap-highlight-color:transparent;
-}
-.btn-play-main:active{transform:scale(.92);}
-.btn-play-main.playing{background:rgba(255,255,255,.1);}
-.btn-skip{width:34px;height:34px;flex-shrink:0;border:0;background:transparent;color:var(--muted);font-size:17px;cursor:pointer;}
-.btn-skip:disabled{opacity:.16;cursor:not-allowed;}
-.prog-outer{flex:1;cursor:pointer;padding:10px 0;touch-action:none;}
-.prog-track{height:2px;background:rgba(255,255,255,.18);border-radius:99px;position:relative;}
-.prog-fill{height:100%;background:#fff;border-radius:99px;width:0%;transition:width .1s linear;}
-.time-row{
-  display:flex;justify-content:space-between;margin-top:6px;
-  font-size:10px;letter-spacing:.04em;color:rgba(255,255,255,.28);
-}
-.btn-tone{
-  font-size:9px;letter-spacing:.12em;
-  border:1px solid var(--border);background:transparent;
-  color:var(--muted);padding:8px 14px;border-radius:99px;cursor:pointer;
-  -webkit-tap-highlight-color:transparent;white-space:nowrap;
-}
-.playback-options{display:flex;gap:8px;margin-top:10px;width:min(100%,620px);justify-content:flex-end;}
-.playback-option{display:none;border:1px solid var(--border);background:rgba(255,255,255,.035);color:var(--muted);border-radius:99px;padding:7px 11px;font:600 9px/1 inherit;letter-spacing:.11em;text-transform:uppercase;cursor:pointer;}
-.playback-option.on{color:var(--primary);border-color:var(--primary);background:color-mix(in srgb,var(--primary) 12%,transparent);}
-
-/* ═══════════════════════════════
-   VIEW 2: LYRICS
-   ═══════════════════════════════ */
-#view-lyrics{display:flex;flex-direction:column;}
-
-.lyrics-header{
-  padding:0 28px 16px;
-  border-bottom:1px solid var(--border);
-  flex-shrink:0;
-}
-.lyrics-header h2{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--text);}
-.lyrics-header p{font-size:11px;color:var(--muted);margin-top:2px;}
-
-.lyrics-stage{
-  flex-shrink:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  padding:32px 28px 24px;position:relative;overflow:hidden;
-  min-height:220px;
-}
-.lyric-prev{
-  font-size:clamp(14px,3.5vw,18px);color:rgba(245,242,236,.18);
-  text-align:center;line-height:1.4;margin-bottom:14px;
-  transition:all .4s ease;font-weight:300;
-  max-width:90%;
+.stage-lyrics>*{position:relative;z-index:1;}
+.lyric-prev,.lyric-next{
+  font-size:clamp(13px,3vw,17px);color:rgba(245,242,236,.2);
+  text-align:center;line-height:1.45;font-weight:300;max-width:90%;
+  transition:opacity var(--t-mid) var(--ease-out),transform var(--t-mid) var(--ease-out);
 }
 .lyric-current{
   font-family:'Bebas Neue',sans-serif;
-  font-size:clamp(30px,8vw,64px);
+  font-size:clamp(28px,6.4vw,58px);
   color:var(--text);text-align:center;
-  line-height:1.0;letter-spacing:.01em;
-  text-shadow:0 0 30px color-mix(in srgb,var(--primary) 50%,transparent);
-  transition:all .3s cubic-bezier(.32,.72,0,1);
-  padding:8px 0;max-width:95%;
+  line-height:1.02;letter-spacing:.01em;
+  text-shadow:0 0 40px var(--primary-glow);
+  padding:6px 0;max-width:95%;
 }
-.lyric-next{
-  font-size:clamp(14px,3.5vw,18px);color:rgba(245,242,236,.18);
-  text-align:center;line-height:1.4;margin-top:14px;
-  transition:all .4s ease;font-weight:300;max-width:90%;
+/* Each new line arrives from below through a blur, so the sync reads as the
+   words landing on the beat rather than text being swapped. */
+.lyric-current.turn{animation:lyricTurn .62s var(--ease-out) both;}
+@keyframes lyricTurn{
+  0%{opacity:0;transform:translateY(20px) scale(.985);filter:blur(9px)}
+  60%{opacity:1;filter:blur(0)}
+  100%{opacity:1;transform:none;filter:blur(0)}
 }
+.stage-lyrics.turn .lyric-prev{animation:lyricDriftUp .62s var(--ease-out) both;}
+.stage-lyrics.turn .lyric-next{animation:lyricDriftUp .62s var(--ease-out) both;}
+@keyframes lyricDriftUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .lyric-bg-char{
-  position:absolute;
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   font-family:'Bebas Neue',sans-serif;
-  font-size:42vw;color:rgba(123,92,240,.04);
+  font-size:min(46vw,52vh);color:color-mix(in srgb,var(--primary) 5%,transparent);
   pointer-events:none;user-select:none;z-index:0;line-height:1;
-}
-.lyrics-stage>*{position:relative;z-index:1;}
-
-/* Progress bar in lyrics view */
-.lyrics-progress-bar{
-  flex-shrink:0;height:2px;background:rgba(255,255,255,.08);
-  margin:0;position:relative;
-}
-.lyrics-progress-fill{
-  height:100%;background:var(--primary);width:0%;
-  transition:width .1s linear;
+  transition:opacity var(--t-slow) var(--ease-out);
 }
 
-.lyrics-list{
-  flex:1;padding:0 28px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+/* ── Transport ── */
+.transport{
+  width:min(100%,720px);margin:0 auto;
+  display:flex;flex-direction:column;gap:11px;
+  padding:15px clamp(14px,3vw,20px) 14px;
+  border-radius:24px;
+  background:linear-gradient(150deg,rgba(255,255,255,.085),rgba(255,255,255,.035));
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 26px 70px rgba(0,0,0,.5);
+  backdrop-filter:blur(26px) saturate(1.2);-webkit-backdrop-filter:blur(26px) saturate(1.2);
 }
+.version-switch{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;}
+.prog-outer{cursor:pointer;padding:8px 0 2px;touch-action:none;}
+.prog-track{height:3px;background:rgba(255,255,255,.16);border-radius:99px;position:relative;}
+.prog-fill{
+  height:100%;border-radius:99px;width:0%;
+  background:linear-gradient(90deg,var(--primary),var(--accent));
+  box-shadow:0 0 16px var(--primary-glow);
+}
+.prog-knob{
+  position:absolute;top:50%;left:0;width:11px;height:11px;border-radius:50%;
+  background:#fff;box-shadow:0 0 14px var(--primary-glow),0 2px 6px rgba(0,0,0,.5);
+  transform:translate(-50%,-50%) scale(0);
+  transition:transform var(--t-fast) var(--ease-spring);pointer-events:none;
+}
+.prog-outer:hover .prog-knob,.prog-outer.scrubbing .prog-knob{transform:translate(-50%,-50%) scale(1);}
+.time-row{
+  display:flex;justify-content:space-between;margin-top:7px;
+  font:10px/1 monospace;font-variant-numeric:tabular-nums;letter-spacing:.04em;color:rgba(255,255,255,.32);
+}
+.transport-row{display:flex;align-items:center;justify-content:center;gap:clamp(14px,4vw,26px);}
+.btn-play-main{
+  width:60px;height:60px;border-radius:50%;
+  border:0;background:var(--primary);
+  color:var(--on-primary);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;position:relative;
+  box-shadow:0 12px 34px var(--primary-glow);
+  transition:transform var(--t-fast) var(--ease-spring),box-shadow var(--t-mid) var(--ease-out);
+  -webkit-tap-highlight-color:transparent;
+}
+.btn-play-main:hover{transform:scale(1.05);}
+.btn-play-main:active{transform:scale(.93);}
+.btn-play-main svg{transition:opacity .2s var(--ease-out),transform .34s var(--ease-spring);}
+.btn-play-main.playing{box-shadow:0 12px 44px var(--primary-glow),0 0 0 1px rgba(255,255,255,.14);}
+/* A ring that leaves on every press — cheap, but it is the difference
+   between a button and a control that feels alive. */
+.btn-play-main:after{
+  content:'';position:absolute;inset:-2px;border-radius:50%;
+  border:1px solid var(--primary);opacity:0;pointer-events:none;
+}
+.btn-play-main.pulse:after{animation:pressRing .7s var(--ease-out);}
+@keyframes pressRing{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.55)}}
+.btn-skip{
+  width:44px;height:44px;flex-shrink:0;border:0;background:transparent;color:var(--text);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;
+  transition:background var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-spring),opacity .2s;
+  -webkit-tap-highlight-color:transparent;
+}
+.btn-skip:hover{background:rgba(255,255,255,.09);}
+.btn-skip:active{transform:scale(.9);}
+.btn-skip:disabled{opacity:.16;cursor:not-allowed;background:transparent;}
+
+/* Volume + pan */
+.transport-aux{display:flex;align-items:center;flex-wrap:wrap;gap:9px 14px;justify-content:center;}
+.fader{display:flex;align-items:center;gap:8px;min-width:0;}
+.fader-label{font:600 9px/1 inherit;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);flex-shrink:0;}
+.fader-icon{
+  border:0;background:transparent;color:var(--muted);cursor:pointer;padding:4px;
+  display:flex;align-items:center;transition:color var(--t-fast);
+  -webkit-tap-highlight-color:transparent;
+}
+.fader-icon:hover,.fader-icon.on{color:var(--text);}
+.nz-range{
+  -webkit-appearance:none;appearance:none;background:transparent;cursor:pointer;
+  width:clamp(74px,17vw,132px);height:22px;flex-shrink:1;min-width:60px;
+}
+.nz-range::-webkit-slider-runnable-track{
+  height:3px;border-radius:99px;
+  background:linear-gradient(90deg,var(--primary) 0%,var(--primary) var(--fill,100%),rgba(255,255,255,.16) var(--fill,100%));
+}
+.nz-range::-moz-range-track{height:3px;border-radius:99px;background:rgba(255,255,255,.16);}
+.nz-range::-moz-range-progress{height:3px;border-radius:99px;background:var(--primary);}
+.nz-range::-webkit-slider-thumb{
+  -webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#fff;margin-top:-5px;
+  box-shadow:0 0 12px var(--primary-glow),0 1px 4px rgba(0,0,0,.5);
+  transition:transform var(--t-fast) var(--ease-spring);
+}
+.nz-range::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:#fff;box-shadow:0 0 12px var(--primary-glow);}
+.nz-range:hover::-webkit-slider-thumb,.nz-range:active::-webkit-slider-thumb{transform:scale(1.22);}
+.nz-range:focus-visible{outline:2px solid var(--primary);outline-offset:4px;border-radius:99px;}
+/* Pan is bipolar: the fill grows out of the centre in whichever direction
+   the listener pushed it, so the control reads as a balance, not a level. */
+.nz-range[data-bipolar]::-webkit-slider-runnable-track{
+  background:
+    linear-gradient(90deg,transparent var(--from,50%),var(--accent) var(--from,50%),var(--accent) var(--to,50%),transparent var(--to,50%)),
+    linear-gradient(90deg,rgba(255,255,255,.16),rgba(255,255,255,.16));
+}
+.fader-reset{
+  border:0;background:transparent;color:var(--muted);font:600 9px/1 inherit;
+  letter-spacing:.12em;text-transform:uppercase;cursor:pointer;padding:5px 6px;
+  opacity:0;pointer-events:none;transition:opacity var(--t-fast),color var(--t-fast);
+}
+.fader-reset.show{opacity:1;pointer-events:auto;}
+.fader-reset:hover{color:var(--text);}
+
+.btn-tone,.playback-option,.sheet-toggle{
+  border:1px solid var(--border);background:rgba(255,255,255,.035);color:var(--muted);
+  border-radius:99px;padding:7px 12px;font:600 9px/1 inherit;letter-spacing:.12em;
+  text-transform:uppercase;cursor:pointer;white-space:nowrap;
+  transition:color var(--t-fast),border-color var(--t-fast),background var(--t-fast),transform var(--t-fast) var(--ease-spring);
+  -webkit-tap-highlight-color:transparent;
+}
+.btn-tone:hover,.playback-option:hover,.sheet-toggle:hover{color:var(--text);border-color:color-mix(in srgb,var(--primary) 60%,transparent);}
+.btn-tone:active,.playback-option:active,.sheet-toggle:active{transform:scale(.95);}
+.playback-option{display:none;}
+.playback-option.on,.sheet-toggle.on{color:var(--on-primary);border-color:var(--primary);background:var(--primary);}
+
+/* ── Full lyric sheet — slides up over the stage on request ── */
+.lyric-sheet{
+  /* Stops above the transport rather than on top of it — reading the words and
+     controlling the record are the same activity. The offset is measured when
+     the sheet opens, because the transport's height depends on how many
+     controls the package actually enabled. */
+  position:absolute;left:0;right:0;bottom:var(--sheet-bottom,0px);z-index:8;
+  height:min(58%,560px);display:flex;flex-direction:column;
+  border-radius:28px 28px 0 0;
+  background:linear-gradient(180deg,rgba(10,9,14,.93),rgba(4,3,7,.97));
+  border:1px solid var(--border);border-bottom:0;
+  box-shadow:0 -30px 90px rgba(0,0,0,.6);
+  backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+  transform:translateY(101%);opacity:0;pointer-events:none;
+  transition:transform var(--t-mid) var(--ease-out),opacity var(--t-fast) var(--ease-out);
+  will-change:transform;
+}
+.lyric-sheet.open{transform:none;opacity:1;pointer-events:auto;}
+.lyric-sheet-grip{width:38px;height:4px;border-radius:99px;background:rgba(255,255,255,.22);margin:11px auto 4px;flex-shrink:0;}
+.lyrics-header{padding:8px 28px 14px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;}
+.lyrics-header h2{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--text);}
+.lyrics-header p{font-size:11px;color:var(--muted);margin-top:2px;}
+.lyrics-close{border:0;background:transparent;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:4px 6px;transition:color var(--t-fast);}
+.lyrics-close:hover{color:var(--text);}
+.lyrics-progress-bar{flex-shrink:0;height:2px;background:rgba(255,255,255,.08);position:relative;}
+.lyrics-progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));width:0%;}
+.lyrics-list{flex:1;padding:14px 28px 28px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .lyric-item{
-  padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);
+  padding:11px 0;border-bottom:1px solid rgba(255,255,255,.04);
   font-size:14px;color:var(--muted);line-height:1.5;
-  transition:color .2s;cursor:pointer;
-  display:flex;align-items:baseline;gap:12px;
+  transition:color var(--t-fast) var(--ease-out),transform var(--t-mid) var(--ease-out),opacity var(--t-fast);
+  cursor:pointer;display:flex;align-items:baseline;gap:12px;
 }
-.lyric-item.active{color:var(--text);font-weight:500;}
+.lyric-item:hover{color:rgba(245,242,236,.8);}
+.lyric-item.active{color:var(--text);font-weight:500;transform:translateX(6px);}
 .lyric-item.active .lyric-ts{color:var(--primary);}
-.lyric-ts{font-size:10px;font-family:monospace;color:rgba(255,255,255,.18);flex-shrink:0;width:36px;}
+.lyric-ts{font:10px/1.5 monospace;color:rgba(255,255,255,.18);flex-shrink:0;width:36px;}
+
+/* ── Stage layout: side by side once there is width for it ── */
+@media(min-width:900px) and (min-height:520px){
+  .stage-main{
+    grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);
+    align-items:center;gap:clamp(28px,4vw,64px);
+  }
+  .stage[data-lyrics="off"] .stage-main{grid-template-columns:minmax(0,1fr);}
+  /* Side by side, the sleeve and the title share one column's height with the
+     transport below. Sized off the viewport they overrun it and collide with
+     the controls, so both are scaled to the column, not the window. */
+  .stage-art{justify-content:center;overflow:hidden;}
+  .p-cover-thumb{width:min(28vw,30vh,340px);}
+  .stage[data-lyrics="off"] .p-cover-thumb{width:min(46vw,44vh,460px);}
+  .p-title{font-size:clamp(24px,3.1vw,46px);}
+  .stage-lyrics{align-items:flex-start;}
+  .stage-lyrics .lyric-prev,.stage-lyrics .lyric-current,.stage-lyrics .lyric-next{text-align:left;}
+  .lyric-bg-char{left:0;transform:translateY(-50%);font-size:min(30vw,46vh);}
+  .lyric-sheet{left:auto;right:0;bottom:0;width:min(560px,52vw);height:100%;border-radius:28px 0 0 0;transform:translateX(101%);}
+  .lyric-sheet.open{transform:none;}
+  /* Raising the sheet must not bury the transport under it — the stage yields
+     the width instead, so play, volume and pan stay reachable while reading. */
+  .stage.sheet-open{padding-right:calc(min(560px,52vw) + clamp(20px,5vw,44px));}
+}
+@media(max-height:620px){
+  .stage{padding-top:calc(var(--safe-t) + 62px);}
+  .p-cover-thumb{width:min(38vw,26vh,240px);}
+  .transport{gap:8px;padding:11px 14px;}
+}
 
 /* ═══════════════════════════════
    VIEW 3: GAMES (play add-ons)
@@ -453,48 +631,84 @@ html,body{
 <div class="grad-bottom"></div>
 <div class="nz-badge">NOIZES</div>
 
-<!-- ── VIEW 1: PLAYER ── -->
+<!-- ── THE STAGE: playback + lyrics, one screen ── -->
 <div class="view active" id="view-player">
-  <div class="p-cover-thumb" id="p-cover-thumb">
-    <img id="p-cover-img" alt="Cover" />
-  </div>
-  <div class="p-artist"><span id="p-artist">—</span></div>
-  <div class="p-title" id="p-title"></div>
-  <div class="p-chips" id="p-chips"></div>
-  <div class="version-switch" id="version-switch" role="group" aria-label="Audio version" hidden></div>
-  <div class="p-controls">
-    <button class="btn-skip" id="btn-prev" aria-label="Previous track">│‹</button>
-    <button class="btn-play-main" id="btn-play">
-      <svg id="ico-play" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-      <svg id="ico-pause" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-    </button>
-    <div class="prog-outer" id="prog-outer">
-      <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
-      <div class="time-row"><span id="t-cur">0:00</span><span id="t-tot">—</span></div>
+  <div class="stage" id="stage" data-lyrics="off">
+    <div class="stage-main">
+      <div class="stage-art">
+        <div class="p-cover-thumb" id="p-cover-thumb">
+          <img id="p-cover-img" alt="Cover" />
+        </div>
+        <div class="stage-copy">
+          <div class="p-artist"><span id="p-artist">—</span></div>
+          <div class="p-title" id="p-title"></div>
+          <div class="p-chips" id="p-chips"></div>
+        </div>
+      </div>
+      <div class="stage-lyrics" id="stage-lyrics">
+        <div class="lyric-bg-char" id="lyric-bg">♪</div>
+        <div class="lyric-prev" id="lyric-prev"></div>
+        <div class="lyric-current" id="lyric-current">Press play to begin</div>
+        <div class="lyric-next" id="lyric-next"></div>
+      </div>
     </div>
-    <button class="btn-skip" id="btn-next" aria-label="Next track">›│</button>
-    <button class="btn-tone" id="btn-tone">♪ Tone</button>
-  </div>
-  <div class="playback-options">
-    <button class="playback-option" id="btn-shuffle" type="button" aria-pressed="false">Shuffle off</button>
-    <button class="playback-option" id="btn-repeat" type="button" aria-pressed="false">Repeat off</button>
-  </div>
-</div>
 
-<!-- ── VIEW 2: LYRICS ── -->
-<div class="view" id="view-lyrics">
-  <div class="lyrics-header">
-    <h2 id="lyrics-title">Lyrics</h2>
-    <p id="lyrics-status">Synced to playback</p>
+    <div class="transport">
+      <div class="version-switch" id="version-switch" role="group" aria-label="Audio version" hidden></div>
+      <div>
+        <div class="prog-outer" id="prog-outer" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+          <div class="prog-track"><div class="prog-fill" id="prog-fill"></div><div class="prog-knob" id="prog-knob"></div></div>
+        </div>
+        <div class="time-row"><span id="t-cur">0:00</span><span id="t-tot">—</span></div>
+      </div>
+      <div class="transport-row">
+        <button class="btn-skip" id="btn-prev" aria-label="Previous track">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7 6h2v12H7zm3.5 6L19 6v12z"/></svg>
+        </button>
+        <button class="btn-play-main" id="btn-play" aria-label="Play">
+          <svg id="ico-play" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="ico-pause" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none;position:absolute"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+        <button class="btn-skip" id="btn-next" aria-label="Next track">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15 6h2v12h-2zM5 18l8.5-6L5 6z"/></svg>
+        </button>
+      </div>
+      <div class="transport-aux">
+        <div class="fader">
+          <button class="fader-icon" id="btn-mute" type="button" aria-label="Mute" aria-pressed="false">
+            <svg id="ico-vol" viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M4 9v6h4l5 4V5L8 9H4zm11.5 3a3.5 3.5 0 0 0-2-3.15v6.3A3.5 3.5 0 0 0 15.5 12zM13.5 3.8v2.06A6.5 6.5 0 0 1 13.5 18.14v2.06A8.5 8.5 0 0 0 13.5 3.8z"/></svg>
+            <svg id="ico-mute" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" style="display:none"><path d="M4 9v6h4l5 4V5L8 9H4zm15.6 3 2.1-2.1-1.4-1.4L18.2 10.6 16.1 8.5l-1.4 1.4 2.1 2.1-2.1 2.1 1.4 1.4 2.1-2.1 2.1 2.1 1.4-1.4z"/></svg>
+          </button>
+          <input class="nz-range" id="vol" type="range" min="0" max="100" step="1" value="100" aria-label="Volume" />
+        </div>
+        <div class="fader">
+          <span class="fader-label">L</span>
+          <input class="nz-range" id="pan" type="range" min="-100" max="100" step="1" value="0" data-bipolar aria-label="Stereo pan" />
+          <span class="fader-label">R</span>
+          <button class="fader-reset" id="btn-pan-reset" type="button">Centre</button>
+        </div>
+        <button class="sheet-toggle" id="btn-lyric-sheet" type="button" aria-expanded="false" aria-controls="lyric-sheet" hidden>Lyrics</button>
+        <button class="playback-option" id="btn-shuffle" type="button" aria-pressed="false">Shuffle off</button>
+        <button class="playback-option" id="btn-repeat" type="button" aria-pressed="false">Repeat off</button>
+        <button class="btn-tone" id="btn-tone">♪ Tone</button>
+      </div>
+    </div>
   </div>
-  <div class="lyrics-progress-bar"><div class="lyrics-progress-fill" id="lyrics-prog"></div></div>
-  <div class="lyrics-stage">
-    <div class="lyric-bg-char" id="lyric-bg">♪</div>
-    <div class="lyric-prev" id="lyric-prev"></div>
-    <div class="lyric-current" id="lyric-current">Press play to begin</div>
-    <div class="lyric-next" id="lyric-next"></div>
+
+  <!-- The full sheet is the same lyrics, scrollable — it slides over the
+       stage instead of being a separate destination. -->
+  <div class="lyric-sheet" id="lyric-sheet">
+    <div class="lyric-sheet-grip"></div>
+    <div class="lyrics-header">
+      <div>
+        <h2 id="lyrics-title">Lyrics</h2>
+        <p id="lyrics-status">Synced to playback</p>
+      </div>
+      <button class="lyrics-close" id="lyric-sheet-close" type="button" aria-label="Close lyrics">×</button>
+    </div>
+    <div class="lyrics-progress-bar"><div class="lyrics-progress-fill" id="lyrics-prog"></div></div>
+    <div class="lyrics-list" id="lyrics-list"></div>
   </div>
-  <div class="lyrics-list" id="lyrics-list"></div>
 </div>
 
 <!-- ── RELEASE TRACKLIST ── -->
@@ -553,17 +767,37 @@ html,body{
 <!-- ── GUIDE (authored journey) ── -->
 <style>
 .entry-gate{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;
-  background:linear-gradient(to bottom,rgba(3,3,3,.3),rgba(3,3,3,.86));backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
-.entry-gate.gone{opacity:0;pointer-events:none;transition:opacity .8s ease;}
+  background:linear-gradient(to bottom,rgba(3,3,3,.3),rgba(3,3,3,.86));backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:opacity var(--t-cine) var(--ease-out),transform var(--t-cine) var(--ease-out),filter var(--t-cine) var(--ease-out);}
+/* Leaving the gate is the first thing a collector feels. It pulls forward and
+   dissolves rather than cutting, so the object opens instead of switching. */
+.entry-gate.gone{opacity:0;pointer-events:none;transform:scale(1.09);filter:blur(22px);}
 .entry-object{display:flex;flex-direction:column;align-items:center;max-width:540px;}
+.entry-object>*{animation:entryRise 1s var(--ease-out) both;}
+.entry-object>*:nth-child(1){animation-delay:.08s}
+.entry-object>*:nth-child(2){animation-delay:.16s}
+.entry-object>*:nth-child(3){animation-delay:.26s}
+.entry-object>*:nth-child(4){animation-delay:.34s}
+.entry-object>*:nth-child(5){animation-delay:.44s}
+.entry-object>*:nth-child(6){animation-delay:.52s}
+@keyframes entryRise{from{opacity:0;transform:translateY(22px);filter:blur(10px)}to{opacity:1;transform:none;filter:blur(0)}}
 .entry-mark{font-size:10px;letter-spacing:.38em;text-transform:uppercase;color:var(--primary);margin-bottom:24px;}
 .entry-cover{width:min(58vw,300px);aspect-ratio:1;border-radius:18px;object-fit:cover;margin-bottom:24px;display:none;
-  box-shadow:0 30px 100px rgba(0,0,0,.7),0 0 70px color-mix(in srgb,var(--primary) 24%,transparent);}
+  box-shadow:0 30px 100px rgba(0,0,0,.7),0 0 70px var(--primary-soft);}
 .entry-title{font-size:clamp(38px,11vw,78px);line-height:.88;font-weight:300;letter-spacing:-.045em;}
 .entry-meta{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:12px 0 28px;line-height:1.8;}
-.entry-button{border:1px solid rgba(255,255,255,.65);color:#fff;background:rgba(255,255,255,.06);padding:13px 30px;border-radius:99px;
-  font:600 12px/1 inherit;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(18px);}
-.entry-return-actions{display:none;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:12px;}.entry-return-actions button{border:1px solid var(--border);background:rgba(255,255,255,.035);color:var(--muted);border-radius:99px;padding:8px 12px;font:600 9px/1 inherit;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;}
+.entry-button{border:0;color:var(--on-primary);background:var(--primary);padding:15px 34px;border-radius:99px;
+  font:600 12px/1 inherit;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;position:relative;
+  box-shadow:0 14px 42px var(--primary-glow);
+  transition:transform var(--t-fast) var(--ease-spring),box-shadow var(--t-mid) var(--ease-out);}
+.entry-button:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 20px 54px var(--primary-glow);}
+.entry-button:active{transform:scale(.96);}
+/* A slow halo so the only thing to press is also the only thing moving. */
+.entry-button:before{content:'';position:absolute;inset:-6px;border-radius:99px;border:1px solid var(--primary);
+  opacity:0;animation:entryHalo 3.4s var(--ease-out) infinite;pointer-events:none;}
+@keyframes entryHalo{0%{opacity:.5;transform:scale(.96)}70%,100%{opacity:0;transform:scale(1.14)}}
+.entry-return-actions{display:none;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px;}.entry-return-actions button{border:1px solid var(--border);background:rgba(255,255,255,.035);color:var(--muted);border-radius:99px;padding:8px 12px;font:600 9px/1 inherit;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:color var(--t-fast),border-color var(--t-fast);}
+.entry-return-actions button:hover{color:var(--text);border-color:color-mix(in srgb,var(--primary) 55%,transparent);}
 /* Above the drawer (z-index 80) so the one button both opens and closes the
    menu. It used to sit under it, which is why a second close button existed
    in the top right — where it collided with the package's own close. */
@@ -615,38 +849,155 @@ html,body{
 .guide-step.visited .guide-dot{background:var(--primary);border-color:var(--primary);color:#000;}
 .guide-step-label{font-size:12px;font-weight:500;}
 .guide-note{font-size:11px;color:var(--muted);margin-top:16px;line-height:1.5;}
+/* ═══════════════════════════════
+   CHAPTER PAGES
+   Everything the artist authored around the music — the screens after Enter,
+   the ones between tracks, the one after the last note — is a page that owns
+   the whole display for the time Studio set. They are not cards floating over
+   the player; the player is not there while they run.
+   ═══════════════════════════════ */
+.chapter{
+  position:fixed;inset:0;z-index:58;
+  display:flex;align-items:center;justify-content:center;
+  padding:calc(var(--safe-t) + 64px) clamp(26px,7vw,110px) calc(var(--safe-b) + 72px);
+  opacity:0;pointer-events:none;
+  transition:opacity var(--t-mid) var(--ease-out);
+  overflow:hidden;
+}
+.chapter.show{opacity:1;pointer-events:auto;}
+.chapter-bg{
+  position:absolute;inset:-4%;z-index:0;
+  background-position:center;background-size:cover;
+  opacity:0;transform:scale(1.14);filter:blur(26px) saturate(1.15) brightness(.5);
+  transition:opacity var(--t-cine) var(--ease-out),transform 9s var(--ease-out);
+}
+.chapter.show .chapter-bg{opacity:1;transform:scale(1.02);}
+.chapter-veil{
+  position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:
+    radial-gradient(ellipse at 50% 12%,color-mix(in srgb,var(--primary) 20%,transparent),transparent 62%),
+    linear-gradient(180deg,rgba(3,3,3,.62),rgba(3,3,3,.9));
+  backdrop-filter:blur(30px) saturate(1.15);-webkit-backdrop-filter:blur(30px) saturate(1.15);
+}
+.chapter-inner{
+  position:relative;z-index:2;
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+  gap:18px;max-width:900px;width:100%;
+}
+.chapter-inner>*{opacity:0;}
+/* The copy assembles: kicker, then title, then body, then the image — each
+   arriving out of a blur. Restarted per moment by re-adding .show. */
+.chapter.show .chapter-inner>*{animation:chapterRise .95s var(--ease-out) both;}
+.chapter.show .chapter-inner>*:nth-child(1){animation-delay:.16s}
+.chapter.show .chapter-inner>*:nth-child(2){animation-delay:.26s}
+.chapter.show .chapter-inner>*:nth-child(3){animation-delay:.38s}
+.chapter.show .chapter-inner>*:nth-child(4){animation-delay:.5s}
+.chapter.show .chapter-inner>*:nth-child(5){animation-delay:.6s}
+@keyframes chapterRise{from{opacity:0;transform:translateY(26px);filter:blur(14px)}to{opacity:1;transform:none;filter:blur(0)}}
+.journey-moment-image{
+  width:min(46vw,30vh,300px);aspect-ratio:1;border-radius:20px;object-fit:cover;display:none;order:-1;
+  box-shadow:0 34px 100px rgba(0,0,0,.66),0 0 90px var(--primary-soft);
+}
+.journey-moment-kicker{font-size:10px;letter-spacing:.36em;text-transform:uppercase;color:var(--primary);}
+.journey-moment-title{
+  font-size:clamp(34px,8vw,86px);line-height:.94;font-weight:300;letter-spacing:-.045em;color:var(--text);
+  text-shadow:0 0 70px var(--primary-glow);max-width:20ch;
+}
+.journey-moment-body{font-size:clamp(14px,2.1vw,18px);line-height:1.65;color:rgba(245,242,236,.66);max-width:56ch;}
+.journey-moment-action{
+  display:none;border:1px solid var(--primary);background:transparent;color:var(--primary);border-radius:99px;
+  padding:11px 22px;font:600 10px/1 inherit;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;
+  transition:background var(--t-fast),color var(--t-fast),transform var(--t-fast) var(--ease-spring);
+}
+.journey-moment-action:hover{background:var(--primary);color:var(--on-primary);}
+.journey-moment-action:active{transform:scale(.95);}
+/* The page is force-timed to the Studio duration; this hairline is the only
+   promise the collector gets that it will move on by itself. */
+.chapter-timer{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(255,255,255,.08);z-index:3;}
+.chapter-timer i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--primary),var(--accent));box-shadow:0 0 14px var(--primary-glow);}
+.chapter.show .chapter-timer i{animation-name:chapterClock;animation-timing-function:linear;animation-fill-mode:both;}
+@keyframes chapterClock{from{width:0}to{width:100%}}
+
+/* Moment type shapes the page rather than just its text. */
+.chapter[data-type="title_reveal"] .journey-moment-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(46px,14vw,150px);letter-spacing:.005em;line-height:.86;}
+.chapter[data-type="image"] .chapter-veil,.chapter[data-type="video"] .chapter-veil{background:linear-gradient(180deg,rgba(3,3,3,.28),rgba(3,3,3,.86));backdrop-filter:none;-webkit-backdrop-filter:none;}
+.chapter[data-type="image"] .chapter-bg,.chapter[data-type="video"] .chapter-bg{filter:saturate(1.1) brightness(.72);}
+.chapter[data-type="credits"] .journey-moment-body,.chapter[data-type="note"] .journey-moment-body{white-space:pre-line;}
+
+/* Studio "Atmosphere" per moment. */
+.chapter[data-effect="soft_glow"] .chapter-veil{background:radial-gradient(ellipse at 50% 40%,color-mix(in srgb,var(--primary) 34%,transparent),rgba(3,3,3,.9) 70%);}
+.chapter[data-effect="cover_bloom"] .chapter-bg{animation:chapterBloom 6s var(--ease-out) both;}
+.chapter[data-effect="slow_drift"] .chapter-bg{animation:chapterDrift 22s var(--ease-in-out) infinite alternate;}
+.chapter[data-effect="film_grain"] .chapter-inner{filter:contrast(1.06) saturate(.82);}
+.chapter[data-effect="film_grain"] .chapter-veil:after{
+  content:'';position:absolute;inset:-50%;opacity:.09;pointer-events:none;
+  background-image:repeating-conic-gradient(#fff 0% 25%,#000 0% 50%);background-size:3px 3px;
+  animation:grainShift .6s steps(3) infinite;
+}
+@keyframes grainShift{0%{transform:translate(0,0)}33%{transform:translate(-2%,1%)}66%{transform:translate(1%,-2%)}}
+.chapter[data-effect="violet_wash"] .chapter-veil{background:linear-gradient(150deg,color-mix(in srgb,var(--primary) 60%,#000),color-mix(in srgb,var(--accent) 34%,#000));}
+@keyframes chapterBloom{0%{filter:blur(30px) brightness(.28)}45%{filter:blur(10px) brightness(.78)}100%{filter:blur(18px) brightness(.5)}}
+@keyframes chapterDrift{from{transform:scale(1.02) translate3d(-1.5%,0,0)}to{transform:scale(1.08) translate3d(1.5%,-1%,0)}}
+
+/* In-track moments land mid-song. Those cannot take the display away from the
+   words they are timed against, so they arrive as a band anchored to the
+   stage — same typography, no card, no chrome. */
+.chapter[data-scope="inline"]{
+  /* Sits in a slot the stage opens for it, between the lyric and the
+     transport — clear of both. --transport-h is measured, because its height
+     depends on which controls the package enabled. */
+  top:auto;left:0;right:0;
+  bottom:calc(var(--safe-b) + var(--transport-h,150px) + 30px);
+  height:auto;display:block;
+  padding:26px clamp(20px,6vw,90px) 6px;
+  background:linear-gradient(to top,rgba(3,3,3,.8) 34%,rgba(3,3,3,.5) 70%,transparent);
+  pointer-events:none;
+}
+.chapter[data-scope="inline"] .chapter-bg,
+.chapter[data-scope="inline"] .chapter-veil,
+.chapter[data-scope="inline"] .chapter-timer{display:none;}
+.chapter[data-scope="inline"] .chapter-inner{align-items:flex-start;text-align:left;gap:8px;max-width:640px;margin:0 auto;}
+.chapter[data-scope="inline"] .journey-moment-title{font-size:clamp(20px,4vw,30px);line-height:1.1;text-shadow:none;}
+.chapter[data-scope="inline"] .journey-moment-body{font-size:13px;}
+.chapter[data-scope="inline"] .journey-moment-image{width:72px;border-radius:12px;order:0;}
+.chapter[data-scope="inline"].actionable{pointer-events:auto;}
+.chapter[data-scope="inline"] .journey-moment-action{pointer-events:auto;}
+
+/* ── Guided-tour pages (arrival, the object, the record, the end) ── */
 .intro-card{position:fixed;inset:0;z-index:55;display:none;flex-direction:column;
-  align-items:center;justify-content:center;text-align:center;padding:32px;
-  background:radial-gradient(ellipse at top,rgba(123,92,240,.16),rgba(3,3,3,.86) 65%);backdrop-filter:blur(28px);}
-.intro-card.show{display:flex;}
-.intro-kicker{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--primary);margin-bottom:12px;}
-.intro-headline{font-size:26px;font-weight:800;color:var(--text);margin-bottom:12px;}
-.intro-body{font-size:14px;color:var(--muted);max-width:32ch;line-height:1.6;margin-bottom:26px;}
-.intro-next{border:1px solid var(--primary);color:var(--primary);background:transparent;
-  padding:11px 26px;border-radius:999px;font-size:13px;cursor:pointer;}
-.intro-next:active{opacity:.6;}
-.journey-moment{position:fixed;z-index:58;left:50%;bottom:clamp(34px,9vh,92px);width:min(680px,calc(100% - 36px));
-  transform:translate(-50%,24px);opacity:0;pointer-events:none;transition:opacity .45s ease,transform .55s cubic-bezier(.2,.8,.2,1);}
-.journey-moment.show{opacity:1;transform:translate(-50%,0);}
-.journey-moment.show.actionable{pointer-events:auto;}
-.journey-moment-card{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;padding:18px 20px;border-radius:20px;
-  background:linear-gradient(120deg,rgba(6,5,12,.88),rgba(20,13,38,.72));border:1px solid rgba(255,255,255,.15);
-  box-shadow:0 26px 90px rgba(0,0,0,.55);backdrop-filter:blur(26px) saturate(1.3);-webkit-backdrop-filter:blur(26px) saturate(1.3);}
-.journey-moment-image{width:72px;height:72px;border-radius:13px;object-fit:cover;display:none;box-shadow:0 12px 32px rgba(0,0,0,.42);}
-.journey-moment-copy{min-width:0}.journey-moment-kicker{font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--primary);margin-bottom:5px;}
-.journey-moment-title{font-size:clamp(20px,4vw,30px);line-height:1.05;font-weight:500;letter-spacing:-.025em;}
-.journey-moment-body{font-size:12px;line-height:1.55;color:var(--muted);margin-top:7px;max-width:58ch;}
-.journey-moment-action{display:none;margin-top:11px;border:1px solid var(--primary);background:transparent;color:var(--primary);border-radius:99px;padding:7px 12px;font:600 10px/1 inherit;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;}
-.journey-moment[data-effect="soft_glow"] .journey-moment-card{box-shadow:0 0 80px color-mix(in srgb,var(--primary) 26%,transparent);}
-.journey-moment[data-effect="cover_bloom"] .journey-moment-card{animation:momentBloom 3s ease both;}
-.journey-moment[data-effect="slow_drift"] .journey-moment-card{animation:momentDrift 5s ease-in-out both;}
-.journey-moment[data-effect="film_grain"] .journey-moment-card{filter:contrast(1.08) saturate(.8);}
-.journey-moment[data-effect="violet_wash"] .journey-moment-card{background:linear-gradient(120deg,rgba(62,34,133,.86),rgba(35,9,52,.78));}
-@keyframes momentBloom{0%{filter:brightness(.8);transform:scale(.97)}35%{filter:brightness(1.12);transform:scale(1)}100%{filter:brightness(1);}}
-@keyframes momentDrift{0%{transform:translateX(-8px)}50%{transform:translateX(5px)}100%{transform:translateX(0)}}
-@media(max-width:560px){.journey-moment-card{padding:15px;gap:12px}.journey-moment-image{width:56px;height:56px}.journey-moment-body{font-size:11px}}
+  align-items:center;justify-content:center;text-align:center;padding:calc(var(--safe-t) + 60px) clamp(26px,7vw,110px) calc(var(--safe-b) + 60px);
+  background:radial-gradient(ellipse at 50% 16%,color-mix(in srgb,var(--primary) 22%,transparent),rgba(3,3,3,.92) 66%);
+  backdrop-filter:blur(30px) saturate(1.15);-webkit-backdrop-filter:blur(30px) saturate(1.15);}
+.intro-card.show{display:flex;animation:chapterFade var(--t-mid) var(--ease-out) both;}
+@keyframes chapterFade{from{opacity:0}to{opacity:1}}
+.intro-card.show>*{animation:chapterRise .95s var(--ease-out) both;}
+.intro-card.show>*:nth-child(1){animation-delay:.14s}
+.intro-card.show>*:nth-child(2){animation-delay:.24s}
+.intro-card.show>*:nth-child(3){animation-delay:.36s}
+.intro-card.show>*:nth-child(4){animation-delay:.5s}
+.intro-kicker{font-size:10px;letter-spacing:.36em;text-transform:uppercase;color:var(--primary);margin-bottom:16px;}
+.intro-headline{font-size:clamp(34px,8vw,86px);line-height:.94;font-weight:300;letter-spacing:-.045em;color:var(--text);
+  text-shadow:0 0 70px var(--primary-glow);margin-bottom:16px;max-width:20ch;}
+.intro-body{font-size:clamp(14px,2.1vw,18px);color:rgba(245,242,236,.66);max-width:56ch;line-height:1.65;margin-bottom:34px;}
+.intro-next{border:0;color:var(--on-primary);background:var(--primary);
+  padding:14px 30px;border-radius:999px;font:600 11px/1 inherit;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;
+  box-shadow:0 14px 40px var(--primary-glow);
+  transition:transform var(--t-fast) var(--ease-spring),box-shadow var(--t-mid) var(--ease-out);}
+.intro-next:hover{transform:translateY(-2px) scale(1.03);}
+.intro-next:active{transform:scale(.96);}
+@media(max-width:560px){.chapter{padding-left:24px;padding-right:24px}.journey-moment-image{width:min(56vw,26vh,240px)}}
 @media(max-width:560px){.guide-drawer{padding-left:24px;padding-right:24px}.world-link{font-size:clamp(34px,12vw,58px)}.menu-coach{font-size:10px}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+  /* Several elements start invisible and are revealed by their entrance
+     animation. Collapsing that animation is fine; a tool that removes it
+     outright would leave a page of blank space, so the end state is asserted
+     here rather than being left to the animation to deliver. */
+  .chapter-inner>*,.intro-card.show>*,.entry-object>*,.p-title-inner,.lyric-current{
+    opacity:1!important;filter:none!important;transform:none!important;
+  }
+  .p-cover-thumb.playing{animation:none!important;}
+}
 </style>
 <div class="entry-gate" id="entry-gate">
   <div class="entry-object">
@@ -689,16 +1040,20 @@ html,body{
   <div class="intro-body" id="intro-body"></div>
   <button class="intro-next" id="intro-next">Continue →</button>
 </div>
-<aside class="journey-moment" id="journey-moment" aria-live="polite" aria-atomic="true" data-effect="none">
-  <div class="journey-moment-card">
+<!-- One host for every authored moment. Release-placed moments (before the
+     first track, between tracks, after the last note) run as full pages;
+     moments timed inside a track run as a band over the stage. -->
+<aside class="chapter" id="journey-moment" aria-live="polite" aria-atomic="true" data-effect="none" data-scope="chapter">
+  <div class="chapter-bg" id="journey-moment-bg"></div>
+  <div class="chapter-veil"></div>
+  <div class="chapter-inner">
     <img class="journey-moment-image" id="journey-moment-image" alt="" />
-    <div class="journey-moment-copy">
-      <div class="journey-moment-kicker" id="journey-moment-kicker"></div>
-      <div class="journey-moment-title" id="journey-moment-title"></div>
-      <div class="journey-moment-body" id="journey-moment-body"></div>
-      <button class="journey-moment-action" id="journey-moment-action" type="button"></button>
-    </div>
+    <div class="journey-moment-kicker" id="journey-moment-kicker"></div>
+    <div class="journey-moment-title" id="journey-moment-title"></div>
+    <div class="journey-moment-body" id="journey-moment-body"></div>
+    <button class="journey-moment-action" id="journey-moment-action" type="button"></button>
   </div>
+  <div class="chapter-timer"><i id="journey-moment-timer"></i></div>
 </aside>
 
 <!-- ── TAB BAR ── -->
@@ -737,9 +1092,165 @@ html,body{
    ═══════════════════════════════════════════════════ */
 var C = window.NZ_CONFIG;
 var ROOT = document.documentElement;
-ROOT.style.setProperty('--primary', C.theme.primary);
-ROOT.style.setProperty('--accent',  C.theme.accent);
-ROOT.style.setProperty('--bg',      C.theme.bg);
+
+/* ═══════════════════════════════════════════════════
+   0a. PALETTE — the cover art decides the colour
+   Noizes purple is the house brand, not the record's. An object dressed in
+   the label's colours reads as a product page; dressed in its own cover it
+   reads as the release. So every accent in this package — highlights,
+   selection states, glows, the generative background, the game palettes — is
+   derived here from the artwork and pushed into the CSS variables the rest of
+   the document already uses. The config theme is only the fallback for a
+   package that shipped without a cover.
+   ═══════════════════════════════════════════════════ */
+var NZ_PALETTE = {primary:C.theme.primary, accent:C.theme.accent, bg:C.theme.bg, derived:false};
+
+function nzRgbToHsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  var max=Math.max(r,g,b), min=Math.min(r,g,b), l=(max+min)/2, h=0, s=0;
+  if(max!==min){
+    var d=max-min;
+    s = l>.5 ? d/(2-max-min) : d/(max+min);
+    if(max===r) h=((g-b)/d+(g<b?6:0));
+    else if(max===g) h=((b-r)/d+2);
+    else h=((r-g)/d+4);
+    h*=60;
+  }
+  return [h,s,l];
+}
+function nzHslToRgb(h,s,l){
+  h=((h%360)+360)%360;
+  var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2, t;
+  if(h<60)t=[c,x,0];else if(h<120)t=[x,c,0];else if(h<180)t=[0,c,x];
+  else if(h<240)t=[0,x,c];else if(h<300)t=[x,0,c];else t=[c,0,x];
+  return t.map(function(v){return Math.round(Math.max(0,Math.min(255,(v+m)*255)));});
+}
+function nzHex(rgb){
+  return '#'+rgb.map(function(v){return Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0');}).join('');
+}
+function nzRgba(rgb,a){return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')';}
+/* Relative luminance — decides whether type on the accent should be ink or paper. */
+function nzLuma(rgb){
+  var v=rgb.map(function(c){c/=255;return c<=.03928?c/12.92:Math.pow((c+.055)/1.055,2.4);});
+  return .2126*v[0]+.7152*v[1]+.0722*v[2];
+}
+function nzClamp(v,lo,hi){return Math.min(hi,Math.max(lo,v));}
+
+/* Hue histogram over a downsampled cover. Buckets are weighted by saturation
+   and penalised as they approach black or white, so a photograph's dark
+   corners and blown highlights cannot out-vote the colour a person actually
+   sees when they look at the sleeve. */
+function nzDerivePalette(image){
+  var size=56;
+  var canvas=document.createElement('canvas');
+  canvas.width=canvas.height=size;
+  var ctx=canvas.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(image,0,0,size,size);
+  var data=ctx.getImageData(0,0,size,size).data;   // throws on a tainted canvas
+
+  var BUCKETS=24, bins=[], i;
+  for(i=0;i<BUCKETS;i++) bins.push({w:0,sin:0,cos:0,s:0,l:0});
+  var chroma=0, lSum=0, n=0;
+  for(i=0;i<data.length;i+=4){
+    if(data[i+3]<8) continue;
+    var hsl=nzRgbToHsl(data[i],data[i+1],data[i+2]);
+    n++; lSum+=hsl[2];
+    if(hsl[1]<.1||hsl[2]<.06||hsl[2]>.96) continue;
+    var weight=hsl[1]*(1-Math.abs(hsl[2]-.5)*.85);
+    var bin=bins[Math.floor(hsl[0]/(360/BUCKETS))%BUCKETS];
+    var rad=hsl[0]*Math.PI/180;
+    bin.w+=weight; bin.sin+=Math.sin(rad)*weight; bin.cos+=Math.cos(rad)*weight;
+    bin.s+=hsl[1]*weight; bin.l+=hsl[2]*weight;
+    chroma+=weight;
+  }
+  var ranked=bins.filter(function(b){return b.w>0;}).map(function(b){
+    var h=Math.atan2(b.sin,b.cos)*180/Math.PI;
+    return {w:b.w, h:((h%360)+360)%360, s:b.s/b.w, l:b.l/b.w};
+  }).sort(function(a,b){return b.w-a.w;});
+
+  var avgL = n ? lSum/n : .2;
+  /* A monochrome sleeve has no colour to borrow. Rather than inventing one,
+     the object goes to tinted silver — still not the brand purple. */
+  if(!ranked.length || chroma/(n||1) < .012){
+    var neutral={h:ranked.length?ranked[0].h:210, s:.06, l:.74};
+    return nzBuildPalette(neutral, {h:neutral.h, s:.1, l:.62}, avgL, true);
+  }
+
+  var lead=ranked[0];
+  var partner=ranked.slice(1).filter(function(b){
+    var d=Math.abs(b.h-lead.h); d=Math.min(d,360-d);
+    return d>=34 && b.w>lead.w*.12;
+  })[0];
+  if(!partner) partner={h:lead.h+(lead.s>.5?38:170), s:lead.s, l:lead.l};
+  return nzBuildPalette(lead, partner, avgL);
+}
+
+/* Normalise into a range that survives a black UI: colours off a sleeve are
+   often too dark or too washed to be read as a highlight.
+   `neutral` drops the saturation floor. That floor exists to rescue a muddy
+   colour, but applied to a black-and-white sleeve it does the opposite —
+   it invents a hue the artwork never had. */
+function nzBuildPalette(lead, partner, avgL, neutral){
+  var floor=neutral?0:.42, accentFloor=neutral?0:.45;
+  var pH=lead.h, pS=nzClamp(lead.s*1.15,floor,.94), pL=nzClamp(lead.l*1.05,.54,.7);
+  var aH=partner.h, aS=nzClamp(partner.s*1.2,accentFloor,.95), aL=nzClamp(partner.l*1.1,.6,.76);
+  var primary=nzHslToRgb(pH,pS,pL);
+  var accent=nzHslToRgb(aH,aS,aL);
+  /* The background keeps the cover's hue at almost no light, so even the black
+     of the object belongs to the record. Brighter artwork lifts it slightly. */
+  var bg=nzHslToRgb(pH,nzClamp(pS*.5,neutral?0:.08,.4),nzClamp(.018+avgL*.035,.014,.055));
+  var text=nzHslToRgb(pH,.07,.965);
+  return {
+    primary:nzHex(primary), accent:nzHex(accent), bg:nzHex(bg),
+    primaryRgb:primary, accentRgb:accent,
+    soft:nzRgba(primary,.16), glow:nzRgba(primary,.42),
+    onPrimary:nzLuma(primary)>.52?'#0b0a0d':'#ffffff',
+    text:nzHex(text), muted:nzRgba(text,.45),
+    derived:true
+  };
+}
+
+function nzApplyPalette(p){
+  ROOT.style.setProperty('--primary',p.primary);
+  ROOT.style.setProperty('--accent',p.accent);
+  ROOT.style.setProperty('--bg',p.bg);
+  ROOT.style.setProperty('--primary-soft',p.soft||nzRgba(nzHslToRgb(0,0,.5),.16));
+  ROOT.style.setProperty('--primary-glow',p.glow||'rgba(255,255,255,.3)');
+  ROOT.style.setProperty('--on-primary',p.onPrimary||'#fff');
+  if(p.text) ROOT.style.setProperty('--text',p.text);
+  if(p.muted) ROOT.style.setProperty('--muted',p.muted);
+  NZ_PALETTE=p;
+  window.NZ_PALETTE=p;
+  /* The generative background and the game palettes read C.theme, so the
+     derived colours replace it rather than living alongside it. */
+  C.theme.primary=p.primary; C.theme.accent=p.accent; C.theme.bg=p.bg;
+  try{window.dispatchEvent(new CustomEvent('nz:palette',{detail:p}));}catch(ignore){}
+}
+
+(function(){
+  /* Seed the derived variables from the config theme so nothing renders
+     colourless in the moment before the cover decodes. */
+  ROOT.style.setProperty('--primary',C.theme.primary);
+  ROOT.style.setProperty('--accent',C.theme.accent);
+  ROOT.style.setProperty('--bg',C.theme.bg);
+  try{
+    var rgb=[1,3,5].map(function(i){return parseInt(C.theme.primary.slice(i,i+2),16);});
+    ROOT.style.setProperty('--primary-soft',nzRgba(rgb,.16));
+    ROOT.style.setProperty('--primary-glow',nzRgba(rgb,.42));
+    ROOT.style.setProperty('--on-primary',nzLuma(rgb)>.52?'#0b0a0d':'#ffffff');
+  }catch(ignore){}
+
+  if(!C.coverSrc) return;
+  var probe=new Image();
+  probe.crossOrigin='anonymous';
+  probe.onload=function(){
+    /* Extraction reads pixels back, which a cross-origin or file:// image can
+       forbid. Failing here must cost nothing but the derived palette. */
+    try{ nzApplyPalette(nzDerivePalette(probe)); }catch(ignore){}
+  };
+  probe.src=C.coverSrc;
+})();
+
 document.title = C.title + ' — ' + C.artist;
 document.getElementById('p-artist').textContent = C.artist;
 document.getElementById('entry-title').textContent = C.title || 'Untitled Object';
@@ -910,11 +1421,21 @@ if(C.coverSrc){
    ═══════════════════════════════════════════════════ */
 (function(){
   var cv = document.getElementById('cover-canvas');
+  var lastW = 0, lastH = 0;
   function draw(){
-    var W = cv.width = window.innerWidth  * Math.min(devicePixelRatio,2);
-    var H = cv.height = window.innerHeight * Math.min(devicePixelRatio,2);
-    cv.style.width = window.innerWidth+'px';
-    cv.style.height = window.innerHeight+'px';
+    /* A package can be mounted into a container that has not been laid out
+       yet — an iframe in the gallery viewer, a background tab. Painting a
+       zero-sized canvas throws out of getImageData below, and an uncaught
+       throw at this point in the script takes every statement after it with
+       it: no audio element, no transport, no experience. Wait for a real
+       viewport and repaint when one arrives. */
+    var vw = window.innerWidth, vh = window.innerHeight;
+    if(vw < 2 || vh < 2) return;
+    var W = cv.width = vw * Math.min(devicePixelRatio,2);
+    var H = cv.height = vh * Math.min(devicePixelRatio,2);
+    lastW = vw; lastH = vh;
+    cv.style.width = vw+'px';
+    cv.style.height = vh+'px';
     var ctx = cv.getContext('2d');
     // Base gradient
     var g = ctx.createLinearGradient(0,0,W,H);
@@ -944,13 +1465,26 @@ if(C.coverSrc){
       ctx.stroke();
     });
     ctx.shadowBlur=0;
-    // Film grain
-    var d=ctx.getImageData(0,0,W,H);
-    for(var i=0;i<d.data.length;i+=4){var n=(Math.random()-.5)*10;d.data[i]+=n;d.data[i+1]+=n;d.data[i+2]+=n;}
-    ctx.putImageData(d,0,0);
+    // Film grain — decorative, and never worth an exception.
+    try{
+      var d=ctx.getImageData(0,0,W,H);
+      for(var i=0;i<d.data.length;i+=4){var n=(Math.random()-.5)*10;d.data[i]+=n;d.data[i+1]+=n;d.data[i+2]+=n;}
+      ctx.putImageData(d,0,0);
+    }catch(ignore){}
   }
   draw();
   var t; window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(draw,200);});
+  // Repaint in the cover's colours the moment they are known.
+  window.addEventListener('nz:palette',function(){draw();});
+  // …and as soon as a container that started at zero finally has a size.
+  if(window.ResizeObserver){
+    try{
+      new ResizeObserver(function(){
+        if(window.innerWidth===lastW && window.innerHeight===lastH) return;
+        clearTimeout(t); t=setTimeout(draw,120);
+      }).observe(document.documentElement);
+    }catch(ignore){}
+  }
 })();
 
 /* ═══════════════════════════════════════════════════
@@ -958,14 +1492,53 @@ if(C.coverSrc){
    ═══════════════════════════════════════════════════ */
 var activeView = 'view-player';
 
+/* Playback and lyrics used to be two destinations you tabbed between, which
+   meant the words were never on screen with the record that was singing them.
+   They are one stage now. 'view-lyrics' survives as a name because authored
+   guides and saved resume state still refer to it — it opens the same stage
+   with the full lyric sheet raised. */
+/* The transport grows and shrinks with the package — version chips only exist
+   for multi-take tracks, shuffle only when the creator allowed it — so
+   anything that has to sit clear of it measures rather than assumes. */
+function syncStageMetrics(){
+  var transport=document.querySelector('.transport');
+  if(!transport)return;
+  ROOT.style.setProperty('--transport-h',Math.round(transport.getBoundingClientRect().height)+'px');
+}
+window.addEventListener('resize',syncStageMetrics);
+window.addEventListener('load',syncStageMetrics);
+
+function openLyricSheet(open){
+  var sheet=document.getElementById('lyric-sheet');
+  var toggle=document.getElementById('btn-lyric-sheet');
+  if(!sheet) return;
+  var has=(C.lyrics||[]).length>0;
+  var on=open&&has;
+  if(on){
+    var transport=document.querySelector('.transport');
+    // Measured, not assumed: the aux row wraps on narrow screens and the
+    // version chips only exist when a track ships more than one take.
+    var clearance=transport?Math.round(window.innerHeight-transport.getBoundingClientRect().top+12):0;
+    sheet.style.setProperty('--sheet-bottom',Math.max(0,clearance)+'px');
+  }
+  sheet.classList.toggle('open',on);
+  var stage=document.getElementById('stage');
+  if(stage) stage.classList.toggle('sheet-open',on);
+  if(toggle){toggle.classList.toggle('on',on);toggle.setAttribute('aria-expanded',on?'true':'false');}
+}
+
 function switchView(target){
+  var wantsLyrics = target==='view-lyrics';
+  if(wantsLyrics) target='view-player';
   var el = document.getElementById(target);
   if(!el) return;
   document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   el.classList.add('active');
-  var tab = document.querySelector('.tab[data-view="'+target+'"]');
+  var tab = document.querySelector('.tab[data-view="'+(wantsLyrics?'view-lyrics':target)+'"]');
   if(tab) tab.classList.add('active');
+  if(target!=='view-player') openLyricSheet(false);
+  else if(wantsLyrics) openLyricSheet(true);
   activeView = target;
 }
 
@@ -1020,6 +1593,10 @@ document.querySelectorAll('.tab').forEach(function(tab){
     document.getElementById('intro-kicker').textContent = copy.kicker || '';
     document.getElementById('intro-headline').textContent = copy.headline || '';
     document.getElementById('intro-body').textContent = copy.body || '';
+    // Each page of the tour arrives fresh. Without the reflow the class is
+    // already present from the previous node and nothing animates.
+    card.classList.remove('show');
+    void card.offsetWidth;
     card.classList.add('show');
   }
 
@@ -1140,23 +1717,45 @@ function trackJourneyMoments(trackId){
   var entry=(journeyConfig.track_journeys||[]).find(function(item){return item.track_id===trackId;});
   return entry&&Array.isArray(entry.moments)?entry.moments:[];
 }
+/* Renders one authored moment.
+   A moment carrying a `placement` was authored around the music — before the
+   first track, between two tracks, after the last note — so nothing is
+   playing that it would interrupt: it takes the whole display for the
+   duration Studio set. A moment carrying only `at_ms` is timed against a
+   lyric inside a track that is still playing, so it arrives as a band over
+   the stage instead of hiding the words it was written for. */
 function showNextJourneyMoment(){
   if(journeyMomentShowing||!journeyMomentQueue.length)return;
   var moment=journeyMomentQueue.shift();var host=document.getElementById('journey-moment');
+  var hold=Math.max(1200,Number(moment.duration_ms)||3500);
   document.getElementById('journey-moment-kicker').textContent=journeyTypeLabel(moment.type);
   document.getElementById('journey-moment-title').textContent=moment.title||journeyTypeLabel(moment.type);
   var body=document.getElementById('journey-moment-body');body.textContent=moment.body||'';body.style.display=moment.body?'':'none';
   var image=document.getElementById('journey-moment-image');var imageSrc=moment.asset_src||'';
   if(imageSrc){image.src=imageSrc;image.style.display='block';}else{image.removeAttribute('src');image.style.display='none';}
+  /* The page is dressed in the moment's own visual, falling back to the cover
+     so a text-only moment is still a room rather than a blank slide. */
+  var backdrop=document.getElementById('journey-moment-bg');
+  var backdropSrc=imageSrc||C.coverSrc||'';
+  backdrop.style.backgroundImage=backdropSrc?('url("'+backdropSrc+'")'):'none';
   var action=document.getElementById('journey-moment-action');var destination=moment.type==='archive_invitation'?'archive':moment.type==='history_invitation'?'history':'';
   action.style.display=destination?'inline-block':'none';action.textContent=destination==='archive'?'Explore Archive':'View History';host.classList.toggle('actionable',!!destination);
   action.onclick=function(){if(destination==='archive'&&window.NZ_ARCHIVE)window.NZ_ARCHIVE.open();if(destination==='history'&&window.NZ_HISTORY)window.NZ_HISTORY.open();host.classList.remove('show');};
+  var inline=!moment.placement;
+  host.dataset.scope=inline?'inline':'chapter';
+  host.dataset.type=moment.type||'story';
+  // The stage opens a slot for an in-track moment so it never lands on the
+  // lyric it was timed against.
+  var stage=document.getElementById('stage');
+  if(stage)stage.dataset.moment=inline?'on':'off';
+  document.getElementById('journey-moment-timer').style.animationDuration=hold+'ms';
   host.dataset.effect=moment.effect||'none';host.classList.add('show');journeyMomentShowing=true;
   window.clearTimeout(journeyMomentTimer);
   journeyMomentTimer=window.setTimeout(function(){
     host.classList.remove('show');journeyMomentShowing=false;
+    if(stage)stage.dataset.moment='off';
     window.setTimeout(function(){showNextJourneyMoment();flushJourneyDrainCallbacks();},380);
-  },Math.max(1200,Number(moment.duration_ms)||3500));
+  },hold);
 }
 function queueJourneyMoment(moment){
   if(!moment||moment.enabled===false||visitedMomentIds.indexOf(moment.moment_id)!==-1)return;
@@ -1198,18 +1797,157 @@ function fmt(s){
   s = Math.floor(s||0);
   return Math.floor(s/60) + ':' + (s%60<10?'0':'') + (s%60);
 }
+var lastShownSecond = -1;
 function setProgress(p, cur){
-  document.getElementById('prog-fill').style.width = (Math.max(0,Math.min(1,p||0))*100)+'%';
-  document.getElementById('lyrics-prog').style.width = (Math.max(0,Math.min(1,p||0))*100)+'%';
-  if(cur !== undefined) document.getElementById('t-cur').textContent = fmt(cur);
+  var pct = Math.max(0,Math.min(1,p||0))*100;
+  document.getElementById('prog-fill').style.width = pct+'%';
+  document.getElementById('prog-knob').style.left = pct+'%';
+  document.getElementById('lyrics-prog').style.width = pct+'%';
+  document.getElementById('prog-outer').setAttribute('aria-valuenow',Math.round(pct));
+  // The clock only ever shows whole seconds; repainting it 60×/s is churn.
+  if(cur !== undefined){
+    var second = Math.floor(cur||0);
+    if(second !== lastShownSecond){
+      lastShownSecond = second;
+      document.getElementById('t-cur').textContent = fmt(cur);
+    }
+  }
 }
 function setPlaying(v){
   playing = v;
+  var button = document.getElementById('btn-play');
   document.getElementById('ico-play').style.display  = v ? 'none' : '';
   document.getElementById('ico-pause').style.display = v ? ''     : 'none';
-  document.getElementById('btn-play').classList.toggle('playing', v);
+  button.classList.toggle('playing', v);
+  button.setAttribute('aria-label', v ? 'Pause' : 'Play');
+  var sleeve = document.getElementById('p-cover-thumb');
+  if(sleeve) sleeve.classList.toggle('playing', v);
   if(C.archive&&playbackSettings.allow_archive_during_journey===false)document.getElementById('menu-archive').hidden=v;
 }
+
+/* ── LEVEL AND STEREO IMAGE ─────────────────────────────────────────────────
+   Volume and pan run through Web Audio rather than the media element, because
+   the element's own `volume` is already spoken for: the crossfade engine
+   rides it to fade one track into the next. Two owners of one property fight,
+   and the listener hears the argument. So the decks keep `volume` for their
+   fade, and the listener's level and balance live on a gain and a panner
+   downstream of both.
+
+   The graph can only be built inside a user gesture: routing a media element
+   through a suspended AudioContext plays silence. Everything that can start
+   the music arms it first, and until then level falls back to the element. */
+var audioGraph = null;          // null = not tried, false = unavailable
+var masterVolume = 1;
+var masterPan = 0;
+var muted = false;
+var deckGain = { main:1, standby:1 };
+var panKind = '';
+
+function applyDeckVolume(){
+  var fallback = audioGraph ? 1 : (muted ? 0 : masterVolume);
+  audio.volume     = Math.max(0,Math.min(1, deckGain.main    * fallback));
+  nextAudio.volume = Math.max(0,Math.min(1, deckGain.standby * fallback));
+}
+function ensureAudioGraph(){
+  if(audioGraph !== null) return audioGraph;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC){ audioGraph = false; applyDeckVolume(); return false; }
+  try{
+    var ctx = new AC();
+    var gain = ctx.createGain();
+    var out  = ctx.createGain();      // the tap point the play module analyses
+    var panner;
+    if(ctx.createStereoPanner){ panner = ctx.createStereoPanner(); panKind = 'stereo'; }
+    else if(ctx.createPanner){ panner = ctx.createPanner(); panner.panningModel = 'equalpower'; panKind = 'spatial'; }
+    ctx.createMediaElementSource(audio).connect(gain);
+    ctx.createMediaElementSource(nextAudio).connect(gain);
+    if(panner){ gain.connect(panner); panner.connect(out); } else { gain.connect(out); }
+    out.connect(ctx.destination);
+    audioGraph = { context:ctx, gain:gain, panner:panner, output:out };
+  }catch(ignore){
+    audioGraph = false;
+  }
+  resumeAudioGraph();
+  applyVolume();
+  applyPan();
+  return audioGraph;
+}
+function resumeAudioGraph(){
+  if(audioGraph && audioGraph.context && audioGraph.context.state === 'suspended'){
+    var resumed = audioGraph.context.resume();
+    if(resumed && resumed.catch) resumed.catch(function(){});
+  }
+}
+function applyVolume(){
+  var level = muted ? 0 : masterVolume;
+  if(audioGraph && audioGraph.gain){
+    // Squared taper tracks perceived loudness; the short ramp stops the
+    // zipper noise a dragged slider makes when it steps the gain.
+    var target = level * level;
+    var param = audioGraph.gain.gain;
+    if(param.setTargetAtTime) param.setTargetAtTime(target, audioGraph.context.currentTime, .015);
+    else param.value = target;
+  }
+  applyDeckVolume();
+  var slider = document.getElementById('vol');
+  if(slider){ slider.value = String(Math.round(masterVolume*100)); paintRange(slider); }
+  var button = document.getElementById('btn-mute');
+  if(button){
+    var off = muted || masterVolume === 0;
+    document.getElementById('ico-vol').style.display  = off ? 'none' : '';
+    document.getElementById('ico-mute').style.display = off ? ''     : 'none';
+    button.setAttribute('aria-pressed', off ? 'true' : 'false');
+    button.setAttribute('aria-label', off ? 'Unmute' : 'Mute');
+    button.classList.toggle('on', !off);
+  }
+}
+function applyPan(){
+  var value = Math.max(-1,Math.min(1,masterPan));
+  if(audioGraph && audioGraph.panner){
+    var ctx = audioGraph.context;
+    if(panKind === 'stereo'){
+      var param = audioGraph.panner.pan;
+      if(param.setTargetAtTime) param.setTargetAtTime(value, ctx.currentTime, .02);
+      else param.value = value;
+    }else if(audioGraph.panner.setPosition){
+      // equalpower needs a point on an arc, not a scalar, or hard-left drops level
+      audioGraph.panner.setPosition(value, 0, 1 - Math.abs(value));
+    }
+  }
+  var slider = document.getElementById('pan');
+  if(slider){ slider.value = String(Math.round(value*100)); paintRange(slider); }
+  var reset = document.getElementById('btn-pan-reset');
+  if(reset) reset.classList.toggle('show', Math.abs(value) > .02);
+}
+/* Range inputs cannot paint their own filled portion, so the track gradient is
+   driven from here — one fill for volume, two edges for the bipolar pan. */
+function paintRange(el){
+  var min = Number(el.min), max = Number(el.max), value = Number(el.value);
+  var span = (max - min) || 1;
+  var pct = ((value - min) / span) * 100;
+  if(el.hasAttribute('data-bipolar')){
+    var middle = ((0 - min) / span) * 100;
+    el.style.setProperty('--from', Math.min(middle,pct)+'%');
+    el.style.setProperty('--to',   Math.max(middle,pct)+'%');
+  }else{
+    el.style.setProperty('--fill', pct+'%');
+  }
+}
+window.NZ_AUDIO = {
+  ensure: ensureAudioGraph,
+  resume: resumeAudioGraph,
+  context: function(){ return audioGraph ? audioGraph.context : null; },
+  /* Lets the play module listen to the same signal the collector hears
+     without opening a second context or a second element source. */
+  tap: function(node){
+    var graph = ensureAudioGraph();
+    if(graph && graph.output){ try{ graph.output.connect(node); }catch(ignore){} }
+    return graph || null;
+  },
+  setVolume: function(v){ masterVolume = Math.max(0,Math.min(1,Number(v)||0)); muted = false; applyVolume(); persistPlayback(true); },
+  setPan: function(v){ masterPan = Math.max(-1,Math.min(1,Number(v)||0)); applyPan(); persistPlayback(true); },
+  getState: function(){ return { volume:masterVolume, pan:masterPan, muted:muted, routed:!!audioGraph }; }
+};
 /* ── Switchable sources ───────────────────────────────────────────────────
    A track can ship several takes of the same performance — main, acapella,
    instrumental. They are alignments of one recording, so switching carries
@@ -1347,6 +2085,15 @@ function renderActiveTrack(){
   updateLyrics(-1);
   document.getElementById('menu-lyrics').hidden=!C.lyrics.length;
   var lyricsTab=document.getElementById('tab-lyrics'); if(lyricsTab) lyricsTab.style.display=C.lyrics.length?'':'none';
+  /* An instrumental track keeps the stage — the artwork takes back the room
+     the words would have used rather than leaving a gap where they were. */
+  var stage=document.getElementById('stage');
+  if(stage) stage.dataset.lyrics=C.lyrics.length?'on':'off';
+  var sheetToggle=document.getElementById('btn-lyric-sheet');
+  if(sheetToggle) sheetToggle.hidden=!C.lyrics.length;
+  if(!C.lyrics.length) openLyricSheet(false);
+  document.getElementById('lyrics-status').textContent=C.lyrics.length?'Synced to playback':'No lyrics for this track';
+  syncStageMetrics();
   document.getElementById('btn-prev').disabled=playbackSettings.allow_track_skip===false||activeTrackIndex===0;
   document.getElementById('btn-next').disabled=playbackSettings.allow_track_skip===false||(!shuffleEnabled&&activeTrackIndex>=releaseTracks.length-1);
   renderTracklist();
@@ -1369,7 +2116,8 @@ function persistPlayback(force){
     current_disc:currentTrack().disc_number,current_track_id:currentTrack().track_id,
     current_track_position_ms:Math.round((audio.currentTime||0)*1000),complete_release_position_ms:completeReleasePositionMs(),
     completed_tracks:completedTrackIds,release_completed:releaseCompleted||completedTrackIds.length>=releaseTracks.length,
-    journey_moments_visited:visitedMomentIds,active_versions:activeVersions,last_selected_mode:activeView,playback_mode:playbackSettings.mode||'sequential',shuffle_enabled:shuffleEnabled,repeat_enabled:repeatEnabled,saved_at:new Date().toISOString()
+    journey_moments_visited:visitedMomentIds,active_versions:activeVersions,last_selected_mode:activeView,playback_mode:playbackSettings.mode||'sequential',shuffle_enabled:shuffleEnabled,repeat_enabled:repeatEnabled,
+    volume:masterVolume,pan:masterPan,muted:muted,saved_at:new Date().toISOString()
   };
   try{localStorage.setItem(resumeKey,JSON.stringify(state));}catch(ignore){}
   try{if(window.parent&&window.parent!==window)window.parent.postMessage({type:'noizes:storage:set',key:resumeKey,value:JSON.stringify(state)},'*');}catch(ignore){}
@@ -1386,7 +2134,8 @@ function playCurrent(){
 }
 function cancelTransition(){
   if(transitionFrame)cancelAnimationFrame(transitionFrame);
-  transitionFrame=0;transitioning=false;nextAudio.pause();nextAudio.currentTime=0;nextAudio.volume=1;audio.volume=1;
+  transitionFrame=0;transitioning=false;nextAudio.pause();nextAudio.currentTime=0;
+  deckGain.main=1;deckGain.standby=1;applyDeckVolume();
 }
 function loadTrack(index,options){
   options=options||{};
@@ -1404,7 +2153,8 @@ function loadTrack(index,options){
 function handoffFromStandby(nextIndex){
   var position=nextAudio.currentTime||0; var keepPlaying=!audio.paused||!nextAudio.paused;var previousTrack=currentTrack();
   activeTrackIndex=nextIndex;renderActiveTrack();journeyTrackChanged(previousTrack,currentTrack());
-  audio.pause();audio.volume=1;audio.src=currentTrack().src;pendingPosition=position;pendingAutoplay=keepPlaying;audio.load();
+  audio.pause();deckGain.main=1;deckGain.standby=1;applyDeckVolume();
+  audio.src=currentTrack().src;pendingPosition=position;pendingAutoplay=keepPlaying;audio.load();
   transitioning=false;transitionFrame=0;plannedNextIndex=-1;
 }
 function startCrossfade(){
@@ -1417,22 +2167,49 @@ function startCrossfade(){
     if(!transitioning)return;
     if(audio.paused){cancelTransition();return;}
     var progress=Math.min(1,(Date.now()-started)/duration);
-    audio.volume=1-progress;nextAudio.volume=progress;
+    /* The fade rides the deck gains, not the listener's level — pulling the
+       volume slider down mid-crossfade must not cancel the crossfade. */
+    deckGain.main=1-progress;deckGain.standby=progress;applyDeckVolume();
     if(progress<1){transitionFrame=requestAnimationFrame(fade);}else{if(completedTrackIds.indexOf(currentTrack().track_id)===-1)completedTrackIds.push(currentTrack().track_id);handoffFromStandby(plannedNextIndex);}
   })();
 }
+/* Every release gets a closing page. If the artist authored one it plays; if
+   they did not, the object closes on its own credits rather than on silence
+   and a paused button — an ending is part of the format, not an add-on. */
+function defaultClosingMoment(){
+  var rights=C.rights||{};
+  var lines=[rights.copyright,rights.license,rights.producer?('Produced by '+rights.producer):'']
+    .concat(Array.isArray(rights.credits)?rights.credits:[])
+    .filter(Boolean);
+  return {
+    moment_id:'nz-closing-credits',
+    type:'credits',
+    placement:'after_final_track',
+    title:'Thank you for listening',
+    body:lines.join('\n'),
+    duration_ms:Math.min(12000,5000+lines.length*900),
+    effect:'soft_glow'
+  };
+}
+
 function advanceTrack(){
   if(completedTrackIds.indexOf(currentTrack().track_id)===-1)completedTrackIds.push(currentTrack().track_id);
   var nextIndex=plannedNextIndex>=0?plannedNextIndex:chooseNextIndex();
   if(nextIndex<0){
     releaseCompleted=true;
+    var queuedBefore=visitedMomentIds.length;
     queueReleaseMoments('after_final_track',currentTrack().track_id,currentTrack().disc_number);
     if(repeatEnabled){completedTrackIds=[];plannedNextIndex=-1;loadTrack(shuffleEnabled?Math.floor(Math.random()*releaseTracks.length):0,{autoplay:true});return;}
-    setPlaying(false);setProgress(1,audio.duration||0);persistPlayback(true);renderTracklist();return;
+    // visitedMomentIds only grows when a moment was actually accepted, so this
+    // is also false when the authored closer already played on an earlier run.
+    if(visitedMomentIds.length===queuedBefore)queueJourneyMoment(defaultClosingMoment());
+    setPlaying(false);setProgress(1,audio.duration||0);persistPlayback(true);renderTracklist();
+    onJourneyQueueDrained(showClosingGate);
+    return;
   }
   queueReleaseMoments('during_transition',currentTrack().track_id,currentTrack().disc_number);
   if(playbackSettings.mode==='gapless'&&nextAudio.src){
-    nextAudio.volume=1;var promise=nextAudio.play();if(promise&&promise.catch)promise.catch(function(){loadTrack(nextIndex,{autoplay:true});});
+    deckGain.standby=1;applyDeckVolume();var promise=nextAudio.play();if(promise&&promise.catch)promise.catch(function(){loadTrack(nextIndex,{autoplay:true});});
     handoffFromStandby(nextIndex);
   }else loadTrack(nextIndex,{autoplay:true});
 }
@@ -1456,7 +2233,13 @@ audio.addEventListener('error',function(){console.warn('Audio load error. src=',
 
 function enterObject(destination,shouldPlay){
   var gate=document.getElementById('entry-gate');switchView(destination||'view-player');gate.classList.add('gone');
-  setTimeout(function(){gate.style.display='none';},850);journeyStarted=true;
+  // The coach points at the menu for someone who has not opened the object
+  // yet. Once they are inside it is just a label sitting on the stage.
+  var coach=document.getElementById('menu-coach');
+  if(coach)window.setTimeout(function(){coach.classList.add('hide');},6000);
+  // Matches the gate's dissolve; cutting it short with display:none is what
+  // turns an opening into a flicker.
+  setTimeout(function(){gate.style.display='none';},1700);journeyStarted=true;
   if(destination==='view-player'||!destination){
     queueReleaseMoments('before_first_track','',currentTrack().disc_number);
     /* journeyTrackChanged only queues before_track when there is a previous
@@ -1473,13 +2256,46 @@ function enterObject(destination,shouldPlay){
     }
   }
 }
-document.getElementById('enter-object').addEventListener('click',function(){enterObject('view-player',true);});
+document.getElementById('enter-object').addEventListener('click',function(){
+  ensureAudioGraph();
+  // Arriving at a finished object means starting it over, moments and all —
+  // otherwise "Play again" drops the listener onto a silent last track.
+  if(releaseCompleted){
+    completedTrackIds=[];visitedMomentIds=[];releaseCompleted=false;
+    document.getElementById('begin-again').style.display='';
+    loadTrack(0,{position:0,autoplay:false});
+  }
+  enterObject('view-player',true);
+});
 document.getElementById('begin-again').addEventListener('click',function(){
   try{localStorage.removeItem(resumeKey);}catch(ignore){}try{if(window.parent&&window.parent!==window)window.parent.postMessage({type:'noizes:storage:remove',key:resumeKey},'*');}catch(ignore){}completedTrackIds=[];visitedMomentIds=[];releaseCompleted=false;shuffleEnabled=false;repeatEnabled=false;loadTrack(0,{position:0,autoplay:false});enterObject('view-player',true);
 });
 document.getElementById('entry-archive').addEventListener('click',function(){enterObject('view-archive',false);});
 document.getElementById('entry-history').addEventListener('click',function(){enterObject('view-history',false);});
+
+/* The last page of the object: the gate returns, now offering the ways back
+   in rather than the way in. Deliberately the same surface the collector
+   arrived through, so the experience closes where it opened. */
+function showClosingGate(){
+  var gate=document.getElementById('entry-gate');
+  var enter=document.getElementById('enter-object');
+  if(!gate||!releaseCompleted)return;
+  enter.textContent='Play again';
+  var actions=document.getElementById('entry-return-actions');
+  actions.style.display='flex';
+  document.getElementById('begin-again').style.display='none';
+  document.getElementById('entry-archive').style.display=window.NZ_ARCHIVE?'':'none';
+  document.getElementById('entry-history').style.display=window.NZ_HISTORY?'':'none';
+  openLyricSheet(false);
+  gate.style.display='';
+  // One frame between display and the class, or the transition has nothing to
+  // transition from and the gate simply appears.
+  requestAnimationFrame(function(){requestAnimationFrame(function(){gate.classList.remove('gone');});});
+}
 document.getElementById('btn-play').addEventListener('click',function(){
+  ensureAudioGraph();resumeAudioGraph();
+  var button=this;
+  button.classList.remove('pulse');void button.offsetWidth;button.classList.add('pulse');
   if(audio.paused){playCurrent();}else{audio.pause();cancelTransition();setPlaying(false);}
 });
 document.getElementById('btn-prev').addEventListener('click',function(){
@@ -1504,12 +2320,76 @@ document.getElementById('btn-repeat').addEventListener('click',function(){
 // Seek on the active track only. The release engine owns all audio state.
 (function(){
   var el=document.getElementById('prog-outer');var seeking=false;
-  function seek(e){if(playbackSettings.allow_seek===false)return;var r=el.getBoundingClientRect();var p=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));if(audio.duration)audio.currentTime=p*audio.duration;setProgress(p);}
-  el.addEventListener('mousedown',function(e){seeking=true;seek(e);});
-  el.addEventListener('touchstart',function(e){seeking=true;seek(e.touches[0]);e.preventDefault();},{passive:false});
+  function seek(e){if(playbackSettings.allow_seek===false)return;var r=el.getBoundingClientRect();var p=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));if(audio.duration)audio.currentTime=p*audio.duration;setProgress(p,audio.duration?p*audio.duration:undefined);}
+  function begin(){seeking=true;el.classList.add('scrubbing');}
+  function end(){seeking=false;el.classList.remove('scrubbing');}
+  el.addEventListener('mousedown',function(e){begin();seek(e);});
+  el.addEventListener('touchstart',function(e){begin();seek(e.touches[0]);e.preventDefault();},{passive:false});
   window.addEventListener('mousemove',function(e){if(seeking)seek(e);});
   window.addEventListener('touchmove',function(e){if(seeking)seek(e.touches[0]);},{passive:false});
-  window.addEventListener('mouseup',function(){seeking=false;});window.addEventListener('touchend',function(){seeking=false;});
+  window.addEventListener('mouseup',end);window.addEventListener('touchend',end);
+  // The scrubber is focusable, so it has to answer the arrow keys too.
+  el.addEventListener('keydown',function(e){
+    if(playbackSettings.allow_seek===false||!audio.duration)return;
+    var step=e.key==='ArrowLeft'?-5:e.key==='ArrowRight'?5:e.key==='Home'?-1e9:e.key==='End'?1e9:0;
+    if(!step)return;
+    e.preventDefault();
+    audio.currentTime=Math.max(0,Math.min(audio.duration-.05,audio.currentTime+step));
+  });
+})();
+
+/* ── Level, balance, and the lyric sheet ── */
+(function(){
+  var volume=document.getElementById('vol');
+  var pan=document.getElementById('pan');
+  var mute=document.getElementById('btn-mute');
+  var reset=document.getElementById('btn-pan-reset');
+
+  function arm(){ensureAudioGraph();resumeAudioGraph();}
+  volume.addEventListener('pointerdown',arm);
+  pan.addEventListener('pointerdown',arm);
+  volume.addEventListener('input',function(){
+    arm();masterVolume=Number(volume.value)/100;muted=false;applyVolume();
+  });
+  volume.addEventListener('change',function(){persistPlayback(true);});
+  pan.addEventListener('input',function(){arm();masterPan=Number(pan.value)/100;applyPan();});
+  pan.addEventListener('change',function(){persistPlayback(true);});
+  mute.addEventListener('click',function(){arm();muted=!muted;applyVolume();persistPlayback(true);});
+  reset.addEventListener('click',function(){arm();masterPan=0;applyPan();persistPlayback(true);});
+
+  var toggle=document.getElementById('btn-lyric-sheet');
+  var close=document.getElementById('lyric-sheet-close');
+  toggle.addEventListener('click',function(){
+    openLyricSheet(!document.getElementById('lyric-sheet').classList.contains('open'));
+  });
+  close.addEventListener('click',function(){openLyricSheet(false);});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&document.getElementById('lyric-sheet').classList.contains('open')) openLyricSheet(false);
+  });
+
+  /* Some browsers only let an AudioContext start inside a gesture, and the
+     first gesture is not always the play button — a collector who reaches for
+     the volume, or resumes from a saved position, must still get sound. */
+  ['pointerdown','keydown'].forEach(function(name){
+    window.addEventListener(name,function once(){window.removeEventListener(name,once);ensureAudioGraph();resumeAudioGraph();},{passive:true});
+  });
+})();
+
+/* The stage repaints every frame while the record plays. `timeupdate` fires
+   about four times a second, which is fine for bookkeeping and visibly steppy
+   for a progress bar and a lyric that is supposed to land on the beat. */
+(function(){
+  var frame=0;
+  function tick(){
+    frame=requestAnimationFrame(tick);
+    if(audio.paused&&!transitioning)return;
+    var duration=audio.duration;
+    if(!duration||!isFinite(duration))return;
+    var at=audio.currentTime;
+    setProgress(at/duration,at);
+    updateLyrics(at*1000-LYRIC_OFFSET_MS);
+  }
+  frame=requestAnimationFrame(tick);
 })();
 
 var restored=restoredPlayback();
@@ -1521,9 +2401,13 @@ if(restored&&restored.current_track_id){
   repeatEnabled=playbackSettings.allow_repeat!==false&&restored.repeat_enabled===true;
   visitedMomentIds=Array.isArray(restored.journey_moments_visited)?restored.journey_moments_visited:[];
   activeVersions=(restored.active_versions&&typeof restored.active_versions==='object')?restored.active_versions:{};
+  if(typeof restored.volume==='number')masterVolume=Math.max(0,Math.min(1,restored.volume));
+  if(typeof restored.pan==='number')masterPan=Math.max(-1,Math.min(1,restored.pan));
+  muted=restored.muted===true;
   loadTrack(restoredIndex>=0?restoredIndex:0,{position:(restored.current_track_position_ms||0)/1000,autoplay:false});
   if(restoredIndex>0||restored.current_track_position_ms>5000){document.getElementById('enter-object').textContent='Resume from Track '+((restoredIndex>=0?restoredIndex:0)+1);document.getElementById('entry-return-actions').style.display='flex';document.getElementById('entry-archive').style.display=window.NZ_ARCHIVE?'':'none';document.getElementById('entry-history').style.display=window.NZ_HISTORY?'':'none';}
 }else loadTrack(0,{autoplay:false});
+applyVolume();applyPan();
 renderPlaybackOptions();
 document.getElementById('btn-tone').style.display=currentTrack().src?'none':'';
 window.addEventListener('beforeunload',function(){persistPlayback(true);});
@@ -1619,18 +2503,32 @@ function updateLyrics(ms){
   // When before first lyric, show first line as "next"
   if(idx === -1 && lyrics.length > 0) next = lyrics[0];
 
+  var currentEl = document.getElementById('lyric-current');
+  var stageEl   = document.getElementById('stage-lyrics');
   document.getElementById('lyric-prev').textContent    = prev ? prev.text : '';
-  document.getElementById('lyric-current').textContent = cur  ? cur.text  : '♪';
+  currentEl.textContent                                = cur  ? cur.text  : '♪';
   document.getElementById('lyric-next').textContent    = next ? next.text : '';
   document.getElementById('lyric-bg').textContent      = cur  ? cur.text.charAt(0) : '♪';
+
+  // Replay the arrival on every line. Removing the class, forcing a reflow and
+  // re-adding it is what makes the animation restart rather than sit finished.
+  currentEl.classList.remove('turn');
+  if(stageEl) stageEl.classList.remove('turn');
+  void currentEl.offsetWidth;
+  currentEl.classList.add('turn');
+  if(stageEl) stageEl.classList.add('turn');
 
   // Highlight in list
   document.querySelectorAll('.lyric-item').forEach(function(el){ el.classList.remove('active'); });
   if(idx >= 0){
     var active = document.getElementById('lyric-item-'+idx);
+    // Only chase the line while the sheet is up — scrolling a panel nobody can
+    // see drags its ancestors around instead.
     if(active){
       active.classList.add('active');
-      active.scrollIntoView({behavior:'smooth', block:'nearest'});
+      if(document.getElementById('lyric-sheet').classList.contains('open')){
+        active.scrollIntoView({behavior:'smooth', block:'nearest'});
+      }
     }
   }
 }
@@ -1639,15 +2537,21 @@ function updateLyrics(ms){
    5. INTRO — fade-in player elements on load
    ═══════════════════════════════════════════════════ */
 window.addEventListener('load', function(){
-  // Simple CSS-based entrance — no GSAP dependency
-  var els = ['#p-artist span', '.p-title', '.p-chips', '.p-controls', '.tabs'];
+  // The stage assembles behind the entry gate, so it is already composed by
+  // the time the gate dissolves. Blur carries the depth; the stagger carries
+  // the order the eye should read them in.
+  var els = ['.p-cover-thumb', '#p-artist span', '.p-title', '.p-chips', '.stage-lyrics', '.transport'];
   els.forEach(function(sel, i){
     var el = document.querySelector(sel);
     if(!el) return;
     el.style.opacity = '0';
-    el.style.transform = 'translateY(16px)';
-    el.style.transition = 'opacity .6s ease, transform .6s ease';
-    setTimeout(function(){ el.style.opacity=''; el.style.transform=''; }, 100 + i*120);
+    el.style.transform = 'translateY(20px)';
+    el.style.filter = 'blur(12px)';
+    el.style.transition = 'opacity .9s var(--ease-out), transform .9s var(--ease-out), filter .9s var(--ease-out)';
+    setTimeout(function(){ el.style.opacity=''; el.style.transform=''; el.style.filter=''; }, 120 + i*110);
+    // Inline transitions would otherwise fight the sleeve's breathing loop and
+    // the cover's own resize easing for the rest of the session.
+    setTimeout(function(){ el.style.transition=''; }, 120 + i*110 + 1000);
   });
 });
 </script>
@@ -1695,16 +2599,20 @@ var mix=function(a,b,t){t=t===undefined?.5:t;return a.map(function(v,i){return M
 var rgba=function(c,a){return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';};
 var WHITE=[255,255,255];
 var GC={};
-(function(){
+var glowCache={};
+function syncGamePalette(){
   GC.primary=hex2rgb(CFG.theme.primary);
   GC.secondary=hex2rgb(CFG.theme.accent);
   GC.accent=mix(mix(GC.primary,GC.secondary,.5),WHITE,.55);
   GC.trail=mix(GC.primary,WHITE,.45);
   GC.hues=[GC.secondary,GC.primary,mix(GC.secondary,GC.accent,.5),GC.accent,mix(GC.secondary,WHITE,.35)];
-})();
+  glowCache={};   // the sprites are baked per colour; stale ones stay purple
+}
+syncGamePalette();
+// The games are drawn from the object's palette, so they follow the cover too.
+window.addEventListener('nz:palette',syncGamePalette);
 
 /* ---------- glow sprites ---------- */
-var glowCache={};
 function glow(color){
   var key=color.join(',');
   if(glowCache[key]) return glowCache[key];
@@ -1743,7 +2651,25 @@ var engine={
   _lastBeatT:0, _flux:[], listeners:[],
   ensure:function(){
     if(this.ctx) return;
+    /* The transport already routes both decks through one context for volume
+       and pan. A second createMediaElementSource on the same element throws,
+       which used to leave the games deaf and faking their motion — so tap the
+       existing master instead of building a rival graph. */
+    var shared=window.NZ_AUDIO&&window.NZ_AUDIO.ensure&&window.NZ_AUDIO.ensure();
+    if(shared&&shared.context){
+      this.ctx=shared.context;
+      try{
+        this.analyser=this.ctx.createAnalyser();
+        this.analyser.fftSize=1024; this.analyser.smoothingTimeConstant=.35;
+        // Analyser only — the master is already connected to the destination.
+        window.NZ_AUDIO.tap(this.analyser);
+        this.freq=new Uint8Array(this.analyser.frequencyBinCount);
+        this._prev=new Uint8Array(this.analyser.frequencyBinCount);
+      }catch(e){ this.analyser=null; }
+      return;
+    }
     var AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC){ this.analyser=null; return; }
     this.ctx=new AC();
     try{
       var src=this.ctx.createMediaElementSource(audio);

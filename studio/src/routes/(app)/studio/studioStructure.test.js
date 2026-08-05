@@ -16,9 +16,28 @@ describe('Studio workflow contract', () => {
     expect(extras).toContain("import StepPlay from './StepPlay.svelte'");
   });
 
-  it('renders only the canonical ultra-v2 preview branch', () => {
+  it('previews exactly the two experience systems a creator can choose', () => {
     expect(page).toContain("$template === 'ultra-v2'");
+    expect(page).toContain("$template === 'transcendence-v1'");
+    // Archived templates must stay unreachable.
     expect(page).not.toContain("$template === 'codex'");
     expect(page).not.toContain("$template === 'transmission'");
+    expect(page).not.toContain("$template === 'monument'");
+  });
+
+  it('keeps the system selector inside the Experience step rather than adding a ninth', () => {
+    const experienceStep = readFileSync(new URL('../../../lib/components/StepExperience.svelte', import.meta.url), 'utf8');
+    expect(page).toContain('<StepExperience />');
+    expect(experienceStep).toContain('CANONICAL_TEMPLATE');
+    expect(experienceStep).toContain('TRANSCENDENCE_TEMPLATE');
+    // ULTRA's own authoring is unchanged: the Guide editor still renders under it.
+    expect(experienceStep).toContain('<StepGuide />');
+  });
+
+  it('does not persist measured artefacts into the draft', () => {
+    // Terrain and analysis are derived from the audio. A draft that carried them
+    // would be megabytes and could go stale against a re-uploaded master.
+    expect(page).toContain('draftableTranscendence(get(transcendence))');
+    expect(page).toContain('terrain: null, analysis: null');
   });
 });

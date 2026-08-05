@@ -35,12 +35,45 @@ const QUALITY_PROFILES = {
   },
 };
 
+/* Art direction. The creator chooses how the measured landscape is *presented*;
+ * they never choose its shape. Nothing here can change the terrain image, so
+ * changing the palette or the sun angle never requires re-analysing the
+ * recording — which is the whole reason these are separate from the analysis.
+ *
+ * Defaults are the reference edition's own values, so an object that supplies no
+ * art direction is lit and scaled exactly as the reference is.
+ */
+const ART = Object.assign({
+  heightScale: 1,          // multiplies elevation
+  ridgeEmphasis: 1,        // multiplies how far harmonics stand out as ridges
+  timeScale: 1,            // multiplies world distance per second of recording
+  terracing: true,         // contour steps on the lower slopes
+  terraceStep: 1.5,        // world units per step
+  palette: 'alabaster',
+  // These two reproduce the reference edition's sun vector exactly: a broad soft
+  // key almost overhead, slightly forward, so the massifs cast relief toward the
+  // viewer. A gallery, not a landscape at noon.
+  sunElevation: 64.32,     // degrees above the horizon
+  sunAzimuth: -146.31,     // degrees, 0 = straight down the time axis
+  flightAltitude: 1,       // multiplies every shot's altitude
+}, (typeof TX !== 'undefined' && TX.artDirection) || {});
+
+/* Three fixed palettes, not colour pickers. Each is a coherent lighting design —
+ * sun, lit ceiling, far wall, floor and fog together — because letting a creator
+ * set five colours independently reliably produces a worse world than any of
+ * these three. */
+const PALETTES = {
+  alabaster: { sun: [1.000, 0.925, 0.845], sky: [0.070, 0.068, 0.066], horizon: [0.052, 0.044, 0.038], ground: [0.014, 0.013, 0.014], fog: [0.045, 0.040, 0.038] },
+  oxide:     { sun: [1.000, 0.842, 0.700], sky: [0.082, 0.058, 0.046], horizon: [0.064, 0.036, 0.026], ground: [0.020, 0.012, 0.009], fog: [0.056, 0.034, 0.026] },
+  frost:     { sun: [0.878, 0.936, 1.000], sky: [0.058, 0.066, 0.080], horizon: [0.038, 0.046, 0.060], ground: [0.011, 0.013, 0.017], fog: [0.034, 0.040, 0.052] },
+};
+
 /* World scale. These are the only numbers that convert the recording into
  * geography, and they are declared once so the timeline, the camera, the
  * landmarks and the Essential fallback all agree. */
-const TIME_SCALE = 26;      // world units per second of recording
-const BAND_WIDTH = 420;     // world units across the whole frequency axis
-const HEIGHT_SCALE = 30;    // world units at full energy in the lowest band
+const TIME_SCALE = 26 * ART.timeScale;      // world units per second of recording
+const BAND_WIDTH = 420;                     // world units across the whole frequency axis
+const HEIGHT_SCALE = 30 * ART.heightScale;  // world units at full energy in the lowest band
 
 class WorldRenderer {
   constructor(canvas, options) {
@@ -81,11 +114,21 @@ class WorldRenderer {
     // A gallery, not a landscape at noon: the key is a broad soft source almost
     // overhead through the oculus, slightly forward so the massifs cast their
     // relief toward the viewer.
-    this.sun = { dir: new T.Vector3(-0.24, 0.90, -0.36).normalize(), color: new T.Color(1.0, 0.925, 0.845) };
-    this.sky = new T.Color(0.070, 0.068, 0.066);      // the lit ceiling
-    this.horizon = new T.Color(0.052, 0.044, 0.038);  // the dark warm wall
-    this.ground = new T.Color(0.014, 0.013, 0.014);   // the polished floor
-    this.fog = new T.Color(0.045, 0.040, 0.038);
+    const palette = PALETTES[ART.palette] || PALETTES.alabaster;
+    const elevation = ART.sunElevation * Math.PI / 180;
+    const azimuth = ART.sunAzimuth * Math.PI / 180;
+    this.sun = {
+      dir: new T.Vector3(
+        Math.cos(elevation) * Math.sin(azimuth),
+        Math.sin(elevation),
+        Math.cos(elevation) * Math.cos(azimuth),
+      ).normalize(),
+      color: new T.Color(...palette.sun),
+    };
+    this.sky = new T.Color(...palette.sky);            // the lit ceiling
+    this.horizon = new T.Color(...palette.horizon);    // the dark warm wall
+    this.ground = new T.Color(...palette.ground);      // the polished floor
+    this.fog = new T.Color(...palette.fog);
 
     this.field = {
       uTerrain: { value: this._tex('terrain', { repeat: false }) },
@@ -95,13 +138,13 @@ class WorldRenderer {
       uDuration: { value: this.analysis.duration },
       uHeightScale: { value: HEIGHT_SCALE },
       uHeightGamma: { value: 1.75 },
-      uRidgeScale: { value: 3.4 },
+      uRidgeScale: { value: 3.4 * ART.ridgeEmphasis },
       uDetailScale: { value: this.profile.detailScale * 0.8 },
       uPlayhead: { value: 0 },
       // Contour terracing: the lower slopes are cut into level steps like a
       // topographic model, the summits stay smooth.
-      uTerrace: { value: 0.85 },
-      uTerraceStep: { value: 1.5 },
+      uTerrace: { value: ART.terracing ? 0.85 : 0 },
+      uTerraceStep: { value: ART.terraceStep },
       uTerraceFrom: { value: 3.0 },
       uTerraceTo: { value: 26.0 },
       uBaseHeight: { value: 2.2 },
@@ -548,7 +591,7 @@ class WorldRenderer {
 
     // Dynamics decide how tall the world is allowed to be.
     this.field.uHeightScale.value = HEIGHT_SCALE * mix(0.86, 1.16, medium) * f.relief;
-    this.field.uRidgeScale.value = 3.4 * mix(0.7, 1.35, analysis.mean('voice', t, 0.8));
+    this.field.uRidgeScale.value = 3.4 * ART.ridgeEmphasis * mix(0.7, 1.35, analysis.mean('voice', t, 0.8));
 
     // ---- the ground follows the camera -------------------------------------
     const origin = this.terrainMaterial.uniforms.uGridOrigin.value;

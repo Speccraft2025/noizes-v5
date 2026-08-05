@@ -229,9 +229,34 @@ export const assets = lens(
   }
 );
 
-// Which template / theme the package uses
-// Canonical experience. Legacy draft values are normalized during compilation.
+// Which experience system the package uses: 'ultra-v2' or 'transcendence-v1'.
+// Legacy draft values are normalized during compilation.
 export const template = writable('ultra-v2');
+
+// Transcendence authoring state.
+//
+// `terrain` and `analysis` are measured from the audio, so they are derived, not
+// authored: the draft deliberately does not persist them and a creator re-runs the
+// analysis after reopening. Everything a creator actually decided — which track,
+// where the lines sit, how the world is lit — does persist.
+export const transcendence = writable({
+  track_id: '',
+  terrain: null,          // Blob, session only
+  analysis: null,         // object, session only
+  landmarks: [],
+  art_direction: {},
+  arc_end_seconds: null,
+  quality_preview: 'balanced',
+});
+
+/** The half of the Transcendence state worth writing into a draft. */
+export const draftableTranscendence = (value) => ({
+  track_id: value.track_id || '',
+  landmarks: value.landmarks || [],
+  art_direction: value.art_direction || {},
+  arc_end_seconds: value.arc_end_seconds ?? null,
+  quality_preview: value.quality_preview || 'balanced',
+});
 
 // Optional game add-ons baked into the experience ("play" block).
 // games: enabled game ids ([] = no Games tab in the package).

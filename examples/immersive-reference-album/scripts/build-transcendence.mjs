@@ -9,12 +9,19 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { access, cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
 const REPO = join(ROOT, '..', '..');
 const GUIDED = join(ROOT, 'build', 'The-House-That-Remembered-Us-Guided');
+// This edition's own inputs: the analysis payload, the procedural textures and
+// the hand-authored arc.
 const SOURCE = join(ROOT, 'transcendence');
+// The runtime, the document and the stylesheet live in Studio and are shared with
+// every Studio-authored Transcendence object. Reading them from there rather than
+// keeping a copy here is what stops the reference edition from silently drifting
+// away from what creators actually get — if it still runs, the engine still works.
+const RUNTIME_SOURCE = join(REPO, 'studio', 'src', 'lib', 'experiences', 'transcendence');
 const PKG = join(ROOT, 'build', 'The-House-That-Remembered-Us-Transcendence');
 const OUT = join(ROOT, 'dist', 'The-House-That-Remembered-Us-Transcendence.nz');
 
@@ -110,11 +117,18 @@ const RUNTIME_MODULES = [
 ];
 
 const runtime = (await Promise.all(
-  RUNTIME_MODULES.map(async file => `\n/* ==== ${file} ==== */\n` + await readFile(join(SOURCE, 'runtime', file), 'utf8')),
+  RUNTIME_MODULES.map(async file => `\n/* ==== ${file} ==== */\n` + await readFile(join(RUNTIME_SOURCE, 'runtime', file), 'utf8')),
 )).join('\n');
 
-const css = await readFile(join(SOURCE, 'styles.css'), 'utf8');
+const css = await readFile(join(RUNTIME_SOURCE, 'styles.css'), 'utf8');
 const analysisPayload = await readFile(analysisPath, 'utf8');
+
+// The arc. Every time in it is a measured musical event from the analysis payload
+// above; it lives beside this build rather than inside the runtime so the engine
+// carries no opinion about any one recording.
+const sequencePath = join(SOURCE, 'sequence.reference.json');
+const sequence = JSON.parse(await readFile(sequencePath, 'utf8'));
+if (sequence.length < 20) throw new Error(`Expected the authored sequence to load; found ${sequence.length} cues`);
 
 const edition = {
   edition_id: EDITION_ID,
@@ -141,16 +155,51 @@ const colophon = `${edition.name} · copy ${edition.copy}. Demonstration edition
   + `Runtime: Three.js ${three.version} (MIT) and GSAP ${gsapVersion}, both bundled locally. `
   + `No network connection is used or possible: this page declares connect-src 'none'.`;
 
-let html = await readFile(join(SOURCE, 'experience.html'), 'utf8');
-html = html
-  .replace('/* TRANSCENDENCE_CSS */', () => css)
-  .replace('<!-- DEBUG_PANEL -->', () => debugPanel)
-  .replace('/* ANALYSIS_PAYLOAD */', () => analysisPayload)
-  .replace('/* EDITION_PAYLOAD */', () => JSON.stringify(edition))
-  .replace('/* THREE_RUNTIME */', () => three.code)
-  .replace('/* GSAP_RUNTIME */', () => gsap)
-  .replace('/* TRANSCENDENCE_RUNTIME */', () => runtime)
-  .replace('<p id="colophon-text"></p>', `<p id="colophon-text">${colophon}</p>`);
+// The runtime knows nothing about which record this is; the configuration tells
+// it. These are the reference edition's answers.
+const config = {
+  version: '1.0.0',
+  slice: { track: SLICE.track, start: SLICE.start, end: SLICE.end },
+  assets: {
+    terrain: 'analysis/track-01.terrain.png',
+    dustGrain: 'assets/images/tx-dust-grain.png',
+    blueNoise: 'assets/images/tx-blue-noise.png',
+  },
+};
+
+const { fillMarkers, escapeJsonPayload, audioSourceTags, timecode } =
+  await import(pathToFileURL(join(RUNTIME_SOURCE, 'markers.js')).href);
+
+const template = await readFile(join(RUNTIME_SOURCE, 'experience.html'), 'utf8');
+let html = fillMarkers(template, {
+  css,
+  three: three.code,
+  gsap,
+  runtime,
+  analysis: analysisPayload,
+  edition: escapeJsonPayload(edition),
+  config: escapeJsonPayload(config),
+  sequence: escapeJsonPayload(sequence),
+  debugPanel,
+  title: 'Home, Sweet Home',
+  subtitle: 'Track one · Sonic Terrain',
+  credit: 'Harry Macdonough, tenor · Charles D’Almaine, violin · recorded 23 January 1902',
+  durationLabel: timecode(SLICE.end),
+  arcEnd: String(SLICE.end),
+  thresholdTitle: 'A 1902 recording, unlit',
+  thresholdAction: 'Press and hold to enter the recording',
+  thresholdHint: 'Below you is the whole track: time runs to the horizon, frequency runs left to right, elevation is loudness. Holding the gesture begins the flight.',
+  openingTitle: 'The sealed object',
+  openingScene: 'The whole recording lies below in the dark, unlit and untravelled.',
+  // This edition earned the measured claim: its landmarks were fitted to detected
+  // vocal phrases. Studio-authored objects say something weaker and true.
+  lyricProvenance: 'Line onsets are anchored to measured vocal-phrase starts in the recording. The supplied lyric file carries evenly spaced reference timings; the drift between the two is recorded in the package’s analysis file.',
+  audioSources: audioSourceTags([
+    { src: 'audio/track-01.mp3', type: 'audio/mpeg' },
+    { src: 'audio/track-01.ogg', type: 'audio/ogg' },
+  ]),
+});
+html = html.replace('<p id="colophon-text"></p>', `<p id="colophon-text">${colophon}</p>`);
 
 await put(join(PKG, 'experience.html'), html);
 
@@ -170,10 +219,10 @@ await cp(join(SOURCE, 'analysis', 'track-01.terrain.png'), join(PKG, 'analysis',
 /* ---------------------------------------------------------------- timeline */
 
 const analysis = JSON.parse(analysisPayload);
-const sequenceSource = await readFile(join(SOURCE, 'runtime', '04-sequence.js'), 'utf8');
-const cueTimes = [...sequenceSource.matchAll(/time:\s*([\d.]+),\s*id:\s*'([\w-]+)',\s*phase:\s*'([\w-]+)',\s*shot:\s*'(\w+)'/g)]
-  .map(m => ({ time: Number(m[1]), id: m[2], phase: m[3], shot: m[4] }));
-if (cueTimes.length < 20) throw new Error(`Expected the authored sequence to parse; found ${cueTimes.length} cues`);
+// The shipped timeline is projected from the same array the runtime receives, so
+// the two can no longer disagree — previously this was re-parsed out of the
+// runtime source with a regex, which could silently drift.
+const cueTimes = sequence.map(({ time, id, phase, shot }) => ({ time, id, phase, shot }));
 
 await put(join(PKG, 'timeline', 'transcendence.timeline.json'), json({
   schema_version: '1.0.0',

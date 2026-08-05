@@ -56,7 +56,9 @@ class CameraDirector {
     const scale = WorldRenderer.scale;
     const f = CameraDirector.evaluate(shot, progress, this.reducedMotion);
 
-    let band = f.band, lookBand = f.lookBand, alt = f.alt;
+    // The creator's altitude bias scales every shot together, so each shot's
+    // composed framing survives: a higher flight is the same flight, further up.
+    let band = f.band, lookBand = f.lookBand, alt = f.alt * ART.flightAltitude;
     if (!this.reducedMotion && state.attentionEnabled && presence) {
       // Attention is presence, not control: it moves the flight a little across
       // the frequency axis and a little in altitude, and never takes the shot

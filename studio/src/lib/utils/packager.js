@@ -1,6 +1,8 @@
 import JSZip from 'jszip';
 import { buildExperienceHTML, buildGuide } from './experience.js';
-import { CANONICAL_TEMPLATE, normalizeEdition } from './project.js';
+import { CANONICAL_TEMPLATE, normalizeEdition, normalizeTemplate, TRANSCENDENCE_TEMPLATE } from './project.js';
+import { buildTranscendenceHTML, TRANSCENDENCE_SCHEMA, QUALITY_PROFILES } from './transcendence.js';
+import { describeFailures, validateTranscendence } from './validateTranscendence.js';
 import { normalizeReleaseProject, orderedTracks } from '../domain/release.js';
 import { normalizePlaybackSettings } from '../domain/playback.js';
 import { materializeJourney } from '../domain/journey.js';
@@ -44,7 +46,11 @@ export async function buildPackage(input) {
     extras: input.extras,
   });
   const zip = new JSZip();
-  const template = CANONICAL_TEMPLATE;
+  // The creator's chosen experience system. Legacy and absent values still
+  // collapse to ULTRA, so this cannot change what an existing draft produces.
+  const template = normalizeTemplate(input.template ?? project.template);
+  const isTranscendenceBuild = template === TRANSCENDENCE_TEMPLATE;
+  const transcendence = input.transcendence ?? {};
   const play = input.play ?? {};
   const extras = input.extras ?? project.extras ?? {};
   const sizeReport = estimatePackageSize(project, extras);
@@ -260,6 +266,121 @@ export async function buildPackage(input) {
     });
   }
 
+  /* ------------------------------------------------- the Sonic Terrain, if any */
+
+  // The terrain and the analysis are real, hashed package components — presented
+  // to the same `writeComponent` as any other asset, so they inherit the inventory
+  // and authenticity record for free. The terrain image is not an illustration of
+  // the recording: it is the landscape the runtime flies over.
+  let transcendenceBuild = null;
+  if (isTranscendenceBuild) {
+    const terrainTrack = tracks.find((track) => track.track_id === transcendence.track_id)
+      ?? tracks.find((track) => !track.hidden)
+      ?? tracks[0];
+    if (!terrainTrack) throw new Error('Transcendence needs a track to analyse.');
+    if (!transcendence.terrain) throw new Error('Transcendence needs an analysed terrain. Run the analysis in the Experience step.');
+    if (!transcendence.analysis) throw new Error('Transcendence needs an analysis payload. Run the analysis in the Experience step.');
+
+    const audioComponent = components.find((component) =>
+      component.track_id === terrainTrack.track_id && component.type !== 'image' && component.path.includes('/audio/'));
+    if (!audioComponent) throw new Error('Transcendence needs the selected track to have packaged audio.');
+
+    const terrainPath = `analysis/${terrainTrack.track_id}.terrain.png`;
+    const analysisPath = `analysis/${terrainTrack.track_id}.analysis.json`;
+
+    await writeComponent({
+      asset_id: `terrain-${terrainTrack.track_id}`,
+      scope: 'track',
+      type: 'image',
+      role: 'sonic_terrain',
+      title: 'Sonic Terrain — the landscape itself',
+      file: transcendence.terrain,
+      mime: 'image/png',
+      filename: `${terrainTrack.track_id}.terrain.png`,
+    }, terrainPath, { track_id: terrainTrack.track_id });
+
+    const lyricRecord = project.lyrics.find((entry) => entry.track_id === terrainTrack.track_id);
+    transcendenceBuild = await buildTranscendenceHTML({
+      identity: {
+        title: release.title,
+        artist: release.primary_artist,
+        release_id: releaseId,
+      },
+      edition: fixedEdition,
+      analysis: transcendence.analysis,
+      track: {
+        track_id: terrainTrack.track_id,
+        title: terrainTrack.title,
+        primary_artist: terrainTrack.primary_artist,
+        audio: { src: audioComponent.path, mime: audioComponent.mime },
+        terrain: terrainPath,
+      },
+      timedLines: lyricRecord?.timed_lines ?? [],
+      landmarks: transcendence.landmarks ?? [],
+      artDirection: transcendence.art_direction ?? {},
+      arcEndSeconds: transcendence.arc_end_seconds ?? null,
+      creditLine: [terrainTrack.primary_artist, ...(terrainTrack.featured_artists ?? [])].filter(Boolean).join(' · '),
+    });
+
+    // Written from the same object the document embeds, so the shipped component
+    // and the page can never disagree about what was measured.
+    await writeComponent({
+      asset_id: `analysis-${terrainTrack.track_id}`,
+      scope: 'track',
+      type: 'analysis',
+      role: 'deterministic_music_analysis',
+      title: 'Deterministic musical analysis',
+      file: new Blob([JSON.stringify(transcendenceBuild.analysis, null, 1)], { type: 'application/json' }),
+      mime: 'application/json',
+      filename: `${terrainTrack.track_id}.analysis.json`,
+    }, analysisPath, { track_id: terrainTrack.track_id });
+
+    const timelinePath = `timeline/${terrainTrack.track_id}.timeline.json`;
+    const timeline = {
+      schema_version: '2.0.0',
+      master_clock: 'audio.currentTime',
+      track_id: terrainTrack.track_id,
+      range_seconds: [0, transcendenceBuild.arcEnd],
+      reconstruction: 'Reduce the authored sequence from the beginning at every frame: the state at t depends on nothing but t.',
+      analysis: analysisPath,
+      determinism: 'Every particle position is f(seed, audioTime) with no integration and no frame history. Seeking, pausing, tab changes and replay reconstruct identical state.',
+      authorship: {
+        statement: 'The shape of this flight is a Noizes-authored itinerary; when each move happens is measured from this recording. Lyric landmark positions are creator-placed, not measured.',
+        cues_anchored_to_measurement: transcendenceBuild.snapped,
+        cues_total: transcendenceBuild.sequence.length,
+      },
+      cues: transcendenceBuild.sequence.map(({ time, id, phase, shot, anchored_to }) => ({ time, id, phase, shot, anchored_to })),
+    };
+    await writeComponent({
+      asset_id: `timeline-${terrainTrack.track_id}`,
+      scope: 'track',
+      type: 'timeline',
+      role: 'authored_sequence',
+      title: 'Authored flight sequence',
+      file: new Blob([JSON.stringify(timeline, null, 2)], { type: 'application/json' }),
+      mime: 'application/json',
+      filename: `${terrainTrack.track_id}.timeline.json`,
+    }, timelinePath, { track_id: terrainTrack.track_id });
+
+    transcendenceBuild.descriptor = {
+      entry: 'experience.html',
+      schema: TRANSCENDENCE_SCHEMA,
+      template,
+      type: 'sonic-terrain',
+      default_mode: 'world',
+      fallback_mode: 'essential',
+      timeline: timelinePath,
+      analysis: analysisPath,
+      terrain: terrainPath,
+      reduced_motion_supported: true,
+      navigation: 'music-directed',
+      clock: 'audio.currentTime',
+      quality_profiles: QUALITY_PROFILES,
+      authored_arc: { track_id: terrainTrack.track_id, start_seconds: 0, end_seconds: transcendenceBuild.arcEnd },
+    };
+    onProgress({ percent: 66, stage: 'Writing the terrain' });
+  }
+
   const authoredJourney = materializeJourney(project.journey, tracks);
   const runtimeJourney = {
     ...stripFiles(authoredJourney),
@@ -340,6 +461,18 @@ export async function buildPackage(input) {
   if (notes.length) {
     experienceJson.attachments = notes.map(({ id, title, path, mime }) => ({ id, title, path, mime, kind: 'notes' }));
   }
+  if (transcendenceBuild) {
+    Object.assign(experienceJson, transcendenceBuild.descriptor, {
+      schema_version: TRANSCENDENCE_SCHEMA,
+      art_direction: transcendenceBuild.config.artDirection,
+      interaction: {
+        threshold: 'press and hold to lower the stylus; unlocks media and AudioContext in one gesture',
+        attention: 'pointer, touch or arrow keys; stillness thickens the deposit',
+        engraving: 'hold during an inscription to press that line deeper; affects only the residue',
+      },
+      lyric_landmarks: 'creator-placed',
+    });
+  }
   zip.file('experience.json', JSON.stringify(experienceJson, null, 2));
 
   const safeLinks = (extras.links || []).filter((link) =>
@@ -407,7 +540,9 @@ export async function buildPackage(input) {
       hidden: track.hidden,
     })),
     components,
-    experience: { entry: 'experience.html', schema: '3.0.0', template },
+    experience: transcendenceBuild
+      ? transcendenceBuild.descriptor
+      : { entry: 'experience.html', schema: '3.0.0', template },
     edition: { path: 'edition.json', edition_id: project.edition.edition_id, applies_to: 'release' },
     authenticity: { path: 'authenticity.json', method: authenticity.method },
     rights: { path: 'rights.json' },
@@ -550,7 +685,10 @@ export async function buildPackage(input) {
       ...project.journey.navigation,
     }),
   };
-  const experienceHTML = buildExperienceHTML({
+  // Transcendence assembles its own document, and references audio and terrain by
+  // relative path — no base64 anywhere, which is why its packages are the size of
+  // their media rather than 1.4x that.
+  const experienceHTML = transcendenceBuild ? transcendenceBuild.html : buildExperienceHTML({
     identity: legacyIdentity,
     edition: fixedEdition,
     rights: releaseRights,
@@ -572,10 +710,24 @@ export async function buildPackage(input) {
   zip.file('experience.html', experienceHTML);
   onProgress({ percent: 82, stage: 'Building offline experience' });
 
+  // A Transcendence object is validated against the archive it will actually ship
+  // as, before it is compressed and handed over. A creator must not be able to
+  // publish a package that opens black.
+  if (transcendenceBuild && input.validate !== false) {
+    onProgress({ percent: 80, stage: 'Validating the experience' });
+    const report = await validateTranscendence(zip);
+    if (!report.ok) {
+      const error = new Error(`This package would not open correctly:\n${describeFailures(report.failures)}`);
+      error.name = 'TranscendenceValidationError';
+      error.report = report;
+      throw error;
+    }
+  }
+
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' }, (metadata) => {
     onProgress({ percent: 82 + Math.round((metadata.percent / 100) * 18), stage: 'Compressing package' });
   });
-  const filename = `${safeFilename(release.title || 'untitled').toLowerCase()}_ultra-v2_noizes.nz`;
+  const filename = `${safeFilename(release.title || 'untitled').toLowerCase()}_${template}_noizes.nz`;
 
   if (input.download !== false && typeof document !== 'undefined') {
     const url = URL.createObjectURL(blob);

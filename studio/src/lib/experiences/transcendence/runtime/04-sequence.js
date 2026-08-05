@@ -1,148 +1,26 @@
 /* The authored sequence — a flight through the recording.
  *
- * Every `time` below is a *measured* musical event from
- * analysis/track-01.analysis.json: a vocal-phrase onset, a section boundary, a
- * breath, or the loudest frame of the slice. None of them were placed by ear.
+ * The arc is authored per object and injected, not compiled into the engine.
  *
- * Cues express interpretation, not signal routing. "The voice raises a ridge
- * and the line is cut into it" is a cue; "band 3 scales mesh 7" is not, and
- * does not appear anywhere in this runtime.
+ * The reference edition ships a hand-authored 104-second arc in which every
+ * `time` is a measured musical event from its analysis payload — a vocal-phrase
+ * onset, a section boundary, a breath, the loudest frame of the slice. Studio
+ * generates an arc from the creator's own analysis instead. Both express
+ * interpretation, not signal routing: "the voice raises a ridge and the line is
+ * cut into it" is a cue; "band 3 scales mesh 7" is not, and does not appear
+ * anywhere in this runtime.
+ *
+ * The shot vocabulary below is shared by every arc, which is what stops the two
+ * producers from drifting into two different camera languages.
  */
-
-const SEQUENCE = [
-  {
-    time: 0.0, id: 'atlas', phase: 'atlas', shot: 'atlas',
-    title: 'The track, entire',
-    scene: 'The whole recording lies below as a single continent of sound. Time runs away toward the horizon; frequency runs left to right, the low register a dark massif on the left, the high register a pale frost at the right-hand edge. Nothing here was modelled — this is the shape of the record itself.',
-    world: { air: 0.30, relief: 1, atmosphere: 1.25, ahead: 0.72 },
-  },
-  {
-    time: 0.4, id: 'announcer', phase: 'atlas', shot: 'atlas',
-    title: 'The announcer',
-    scene: 'The first sound on this record is not the song. A man in a room in 1902 speaks the title into the horn, and his three short syllables raise the first three ridges in the landscape below.',
-    world: { air: 0.35, relief: 1, atmosphere: 1.2, ahead: 0.70 },
-  },
-  {
-    time: 4.6, id: 'descent', phase: 'descent', shot: 'descent',
-    title: 'Descent',
-    scene: 'The violin plays its first sustained tone, alone. The tone becomes a long unbroken range running away into the distance, and the view falls toward it.',
-    world: { air: 0.55, relief: 1, atmosphere: 1.05, ahead: 0.62 },
-  },
-  {
-    time: 8.0, id: 'ranges', phase: 'flight', shot: 'ranges',
-    title: 'Between the ranges',
-    scene: 'Flying in the trough between two harmonic ranges. Each range is one partial of the violin’s tone; they run parallel into the distance and rise and fall together as the player’s vibrato moves them.',
-    world: { air: 0.75, relief: 1, atmosphere: 0.95, ahead: 0.55 },
-    attention: true,
-  },
-  {
-    time: 15.2, id: 'expanse', phase: 'flight', shot: 'expanse',
-    title: 'Expanse',
-    scene: 'The violin reaches its brightest register. High-frequency country rises at the right of the world — thin, crystalline and unstable — and the horizon pulls away.',
-    world: { air: 0.85, relief: 1.04, atmosphere: 0.9, ahead: 0.5 },
-  },
-  {
-    time: 18.65, id: 'voice', phase: 'voice', shot: 'vocalRidge',
-    title: 'The voice raises a ridge',
-    scene: 'Measured onset of the tenor’s first entry. A new range lifts out of the plain at six hundred hertz — the singer’s own strongest partial — and the first line of the song is cut into its flank as the words are sung.',
-    world: { air: 0.9, relief: 1.06, atmosphere: 0.85, ahead: 0.45 },
-    lyric: 0, engrave: true,
-  },
-  {
-    time: 29.5, id: 'erasure', phase: 'flight', shot: 'erasure',
-    title: 'Breath',
-    scene: 'The singer breathes. The ridge he was raising falls away to nothing and the country opens out. What was written stays cut into the rock behind.',
-    world: { air: 0.8, relief: 1, atmosphere: 1.05, ahead: 0.5 },
-  },
-  {
-    time: 31.25, id: 'second', phase: 'voice', shot: 'traverse',
-    title: 'Second line',
-    scene: 'The voice returns and the range resumes. The view banks across the frequency axis, crossing from the low massif toward the singer’s own country, and the second line is cut as it passes.',
-    world: { air: 0.9, relief: 1.08, atmosphere: 0.85, ahead: 0.42 },
-    lyric: 1, engrave: true,
-  },
-  {
-    time: 37.0, id: 'summit', phase: 'summit', shot: 'summit',
-    title: 'Summit',
-    scene: 'The loudest frame of the passage. Every range in the world reaches its greatest elevation at once, the light hardens, and the shadows of the ridges run the full length of the valley.',
-    world: { air: 1, relief: 1.16, atmosphere: 0.78, ahead: 0.38 },
-  },
-  {
-    time: 42.9, id: 'sustain', phase: 'flight', shot: 'sustain',
-    title: 'Sustain',
-    scene: 'The long sustained passage. The country becomes steady and enormous, and the flight is allowed to be quiet for a while.',
-    world: { air: 0.95, relief: 1.06, atmosphere: 0.88, ahead: 0.42 },
-  },
-  {
-    time: 48.0, id: 'breath', phase: 'flight', shot: 'sustain',
-    title: 'Thin air',
-    scene: 'A breath in the recording. The haze thins, the ground falls quiet, and for a moment the horizon is very far away.',
-    world: { air: 0.68, relief: 0.94, atmosphere: 1.2, ahead: 0.5 },
-  },
-  {
-    time: 58.0, id: 'approach', phase: 'flight', shot: 'approach',
-    title: 'Into the trough',
-    scene: 'The view drops until the harmonic walls stand above it on both sides. At this altitude the individual partials of the voice are cliffs.',
-    world: { air: 0.9, relief: 1.04, atmosphere: 0.9, ahead: 0.4 },
-  },
-  {
-    time: 64.71, id: 'third', phase: 'voice', shot: 'trough',
-    title: 'Third line — ground level',
-    scene: 'The third line is cut at ground level, read along the wall of the singer’s own ridge as the flight passes it. The rock is made of one sustained note.',
-    world: { air: 0.95, relief: 1.06, atmosphere: 0.85, ahead: 0.35 },
-    lyric: 2, engrave: true,
-  },
-  {
-    time: 75.5, id: 'rise', phase: 'flight', shot: 'rise',
-    title: 'Rise',
-    scene: 'A breath. The view climbs out of the trough and the whole width of the recording is visible again — the low massif, the inhabited middle country, the frost at the edge.',
-    world: { air: 0.85, relief: 1, atmosphere: 0.95, ahead: 0.42 },
-  },
-  {
-    time: 79.04, id: 'fourth', phase: 'voice', shot: 'highTraverse',
-    title: 'Fourth line',
-    scene: 'The longest line of the verse, cut along the crest of the range and read from above.',
-    world: { air: 0.95, relief: 1.1, atmosphere: 0.85, ahead: 0.35 },
-    lyric: 3, engrave: true,
-  },
-  {
-    time: 88.0, id: 'converge', phase: 'convergence', shot: 'ascend',
-    title: 'Ascent',
-    scene: 'The climb begins. Every system aims at one thing: the light hardens, the air clears, the ranges align, and the whole massif of the verse comes into view at once.',
-    world: { air: 1, relief: 1.2, atmosphere: 0.72, ahead: 0.28 },
-  },
-  {
-    time: 91.5, id: 'apex', phase: 'apex', shot: 'apex',
-    title: 'Apex',
-    scene: 'The largest low-frequency event in the passage. From here the entire sung verse is one continuous landform, four lines cut along its length, and the country that made it is legible end to end.',
-    world: { air: 0.95, relief: 1.24, atmosphere: 0.68, ahead: 0.2 },
-  },
-  {
-    time: 94.5, id: 'return', phase: 'atlas', shot: 'atlasReturn',
-    title: 'The track, entire, again',
-    scene: 'The measured end of the sung passage. The flight rises back to the altitude it began at, and the ground that has been travelled is lit while the rest of the record stays dark.',
-    world: { air: 0.7, relief: 1.1, atmosphere: 0.95, ahead: 0.32 },
-  },
-  {
-    time: 99.0, id: 'condense', phase: 'condense', shot: 'condense',
-    title: 'Condensation',
-    scene: 'The world contracts. The continent draws in on itself until the whole recording will fit in the hand.',
-    world: { air: 0.4, relief: 0.9, atmosphere: 1.15, ahead: 0.4 },
-  },
-  {
-    time: 101.0, id: 'specimen', phase: 'residue', shot: 'specimen',
-    title: 'The specimen',
-    scene: 'What is left is a relief object: the complete track as a landscape specimen, its surface the same data the world was made from. The part you listened to is lit; the rest of the record remains in shadow.',
-    world: { air: 0.28, relief: 0.9, atmosphere: 1.0, ahead: 0.4 },
-  },
-  {
-    time: 104.0, id: 'complete', phase: 'complete', shot: 'specimen',
-    title: 'Final state',
-    scene: 'The transport holds inside the record’s own near-silence. The specimen keeps turning. This is what is left of the recording having happened to you.',
-    world: { air: 0.25, relief: 0.9, atmosphere: 1.0, ahead: 0.4 },
-    terminal: true,
-  },
-];
+const SEQUENCE = (() => {
+  const node = document.querySelector('#sequence-payload');
+  const parsed = node ? JSON.parse(node.textContent) : null;
+  if (!Array.isArray(parsed) || !parsed.length) {
+    throw new Error('Transcendence runtime: no authored sequence was injected.');
+  }
+  return parsed.slice().sort((a, b) => a.time - b.time);
+})();
 
 /* Camera shots.
  *

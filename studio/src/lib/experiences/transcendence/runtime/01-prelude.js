@@ -5,10 +5,20 @@
  * There is no import, no bundler resolution and no network fetch at any point.
  */
 
-const TX = {
-  version: '1.0.0',
-  slice: { track: 'track-01', start: 0, end: 104 },
-};
+/* Everything about *which* record this is comes from the injected configuration:
+ * the track, the arc bounds, where the terrain and textures live, and the art
+ * direction the creator chose. The runtime itself knows nothing about any
+ * particular recording, which is what lets one engine serve both the reference
+ * edition and every object Studio produces.
+ */
+const TX = (() => {
+  const node = document.querySelector('#config-payload');
+  const parsed = node ? JSON.parse(node.textContent) : null;
+  if (!parsed || !parsed.slice || !parsed.assets) {
+    throw new Error('Transcendence runtime: no configuration was injected.');
+  }
+  return parsed;
+})();
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const clamp01 = v => (v < 0 ? 0 : v > 1 ? 1 : v);

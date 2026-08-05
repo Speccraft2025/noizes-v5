@@ -1,5 +1,5 @@
 <script>
-  import { identity, edition, releaseProject, template, play, extras } from '$lib/stores/package.js';
+  import { identity, edition, releaseProject, template, play, extras, transcendence } from '$lib/stores/package.js';
   import { buildPackage } from '$lib/utils/packager.js';
   import { editionErrors } from '$lib/utils/project.js';
   import { validateReleaseProject } from '$lib/domain/release.js';
@@ -43,6 +43,7 @@
         template: $template,
         play: $play,
         extras: $extras,
+        transcendence: $transcendence,
         download: false,
         onProgress: progressUpdate,
       });
@@ -88,6 +89,7 @@
         template: $template,
         play:     $play,
         extras:   $extras,
+        transcendence: $transcendence,
         onProgress: progressUpdate,
       });
       exportedFilename = result.filename;

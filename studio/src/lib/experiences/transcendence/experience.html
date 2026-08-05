@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:;script-src 'self' 'unsafe-inline' blob:;style-src 'self' 'unsafe-inline';media-src 'self' blob:;img-src 'self' data: blob:;font-src 'self' data:;connect-src 'none';form-action 'none';base-uri 'none';object-src 'none'">
 <meta name="referrer" content="no-referrer">
-<title>Home, Sweet Home — Sonic Terrain</title>
+<title>/* TX_TITLE */ — Sonic Terrain</title>
 <style>/* TRANSCENDENCE_CSS */</style>
 </head><body>
 
@@ -15,12 +15,12 @@
   <!-- Encounter. The object, before there is a clock. -->
   <section id="threshold" aria-labelledby="threshold-label" data-holding="false">
     <div class="threshold-inner">
-      <p id="threshold-label" class="threshold-title">A 1902 recording, unlit</p>
+      <p id="threshold-label" class="threshold-title">/* TX_THRESHOLD_TITLE */</p>
       <button id="threshold-action" type="button">
         <span class="threshold-ring" aria-hidden="true"></span>
-        <span class="threshold-copy">Press and hold to enter the recording</span>
+        <span class="threshold-copy">/* TX_THRESHOLD_ACTION */</span>
       </button>
-      <p id="threshold-hint">Below you is the whole track: time runs to the horizon, frequency runs left to right, elevation is loudness. Holding the gesture begins the flight.</p>
+      <p id="threshold-hint">/* TX_THRESHOLD_HINT */</p>
     </div>
   </section>
 
@@ -44,9 +44,9 @@
 
     <!-- Identity, kept to the corner. -->
     <div id="identity">
-      <p class="identity-track">Home, Sweet Home</p>
-      <p class="identity-sub">Track 01 · Sonic Terrain</p>
-      <p class="identity-time"><span id="hud-elapsed">0:00</span> / 1:44</p>
+      <p class="identity-track">/* TX_TITLE */</p>
+      <p class="identity-sub">/* TX_SUBTITLE */</p>
+      <p class="identity-time"><span id="hud-elapsed">0:00</span> / /* TX_DURATION_LABEL */</p>
     </div>
   </div>
 
@@ -65,9 +65,9 @@
   <aside id="sheet" hidden aria-label="Controls, lyric and accessibility">
     <header>
       <div>
-        <small>Track one · Sonic Terrain</small>
-        <h1>Home, Sweet Home</h1>
-        <p class="credit">Harry Macdonough, tenor · Charles D’Almaine, violin · recorded 23 January 1902</p>
+        <small>/* TX_SUBTITLE */</small>
+        <h1>/* TX_TITLE */</h1>
+        <p class="credit">/* TX_CREDIT */</p>
       </div>
       <button id="sheet-close" type="button" aria-label="Close controls">×</button>
     </header>
@@ -76,10 +76,10 @@
       <h2>Recording</h2>
       <div class="transport-row">
         <button id="transport" type="button" aria-label="Pause the recording"><b>Pause</b></button>
-        <span id="elapsed">0:00 / 1:44</span>
+        <span id="elapsed">0:00 / /* TX_DURATION_LABEL */</span>
       </div>
       <label class="field" for="sheet-seek">Position
-        <input id="sheet-seek" type="range" min="0" max="104" step="0.05" value="0" aria-label="Position in the recording">
+        <input id="sheet-seek" type="range" min="0" max="/* TX_ARC_END */" step="0.05" value="0" aria-label="Position in the recording">
       </label>
       <label class="field" for="volume">Volume
         <input id="volume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume">
@@ -88,15 +88,15 @@
 
     <section>
       <h2>Scene</h2>
-      <h3 id="scene-title">The sealed object</h3>
-      <p id="scene-description">The whole recording lies below in the dark, unlit and untravelled.</p>
+      <h3 id="scene-title">/* TX_OPENING_TITLE */</h3>
+      <p id="scene-description">/* TX_OPENING_SCENE */</p>
     </section>
 
     <section>
       <h2>Line being written</h2>
       <p id="stable-lyric">No line is being cut.</p>
       <ol id="lyric-list" class="lyric-list"></ol>
-      <p class="note">Line onsets are anchored to measured vocal-phrase starts in the recording. The supplied lyric file carries evenly spaced reference timings; the drift between the two is recorded in the package’s analysis file.</p>
+      <p class="note">/* TX_LYRIC_PROVENANCE */</p>
     </section>
 
     <section>
@@ -145,8 +145,7 @@
   </div>
 
   <audio id="audio" preload="auto" crossorigin="anonymous">
-    <source src="audio/track-01.mp3" type="audio/mpeg">
-    <source src="audio/track-01.ogg" type="audio/ogg">
+    <!-- TX_AUDIO_SOURCES -->
   </audio>
 
   <p id="live" class="sr-only" role="status" aria-live="polite"></p>
@@ -157,6 +156,8 @@
 
 <script type="application/json" id="analysis-payload">/* ANALYSIS_PAYLOAD */</script>
 <script type="application/json" id="edition-payload">/* EDITION_PAYLOAD */</script>
+<script type="application/json" id="config-payload">/* CONFIG_PAYLOAD */</script>
+<script type="application/json" id="sequence-payload">/* SEQUENCE_PAYLOAD */</script>
 <script>/* THREE_RUNTIME */</script>
 <script>/* GSAP_RUNTIME */</script>
 <script>/* TRANSCENDENCE_RUNTIME */</script>

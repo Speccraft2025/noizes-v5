@@ -1,0 +1,6 @@
+{
+  "generated_by": "studio/scripts/build-transcendence-template.mjs",
+  "three": "0.185.1",
+  "gsap": "3.15.0",
+  "note": "Regenerate with `npm run build:transcendence-template` after changing either dependency."
+}

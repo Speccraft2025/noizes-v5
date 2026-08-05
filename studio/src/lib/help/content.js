@@ -232,6 +232,23 @@ export const FIELD_HELP = {
   credit_name: 'Required. The person, artist or organisation being credited, by their real name.',
   credit_role: 'Required. What they did — "Featured Artist", "Mixing Engineer", "Photography".',
   credit_email: 'Optional. Invites this collaborator to confirm their credit. Nothing is sent until you choose to send it.',
+
+  // Experience — the Transcendence system. ULTRA needs no fields here; its
+  // authoring lives in the Guide editor.
+  experience_system: 'ULTRA arranges your media into a guided player and suits any release. Transcendence computes a landscape from one recording and flies through it in sync. Both ship offline.',
+  terrain_track: 'Required for Transcendence. Which recording becomes the terrain. The rest of the release still ships in the package.',
+  terrain_analyse: 'Measures the recording in your browser — nothing is uploaded. A four-minute track takes a few seconds and produces the terrain image the world is built from.',
+  terrain_height: 'How tall the landscape stands. This changes only how the measured shape is presented, never the shape itself.',
+  terrain_ridge: 'How far harmonics stand out as separate ridges. Higher turns a smooth swell into parallel ranges.',
+  terrain_sun_elevation: 'How high the light sits. Low rakes long shadows across the ranges; high flattens them into a gallery light.',
+  terrain_sun_azimuth: 'Which direction the light comes from, around the world.',
+  terrain_flight_altitude: 'How high the flight travels. Scales every shot together, so each composed framing survives.',
+  terrain_time_scale: 'How much ground a second of the recording covers. Lower packs the track into a denser landscape.',
+  terrain_palette: 'Three fixed lighting designs. Each sets sun, ceiling, wall, floor and fog together, which is why there are no individual colour pickers.',
+  terrain_terracing: 'Cuts the lower slopes into level steps like a topographic model, leaving the summits smooth.',
+  landmark_time: 'Where in the track this line is cut into the terrain. Your decision, not a measurement — the package records it as creator-placed.',
+  landmark_band: 'Which frequency band the line is cut into. Place it on a ridge the voice actually made, using the terrain above as your guide.',
+  quality_preview: 'Where the experience opens. All four profiles ship; a collector\'s machine can pick another. Essential renders without WebGL at all.',
 };
 
 /** Ordered checklist shown on the Publish step. Mirrors the manual. */

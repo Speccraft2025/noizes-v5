@@ -126,10 +126,10 @@ class ExperienceDirector {
       // its first meaningful frame without waiting for the whole world.
       // The terrain image is the world; nothing can be drawn before it exists.
       this.textures = await this._loadTextures(THREE_NS, [
-        ['terrain', 'analysis/track-01.terrain.png'],
-        ['dustGrain', 'assets/images/tx-dust-grain.png'],
-        ['blueNoise', 'assets/images/tx-blue-noise.png'],
-      ]);
+        ['terrain', TX.assets.terrain],
+        ['dustGrain', TX.assets.dustGrain],
+        ['blueNoise', TX.assets.blueNoise],
+      ].filter(([, path]) => path));
       this._decodeTerrain();
       try {
         this.world = new WorldRenderer(this.el.world, {

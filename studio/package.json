@@ -11,7 +11,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "check:schema": "node scripts/check-schema.mjs"
+    "check:schema": "node scripts/check-schema.mjs",
+    "build:transcendence-template": "node scripts/build-transcendence-template.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "3.0.10",

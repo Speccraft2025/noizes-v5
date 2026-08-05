@@ -1,14 +1,14 @@
 <script>
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { identity, edition, assets, rights, releaseProject, template, play, extras } from '$lib/stores/package.js';
+  import { identity, edition, assets, rights, releaseProject, template, play, extras, transcendence, draftableTranscendence } from '$lib/stores/package.js';
   import { createReleaseProject } from '$lib/domain/release.js';
   import { loadStudioDraft, saveStudioDraft } from '$lib/utils/studio-draft.js';
   import StepIdentity    from '$lib/components/StepIdentity.svelte';
   import StepTracklist   from '$lib/components/StepTracklist.svelte';
   import StepAssets      from '$lib/components/StepAssets.svelte';
   import StepLyrics      from '$lib/components/StepLyrics.svelte';
-  import StepGuide       from '$lib/components/StepGuide.svelte';
+  import StepExperience  from '$lib/components/StepExperience.svelte';
   import StepExtras      from '$lib/components/StepExtras.svelte';
   import StepEdition     from '$lib/components/StepEdition.svelte';
   import StepRights      from '$lib/components/StepRights.svelte';
@@ -74,6 +74,9 @@
       template: get(template),
       play: get(play),
       extras: get(extras),
+      // Only the creator's decisions. The terrain and analysis are measured from
+      // the audio, so they are re-derived rather than carried in a draft.
+      transcendence: draftableTranscendence(get(transcendence)),
       currentStep,
     };
   }
@@ -161,6 +164,11 @@
           template.set(snapshot.template || 'ultra-v2');
           play.set(snapshot.play || { games: [], difficulty: 'standard', intensity: 1 });
           extras.set(snapshot.extras || { story: '', links: [], pdfs: [] });
+          transcendence.set({
+            track_id: '', landmarks: [], art_direction: {}, arc_end_seconds: null, quality_preview: 'balanced',
+            ...(snapshot.transcendence || {}),
+            terrain: null, analysis: null,
+          });
           currentStep = Math.max(1, Math.min(steps.length, Number(snapshot.currentStep) || 1));
           draftSavedAt = restored.saved_at;
           draftRestored = true;
@@ -174,7 +182,7 @@
       importBeatsUnlimitedDeal();
       draftStatus = 'saved';
       lastFileSignature = fileSignature();
-      draftSubscriptions = [releaseProject, template, play, extras].map((store) => store.subscribe(() => scheduleDraftSave()));
+      draftSubscriptions = [releaseProject, template, play, extras, transcendence].map((store) => store.subscribe(() => scheduleDraftSave()));
       document.addEventListener('visibilitychange', onVisibilityChange);
       window.addEventListener('pagehide', onPageHide);
     }
@@ -296,7 +304,7 @@
       {:else if currentStep === 5}
         <StepExtras />
       {:else if currentStep === 6}
-        <StepGuide />
+        <StepExperience />
       {:else if currentStep === 7}
         <StepEdition />
       {:else if currentStep === 8}
@@ -338,7 +346,13 @@
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Experience</span>
-          <span class="truncate ml-4" style="color: #7B5CF0;">ULTRA V2 · {$assets.guide?.nodes?.length ?? 0} moments</span>
+          <span class="truncate ml-4" style="color: #7B5CF0;">
+            {#if $template === 'transcendence-v1'}
+              TRANSCENDENCE · {$transcendence.analysis ? 'terrain measured' : 'not analysed'}
+            {:else}
+              ULTRA V2 · {$assets.guide?.nodes?.length ?? 0} moments
+            {/if}
+          </span>
         </div>
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Audio</span>
@@ -373,6 +387,14 @@
           </div>
         </div>
         <p class="text-xs text-center" style="color: var(--ink-muted);">ULTRA V2 · canonical immersive experience</p>
+      {:else if $template === 'transcendence-v1'}
+        <div class="w-full rounded-2xl overflow-hidden" style="background: #030303; border: 1px solid rgba(123,92,240,0.3); aspect-ratio: 9/16; max-height: 300px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding: 20px; gap: 3px;">
+          <!-- A landscape read from the record: ranges running to a horizon. -->
+          {#each [0.18, 0.42, 0.3, 0.66, 0.52, 0.88, 0.6, 0.34] as ridge}
+            <div class="w-full rounded-sm" style="height: {4 + ridge * 16}px; background: linear-gradient(90deg, rgba(123,92,240,{0.15 + ridge * 0.5}), rgba(240,75,216,{0.08 + ridge * 0.3}));"></div>
+          {/each}
+        </div>
+        <p class="text-xs text-center" style="color: var(--ink-muted);">TRANSCENDENCE · the recording as terrain</p>
       {/if}
     </div>
   </div>

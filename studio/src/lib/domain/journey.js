@@ -42,6 +42,38 @@ export const RELEASE_PLACEMENTS = Object.freeze([
   'after_final_track',
 ]);
 
+export const RELEASE_PACING = Object.freeze({
+  opening:              6000,
+  release_identity:     5000,
+  release_introduction: 7000,
+  tracklist_reveal:     7000,
+  interlude:            4000,
+  chapter_card:         3500,
+  disc_change:          4000,
+  story:                7000,
+  artwork:              6000,
+  gallery:              8000,
+  credits:              6000,
+  closing_reflection:   7000,
+  collector_message:    6000,
+  archive_invitation:   5000,
+  history_invitation:   5000,
+});
+
+export const TRACK_PACING = Object.freeze({
+  title_reveal:  3500,
+  artwork:       5000,
+  lyrics:        4000,
+  image:         5000,
+  video:         6000,
+  story:         5000,
+  note:          4500,
+  effect:        3000,
+  credits:       4000,
+  track_ending:  3000,
+  transition:    2500,
+});
+
 export const MOMENT_EFFECTS = Object.freeze([
   'none',
   'soft_glow',
@@ -79,7 +111,7 @@ export function createReleaseMoment(input = {}, options = {}) {
     order: Math.max(1, Number.parseInt(input.order, 10) || (options.index ?? 0) + 1),
     asset_ref: clean(input.asset_ref),
     effect: MOMENT_EFFECTS.includes(input.effect) ? input.effect : 'none',
-    duration_ms: Math.max(0, Number(input.duration_ms) || 0),
+    duration_ms: Math.max(0, Number(input.duration_ms) || RELEASE_PACING[type] || 5000),
     enabled: input.enabled !== false,
   };
 }
@@ -97,7 +129,7 @@ export function createTrackMoment(input = {}, options = {}) {
     body: clean(input.body ?? input.text),
     asset_ref: clean(input.asset_ref),
     effect: MOMENT_EFFECTS.includes(input.effect) ? input.effect : 'none',
-    duration_ms: Math.max(0, Number(input.duration_ms) || 3500),
+    duration_ms: Math.max(0, Number(input.duration_ms) || TRACK_PACING[type] || 3500),
     enabled: input.enabled !== false,
   };
 }

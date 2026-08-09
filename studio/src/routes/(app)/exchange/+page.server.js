@@ -28,7 +28,12 @@ export async function load({ locals }) {
   if (releasesError) console.error('[exchange] release listing failed:', releasesError);
 
   const all = releases ?? [];
-  const featured = all.slice(0, 3);
+  const featured = all.slice(0, 8).map((release) => ({
+    ...release,
+    cover_url: release.cover_path
+      ? sb.storage.from('releases').getPublicUrl(release.cover_path).data?.publicUrl ?? null
+      : null,
+  }));
 
   // Discovery is intentionally assembled server-side with a service client:
   // acquisitions remain private under RLS and only these safe listing fields

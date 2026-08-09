@@ -7,7 +7,35 @@
   // query are different things and must not look the same.
   $: loadError = data.loadError ?? null;
 
+  import { onMount, onDestroy } from 'svelte';
+
   const colors = ['#7B5CF0', '#4B6BF0', '#F04BD8', '#7B5CF0', '#4B6BF0', '#F04BD8'];
+
+  let carouselEl;
+  let autoScrollTimer;
+  let paused = false;
+
+  function startAutoScroll() {
+    stopAutoScroll();
+    autoScrollTimer = setInterval(() => {
+      if (paused || !carouselEl) return;
+      const { scrollLeft, scrollWidth, clientWidth } = carouselEl;
+      const maxScroll = scrollWidth - clientWidth;
+      if (maxScroll <= 0) return;
+      const cardWidth = carouselEl.querySelector('.store-card')?.offsetWidth ?? clientWidth;
+      const gap = 16;
+      const step = cardWidth + gap;
+      const next = scrollLeft + step;
+      carouselEl.scrollTo({ left: next > maxScroll ? 0 : next, behavior: 'smooth' });
+    }, 5000);
+  }
+
+  function stopAutoScroll() {
+    if (autoScrollTimer) clearInterval(autoScrollTimer);
+  }
+
+  onMount(() => { if (featured.length > 0) startAutoScroll(); });
+  onDestroy(stopAutoScroll);
 
   let acquiring = null; // release id with a checkout in flight
   let soldOut = {};     // release ids learned sold-out from a 409
@@ -178,39 +206,73 @@
     {#if featured.length > 0}
       <div class="mb-10">
         <p class="t-caption mb-4">Top Experiences</p>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div
+          class="carousel-track"
+          bind:this={carouselEl}
+          on:mouseenter={() => (paused = true)}
+          on:mouseleave={() => (paused = false)}
+          on:touchstart={() => (paused = true)}
+          on:touchend={() => { setTimeout(() => (paused = false), 3000); }}
+        >
           {#each featured as ed, i}
             {@const color = colors[i % 6]}
-            <div class="glass rounded-2xl overflow-hidden group relative transition-all duration-300" style="border-color: {color}30;">
+            <article class="store-card glass rounded-2xl overflow-hidden group relative" style="border-color: {color}30;">
               {#if dropHref(ed)}
-                <!-- Covers the card so the artwork, title and metadata are all
-                     one link, while the Acquire button below stays above it
-                     and keeps its own action. -->
                 <a href={dropHref(ed)} class="absolute inset-0 z-10">
                   <span class="sr-only">Open the drop page for {ed.title} by {ed.artist_name}</span>
                 </a>
               {/if}
-              <div class="w-full aspect-square relative flex items-end p-5"
-                style="background: radial-gradient(ellipse at top, {color}30 0%, transparent 70%), var(--charcoal);">
-                <div class="absolute inset-0 flex items-center justify-center">
-                  <div class="w-20 h-20 rounded-full opacity-20" style="background: {color}; filter: blur(30px);"></div>
-                  <span class="text-6xl font-black opacity-10 absolute" style="color: {color};">{ed.artist_name[0]}</span>
-                </div>
-                <div class="relative z-10">
-                  <p class="text-xs font-bold uppercase tracking-widest mb-1" style="color: {color};">{ed.artist_name}</p>
+
+              <div class="store-card-hero" style="background: radial-gradient(ellipse at top, {color}30 0%, transparent 70%), var(--charcoal);">
+                {#if ed.cover_url}
+                  <img
+                    src={ed.cover_url}
+                    alt="{ed.title} cover artwork"
+                    class="absolute inset-0 w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div class="absolute inset-0" style="background: linear-gradient(to top, rgba(0,0,0,.85) 0%, rgba(0,0,0,.3) 40%, transparent 70%);"></div>
+                {:else}
+                  <div class="absolute inset-0 flex items-center justify-center">
+                    <div class="w-24 h-24 rounded-full opacity-20" style="background: {color}; filter: blur(40px);"></div>
+                    <span class="text-7xl font-black opacity-10 absolute" style="color: {color};">{ed.artist_name[0]}</span>
+                  </div>
+                {/if}
+
+                <div class="absolute bottom-0 left-0 right-0 p-5 z-[2]">
+                  <p class="text-[10px] font-bold uppercase tracking-[.25em] mb-1.5" style="color: {color};">{ed.artist_name}</p>
                   <h3 class="text-xl font-black text-white leading-tight">{ed.title}</h3>
                 </div>
               </div>
-              <div class="p-4 flex items-center justify-between">
-                <div>
-                  <p class="text-xs font-semibold" style="color: var(--ink-muted);">
+
+              <div class="store-card-sample">
+                {#if ed.tracks?.length}
+                  <div class="flex flex-col gap-1">
+                    {#each ed.tracks.filter((t) => !t.hidden).slice(0, 3) as track, ti}
+                      <div class="flex items-center gap-2">
+                        <span class="text-[9px] font-mono shrink-0" style="color: {color};">{String(ti + 1).padStart(2, '0')}</span>
+                        <span class="text-xs text-white truncate">{track.title}</span>
+                      </div>
+                    {/each}
+                    {#if (ed.tracks?.filter((t) => !t.hidden).length ?? 0) > 3}
+                      <span class="text-[10px]" style="color: var(--ink-muted);">+{ed.tracks.filter((t) => !t.hidden).length - 3} more</span>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+
+              <div class="store-card-footer">
+                <div class="min-w-0">
+                  <p class="text-[10px] font-semibold truncate" style="color: var(--ink-muted);">
                     {formatType(ed.release_type)} · {ed.track_count || 1} track{ed.track_count === 1 ? '' : 's'}{duration(ed.total_duration_ms) ? ` · ${duration(ed.total_duration_ms)}` : ''}
                   </p>
-                  <p class="text-[10px] mt-1" style="color: var(--ink-muted);">
+                  <p class="text-[9px] mt-0.5 truncate" style="color: var(--ink-muted);">
                     {ed.edition_name || ed.edition_type} · {available(ed) !== null ? `${available(ed)} left` : 'Open edition'}
                   </p>
                 </div>
-                <div class="flex items-center gap-3 relative z-20">
+                <div class="flex items-center gap-2.5 shrink-0 relative z-20">
                   <span class="text-sm font-black text-white">{fmt(ed.price, ed.currency)}</span>
                   <button
                     class="btn-spectral py-1.5 px-4 text-xs rounded-full disabled:opacity-40"
@@ -219,7 +281,7 @@
                   >{isSoldOut(ed) ? 'Sold out' : acquiring === ed.id ? '…' : 'Acquire'}</button>
                 </div>
               </div>
-            </div>
+            </article>
           {/each}
         </div>
       </div>
@@ -286,3 +348,55 @@
 
   {/if}
 </div>
+
+<style>
+  .carousel-track {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+  }
+  .carousel-track::-webkit-scrollbar { display: none; }
+
+  .store-card {
+    scroll-snap-align: start;
+    flex: 0 0 calc(85vw - 48px);
+    max-width: 340px;
+    min-width: 260px;
+    transition: transform .25s ease, box-shadow .25s ease;
+  }
+  .store-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0,0,0,.4); }
+
+  @media (min-width: 640px) {
+    .store-card { flex: 0 0 300px; }
+  }
+  @media (min-width: 1024px) {
+    .store-card { flex: 0 0 320px; }
+  }
+
+  .store-card-hero {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+  }
+
+  .store-card-sample {
+    padding: 10px 16px;
+    min-height: 52px;
+    border-top: 1px solid rgba(255,255,255,.06);
+  }
+
+  .store-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 16px;
+    border-top: 1px solid rgba(255,255,255,.06);
+  }
+</style>

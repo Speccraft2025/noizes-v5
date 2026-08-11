@@ -44,12 +44,6 @@
       <slot />
     </article>
 
-    <!-- Footer -->
-    <footer class="mt-20 pt-8 border-t text-xs font-mono flex flex-wrap items-center justify-between gap-4"
-      style="border-color: var(--border-dim); color: var(--ink-muted);">
-      <span>&copy; {new Date().getFullYear()} Speccraft Media Ltd.</span>
-      <a href="mailto:legal@noizes.xyz" class="hover:text-white transition-colors">legal@noizes.xyz</a>
-    </footer>
   </div>
 </div>
 

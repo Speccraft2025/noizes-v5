@@ -246,7 +246,12 @@
               {/if}
             </form>
 
-            <p class="text-xs mt-4" style="color: var(--ink-muted);">
+            <p class="text-xs mt-3" style="color: var(--ink-muted); line-height: 1.5;">
+              By joining the waitlist you agree to our
+              <a href="/legal/terms" class="text-white hover:underline">Terms</a> and
+              <a href="/legal/privacy" class="text-white hover:underline">Privacy Policy</a>.
+            </p>
+            <p class="text-xs mt-2" style="color: var(--ink-muted);">
               Have an account? <a href="/auth/login" class="text-white hover:underline font-semibold">Sign in →</a>
             </p>
           </div>
@@ -372,11 +377,20 @@
   </section>
 
   <!-- FOOTER -->
-  <footer class="border-t px-8 py-6 flex flex-wrap items-center justify-between gap-4 text-xs font-mono"
+  <footer class="border-t px-8 py-6 text-xs font-mono"
     style="border-color: var(--border-dim); color: var(--ink-muted);">
-    <span>NOIZES · v5 · {new Date().getFullYear()}</span>
-    <span>Music as a cultural object.</span>
-    <a href="/auth/login" class="hover:text-white transition-colors">Sign in</a>
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-3">
+      <span>NOIZES · v5 · {new Date().getFullYear()}</span>
+      <span>Music as a cultural object.</span>
+      <a href="/auth/login" class="hover:text-white transition-colors">Sign in</a>
+    </div>
+    <div class="flex flex-wrap gap-x-4 gap-y-1">
+      <a href="/legal/terms" class="hover:text-white transition-colors">Terms</a>
+      <a href="/legal/privacy" class="hover:text-white transition-colors">Privacy</a>
+      <a href="/legal/acceptable-use" class="hover:text-white transition-colors">Acceptable Use</a>
+      <a href="/legal/copyright" class="hover:text-white transition-colors">Copyright</a>
+      <a href="/legal/cookies" class="hover:text-white transition-colors">Cookies</a>
+    </div>
   </footer>
 
   </div>

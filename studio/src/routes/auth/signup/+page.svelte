@@ -101,7 +101,13 @@
           </button>
         </form>
 
-        <p class="text-center text-sm mt-5" style="color: var(--ink-muted);">
+        <p class="text-center text-xs mt-4" style="color: var(--ink-muted); line-height: 1.5;">
+          By creating an account you agree to our
+          <a href="/legal/terms" class="text-white hover:underline">Terms</a>,
+          <a href="/legal/privacy" class="text-white hover:underline">Privacy Policy</a>,
+          and <a href="/legal/cookies" class="text-white hover:underline">Cookie Notice</a>.
+        </p>
+        <p class="text-center text-sm mt-3" style="color: var(--ink-muted);">
           Have an account? <a href="/auth/login" class="text-white font-semibold hover:underline">Sign in</a>
         </p>
       </div>

@@ -105,6 +105,35 @@ export async function saveStudioDraft(userId, snapshot, options = {}) {
   return { savedAt: record.saved_at, durableFiles, storage: durableFiles ? 'indexeddb' : 'localstorage' };
 }
 
+export async function clearStudioDraft(userId, options = {}) {
+  const key = draftKey(userId);
+  const indexedDBRef = Object.hasOwn(options, 'indexedDBRef') ? options.indexedDBRef : defaultBrowserStorage('indexedDB');
+  const storage = Object.hasOwn(options, 'storage') ? options.storage : defaultBrowserStorage('localStorage');
+  const driver = options.driver;
+
+  if (driver) {
+    await driver.set(key, null);
+  } else if (indexedDBRef) {
+    try {
+      const db = await openDatabase(indexedDBRef);
+      try {
+        await new Promise((resolve, reject) => {
+          const transaction = db.transaction(STORE_NAME, 'readwrite');
+          transaction.objectStore(STORE_NAME).delete(key);
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => reject(transaction.error);
+          transaction.onabort = () => reject(transaction.error);
+        });
+      } finally {
+        db.close();
+      }
+    } catch {
+      // Best-effort — the next save will overwrite anyway.
+    }
+  }
+  try { storage?.removeItem(`noizes:${key}`); } catch { /* best-effort */ }
+}
+
 export async function loadStudioDraft(userId, options = {}) {
   const key = draftKey(userId);
   const indexedDBRef = Object.hasOwn(options, 'indexedDBRef') ? options.indexedDBRef : defaultBrowserStorage('indexedDB');

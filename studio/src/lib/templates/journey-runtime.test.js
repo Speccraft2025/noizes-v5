@@ -127,9 +127,9 @@ describe('journey moment queue', () => {
     j.queueReleaseMoments('before_first_track', '', 1);
 
     expect(j.shownTitle()).toBe('Opening 1');
-    j.advance(3000 + 380);
+    j.advance(3000 + 900);
     expect(j.shownTitle()).toBe('Opening 2');
-    j.advance(3000 + 380);
+    j.advance(3000 + 900);
     expect(j.shownTitle()).toBe('Opening 3');
   });
 
@@ -153,7 +153,7 @@ describe('journey moment queue', () => {
     });
     j.queueReleaseMoments('before_first_track', '', 1);
     expect(j.shownTitle()).toBe('Opener');
-    j.advance(3000 + 380);
+    j.advance(3000 + 900);
     expect(j.state().showing).toBe(false);      // the closer must not follow on
     expect(j.state().queued).toBe(0);
   });
@@ -173,11 +173,11 @@ describe('playback waits for the opening moments', () => {
     j.onJourneyQueueDrained(j.play);
 
     expect(j.played).toEqual([]);               // the bug: this used to be ['play']
-    j.advance(3000 + 380);
+    j.advance(3000 + 900);
     expect(j.played).toEqual([]);               // still moment 2
-    j.advance(3000 + 380);
+    j.advance(3000 + 900);
     expect(j.played).toEqual([]);               // still moment 3
-    j.advance(3000 + 380);
+    j.advance(3000 + 900);
     expect(j.played).toEqual(['play']);         // only now
   });
 
@@ -270,7 +270,7 @@ describe('a moment gets the display or a band, never both', () => {
     j.synchronizeTrackJourney(0, 8000);
     expect(j.el('stage').dataset.moment).toBe('on');
 
-    j.advance(4000 + 380);
+    j.advance(4000 + 900);
     expect(j.el('stage').dataset.moment).toBe('off');
   });
 
@@ -296,7 +296,7 @@ describe('a moment gets the display or a band, never both', () => {
   it('floors an unset or absurdly short duration rather than flashing a page', () => {
     const j = boot({ releaseMoments: [{ ...releaseMoment, duration_ms: 10 }] });
     j.queueReleaseMoments('before_first_track', '', 1);
-    expect(j.el('journey-moment-timer').style.animationDuration).toBe('1200ms');
+    expect(j.el('journey-moment-timer').style.animationDuration).toBe('3000ms');
   });
 
   it('dresses a text-only page in the cover rather than leaving it blank', () => {

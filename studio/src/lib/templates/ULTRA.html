@@ -1727,7 +1727,7 @@ function trackJourneyMoments(trackId){
 function showNextJourneyMoment(){
   if(journeyMomentShowing||!journeyMomentQueue.length)return;
   var moment=journeyMomentQueue.shift();var host=document.getElementById('journey-moment');
-  var hold=Math.max(1200,Number(moment.duration_ms)||3500);
+  var hold=Math.max(3000,Number(moment.duration_ms)||6000);
   document.getElementById('journey-moment-kicker').textContent=journeyTypeLabel(moment.type);
   document.getElementById('journey-moment-title').textContent=moment.title||journeyTypeLabel(moment.type);
   var body=document.getElementById('journey-moment-body');body.textContent=moment.body||'';body.style.display=moment.body?'':'none';
@@ -1754,7 +1754,7 @@ function showNextJourneyMoment(){
   journeyMomentTimer=window.setTimeout(function(){
     host.classList.remove('show');journeyMomentShowing=false;
     if(stage)stage.dataset.moment='off';
-    window.setTimeout(function(){showNextJourneyMoment();flushJourneyDrainCallbacks();},380);
+    window.setTimeout(function(){showNextJourneyMoment();flushJourneyDrainCallbacks();},900);
   },hold);
 }
 function queueJourneyMoment(moment){

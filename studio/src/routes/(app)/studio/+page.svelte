@@ -3,7 +3,7 @@
   import { get } from 'svelte/store';
   import { identity, edition, assets, rights, releaseProject, template, play, extras, transcendence, draftableTranscendence } from '$lib/stores/package.js';
   import { createReleaseProject } from '$lib/domain/release.js';
-  import { loadStudioDraft, saveStudioDraft } from '$lib/utils/studio-draft.js';
+  import { clearStudioDraft, loadStudioDraft, saveStudioDraft } from '$lib/utils/studio-draft.js';
   import StepIdentity    from '$lib/components/StepIdentity.svelte';
   import StepTracklist   from '$lib/components/StepTracklist.svelte';
   import StepAssets      from '$lib/components/StepAssets.svelte';
@@ -135,6 +135,25 @@
   function goToStep(step) {
     currentStep = Math.max(1, Math.min(steps.length, Number(step) || 1));
     scheduleDraftSave();
+  }
+
+  async function handlePublished() {
+    const userId = data?.user?.id;
+    if (!userId) return;
+    clearTimeout(saveTimer);
+    draftSubscriptions.forEach((unsubscribe) => unsubscribe());
+    draftSubscriptions = [];
+    await clearStudioDraft(userId);
+    releaseProject.set(createReleaseProject({}));
+    template.set('ultra-v2');
+    play.set({ games: [], difficulty: 'standard', intensity: 1 });
+    extras.set({ story: '', links: [], pdfs: [] });
+    transcendence.set({ track_id: '', terrain: null, analysis: null, landmarks: [], art_direction: {}, arc_end_seconds: null, quality_preview: 'balanced' });
+    currentStep = 1;
+    draftRestored = false;
+    draftSavedAt = '';
+    draftWarning = '';
+    draftStatus = 'saved';
   }
 
   function savedTime(value) {
@@ -308,7 +327,7 @@
       {:else if currentStep === 7}
         <StepEdition />
       {:else if currentStep === 8}
-        <div class="space-y-8"><StepRights /><div class="border-t pt-8" style="border-color: var(--border-dim);"><StepExport /></div></div>
+        <div class="space-y-8"><StepRights /><div class="border-t pt-8" style="border-color: var(--border-dim);"><StepExport on:published={handlePublished} /></div></div>
       {/if}
     </div>
 

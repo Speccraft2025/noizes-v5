@@ -1,4 +1,5 @@
 <script>
+  import { createEventDispatcher } from 'svelte';
   import { identity, edition, releaseProject, template, play, extras, transcendence } from '$lib/stores/package.js';
   import { buildPackage } from '$lib/utils/packager.js';
   import { editionErrors } from '$lib/utils/project.js';
@@ -6,6 +7,8 @@
   import { estimatePackageSize, formatBytes } from '$lib/domain/package-size.js';
   import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
   import { goto } from '$app/navigation';
+
+  const dispatch = createEventDispatcher();
 
   let exporting = false;
   let exported = false;
@@ -183,10 +186,7 @@
         dropPath = body.drop_path || '';
         progress = 100;
         exporting = false;
-        // Publishing ends on the release's public page, not in the tool that
-        // built it. That page is the thing the creator is about to send to
-        // people, so landing there is what makes it real — and it is where the
-        // share controls live.
+        dispatch('published');
         if (dropPath) {
           statusLabel = 'Opening your Drop Page…';
           await goto(dropPath);

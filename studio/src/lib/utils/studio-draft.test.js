@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { loadStudioDraft, sanitizeDraftForJson, saveStudioDraft } from './studio-draft.js';
+import { clearStudioDraft, loadStudioDraft, sanitizeDraftForJson, saveStudioDraft } from './studio-draft.js';
 
 function memoryStorage() {
   const values = new Map();
   return {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
   };
 }
 
@@ -41,5 +42,22 @@ describe('Studio draft persistence', () => {
     const blocked = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
     await expect(saveStudioDraft('creator-a', { title: 'Unsaved' }, { indexedDBRef: null, storage: blocked }))
       .rejects.toThrow('does not provide persistent draft storage');
+  });
+
+  it('clears the draft so a fresh bake starts clean', async () => {
+    const storage = memoryStorage();
+    await saveStudioDraft('creator-a', { title: 'Published' }, { indexedDBRef: null, storage });
+    expect((await loadStudioDraft('creator-a', { indexedDBRef: null, storage })).snapshot.title).toBe('Published');
+    await clearStudioDraft('creator-a', { indexedDBRef: null, storage });
+    expect(await loadStudioDraft('creator-a', { indexedDBRef: null, storage })).toBeNull();
+  });
+
+  it('clears the draft through the durable driver', async () => {
+    const values = new Map();
+    const driver = { get: async (key) => values.get(key), set: async (key, value) => { if (value === null) values.delete(key); else values.set(key, value); } };
+    const storage = memoryStorage();
+    await saveStudioDraft('creator-a', { title: 'Done' }, { driver, storage });
+    await clearStudioDraft('creator-a', { driver, storage });
+    expect(await loadStudioDraft('creator-a', { driver, storage })).toBeNull();
   });
 });

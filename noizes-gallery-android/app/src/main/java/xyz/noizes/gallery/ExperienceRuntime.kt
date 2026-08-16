@@ -40,7 +40,7 @@ import java.io.ByteArrayInputStream
             setOnKeyListener{_,key,event->if(event.action!=KeyEvent.ACTION_DOWN)return@setOnKeyListener false;when(key){KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE->{player?.let{if(it.isPlaying)it.pause()else it.play()};dispatch(this,key);true};KeyEvent.KEYCODE_MEDIA_REWIND->{player?.seekTo((player?.currentPosition?.minus(10_000)?:0).coerceAtLeast(0));true};KeyEvent.KEYCODE_MEDIA_FAST_FORWARD->{player?.seekTo((player?.currentPosition?:0)+10_000);true};KeyEvent.KEYCODE_MENU->{drawer=true;true};else->{dispatch(this,key);false}}}
             loadUrl("https://noizes.local/object/${active.experienceEntry}")
         }},modifier=Modifier.fillMaxSize())
-        if(drawer)Box(Modifier.fillMaxHeight().width(340.dp).background(Color(0xEE111312)).padding(28.dp)){Column(verticalArrangement=Arrangement.spacedBy(14.dp)){Text("EXPERIENCE",color=Color(0xFFC9AE7A));Text(active?.title.orEmpty(),style=MaterialTheme.typography.headlineMedium);Button(onClick={player?.let{if(it.isPlaying)it.pause()else it.play()};drawer=false}){Text("Play / Pause")};OutlinedButton(onClick={drawer=false}){Text("Return to work")};OutlinedButton(onClick=onExit){Text("Exit Experience")}}}
+        if(drawer)Box(Modifier.fillMaxHeight().width(340.dp).background(Color(0xEB050505)).padding(28.dp)){Column(verticalArrangement=Arrangement.spacedBy(14.dp)){Text("EXPERIENCE",color=Color(0xFF7B5CF0));Text(active?.title.orEmpty(),style=MaterialTheme.typography.headlineMedium);Button(onClick={player?.let{if(it.isPlaying)it.pause()else it.play()};drawer=false}){Text("Play / Pause")};OutlinedButton(onClick={drawer=false}){Text("Return to work")};OutlinedButton(onClick=onExit){Text("Exit Experience")}}}
     }
 }
 

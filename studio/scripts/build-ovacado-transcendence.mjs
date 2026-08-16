@@ -211,15 +211,15 @@ const config = {
     blueNoise: '',
   },
   artDirection: {
-    heightScale: 1.8,
-    ridgeEmphasis: 1.4,
+    heightScale: 2.4,
+    ridgeEmphasis: 1.6,
     timeScale: 1,
     terracing: true,
-    terraceStep: 1.2,
+    terraceStep: 0.9,
     palette: 'alabaster',
-    sunElevation: 64.32,
+    sunElevation: 38,
     sunAzimuth: -146.31,
-    flightAltitude: 1,
+    flightAltitude: 0.7,
   },
 };
 

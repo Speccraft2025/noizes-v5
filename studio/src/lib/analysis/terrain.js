@@ -35,9 +35,11 @@ export const BAND_SCALE = 'log';                 // constant-Q: every octave get
 
 export const SCHEMA_VERSION = '3.0.0';
 
-const DB_FLOOR_PERCENTILE = 0.62;
+const DB_FLOOR_PERCENTILE_SPARSE = 0.62;
+const DB_FLOOR_PERCENTILE_DENSE = 0.32;
 const DB_CEIL_PERCENTILE = 0.9995;
-const TERRAIN_GAMMA = 0.72;
+const TERRAIN_GAMMA_SPARSE = 0.72;
+const TERRAIN_GAMMA_DENSE = 0.52;
 
 // Pitch is the most expensive measurement in the pipeline by an order of
 // magnitude. The voice curve it feeds is smoothed over +-4 frames (~0.19 s) and
@@ -350,12 +352,33 @@ export function* analyseSamplesChunked(samples, {
     }
   }
 
-  // Percentile anchoring rather than a fixed window below the peak. Anchoring to
-  // the peak alone would put the whole landscape on one high plateau with the
-  // music barely raised above the hiss. The floor percentile becomes the plains,
-  // the ceiling percentile becomes the summits, and a gamma opens up the middle
-  // where the music lives.
+  // Density detection: two signals combined.
+  // 1) IQR-based spectral density — how tightly clustered is the energy after
+  //    noise floor subtraction? Compressed pop → tight cluster → high density.
+  // 2) Crest factor — peak / RMS of the raw waveform. Heavily compressed
+  //    material has crest < 3; sparse classical is 5-10+.
   const dbSorted = Float32Array.from(melDb).sort();
+  const dbMedian = dbSorted[Math.floor(dbSorted.length * 0.50)];
+  const dbQ25 = dbSorted[Math.floor(dbSorted.length * 0.25)];
+  const dbQ75 = dbSorted[Math.floor(dbSorted.length * 0.75)];
+  const iqr = dbQ75 - dbQ25;
+  const iqrDensity = Math.max(0, Math.min(1, 1 - iqr / Math.max(1e-6, Math.abs(dbMedian) + iqr)));
+
+  let globalRms = 0, globalPeak = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const v = Math.abs(samples[i]);
+    globalRms += v * v;
+    if (v > globalPeak) globalPeak = v;
+  }
+  globalRms = Math.sqrt(globalRms / samples.length);
+  const crestFactor = globalPeak / Math.max(1e-10, globalRms);
+  const crestDensity = Math.max(0, Math.min(1, 1 - (crestFactor - 2) / 5));
+
+  const density = Math.max(iqrDensity, crestDensity);
+
+  const DB_FLOOR_PERCENTILE = DB_FLOOR_PERCENTILE_SPARSE + (DB_FLOOR_PERCENTILE_DENSE - DB_FLOOR_PERCENTILE_SPARSE) * density;
+  const TERRAIN_GAMMA = TERRAIN_GAMMA_SPARSE + (TERRAIN_GAMMA_DENSE - TERRAIN_GAMMA_SPARSE) * density;
+
   const dbLow = dbSorted[Math.floor(dbSorted.length * DB_FLOOR_PERCENTILE)];
   const dbHigh = dbSorted[Math.floor(dbSorted.length * DB_CEIL_PERCENTILE)];
   const melNorm = new Float32Array(frames * MEL_BANDS);
@@ -481,13 +504,18 @@ export function* analyseSamplesChunked(samples, {
         f_min_hz: MEL_MIN,
         f_max_hz: MEL_MAX,
         band_centres_hz: Array.from(bank.centresHz).map(v => Number(v.toFixed(1))),
-        per_band_floor: 'each band’s 18th percentile across the whole track is subtracted before normalisation, so the recording’s own surface noise becomes flat ground instead of a high plateau',
-        db_floor_percentile: DB_FLOOR_PERCENTILE,
+        per_band_floor: "each band’s 18th percentile across the whole track is subtracted before normalisation, so the recording’s own surface noise becomes flat ground instead of a high plateau",
+        density: Number(density.toFixed(3)),
+        iqr_density: Number(iqrDensity.toFixed(3)),
+        crest_factor: Number(crestFactor.toFixed(3)),
+        crest_density: Number(crestDensity.toFixed(3)),
+        density_adapted: "floor percentile and gamma are interpolated between sparse and dense presets; density is max(iqr, crest) so either compression signal triggers adaptation",
+        db_floor_percentile: Number(DB_FLOOR_PERCENTILE.toFixed(3)),
         db_ceiling_percentile: DB_CEIL_PERCENTILE,
         db_floor: Number(dbLow.toFixed(3)),
         db_ceiling: Number(dbHigh.toFixed(3)),
         db_peak: Number(dbMax.toFixed(3)),
-        gamma: TERRAIN_GAMMA,
+        gamma: Number(TERRAIN_GAMMA.toFixed(3)),
         separation: 'median filtering, 17-frame time window and 17-band frequency window',
         ridge_radius_bands: 4,
         elevation_time_smoothing_frames: 9,

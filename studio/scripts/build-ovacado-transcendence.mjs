@@ -100,11 +100,43 @@ const { buildLyricLines } = await import(
 
 const bandCentresHz = analysis.parameters?.terrain?.band_centres_hz ?? [];
 const timedLines = LYRICS_JSON.timed_lines;
-const landmarks = timedLines.map((line, index) => ({
-  line: index,
-  time: (line.t || 0) / 1000,
-  band: Math.round((bandCentresHz.length - 1) * 0.45),
-}));
+const frameRate = analysis.frame_rate;
+
+const bandOfHz = hz => {
+  let best = 0, bestD = Infinity;
+  for (let b = 0; b < height; b++) {
+    const d = Math.abs(bandCentresHz[b] - hz);
+    if (d < bestD) { bestD = d; best = b; }
+  }
+  return best;
+};
+
+const loBand = bandOfHz(160);
+const hiBand = bandOfHz(1400);
+
+function dominantBand(seconds) {
+  const f = Math.max(0, Math.min(width - 1, Math.round(seconds * frameRate)));
+  let best = loBand, bestValue = -1;
+  for (let b = loBand; b <= hiBand; b++) {
+    const idx = (f * height + b) * 4;
+    const elevation = terrainRGBA[idx];
+    const ridge = terrainRGBA[idx + 3];
+    const v = elevation * (0.4 + ridge / 255);
+    if (v > bestValue) { bestValue = v; best = b; }
+  }
+  return best;
+}
+
+const landmarks = timedLines.map((line, index) => {
+  const t = (line.t || 0) / 1000;
+  const end = index < timedLines.length - 1
+    ? (timedLines[index + 1].t || 0) / 1000
+    : Math.min(t + 4, duration);
+  let sum = 0, n = 0;
+  for (let s = t; s < end; s += 0.25) { sum += dominantBand(s); n++; }
+  const band = Math.round(sum / Math.max(1, n));
+  return { line: index, time: t, band };
+});
 
 const lyrics = buildLyricLines({
   timedLines,
@@ -179,11 +211,11 @@ const config = {
     blueNoise: '',
   },
   artDirection: {
-    heightScale: 1,
-    ridgeEmphasis: 1,
+    heightScale: 1.8,
+    ridgeEmphasis: 1.4,
     timeScale: 1,
     terracing: true,
-    terraceStep: 1.5,
+    terraceStep: 1.2,
     palette: 'alabaster',
     sunElevation: 64.32,
     sunAzimuth: -146.31,

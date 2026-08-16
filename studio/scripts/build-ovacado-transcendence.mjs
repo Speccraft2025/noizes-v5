@@ -296,10 +296,7 @@ addComponent('experience.html', 'experience', 'transcendence_runtime', experienc
 addComponent('analysis/track-01.terrain.png', 'image', 'sonic_terrain', terrainBytes);
 addComponent('analysis/track-01.analysis.json', 'analysis', 'deterministic_music_analysis', analysisBytes);
 
-const timelineBytes = Buffer.from(json({
-  schema_version: '1.0.0', master_clock: 'audio.currentTime',
-  track_id: TRACK_JSON.track_id, range_seconds: [0, arcEnd],
-}));
+const timelineBytes = await readFile(join(OUT_DIR, 'timeline', 'transcendence.timeline.json'));
 addComponent('timeline/transcendence.timeline.json', 'timeline', 'authored_sequence', timelineBytes);
 
 await put(join(OUT_DIR, 'manifest.json'), json(manifest));

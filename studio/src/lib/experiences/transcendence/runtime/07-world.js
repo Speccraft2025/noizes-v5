@@ -343,6 +343,7 @@ class WorldRenderer {
         uPixelRatio: { value: 1 },
         uPresence: { value: 0 },
         uLift: { value: 0 },
+        uBrightness: { value: 0 },
         uCentre: { value: new T.Vector3() },
         uSpan: { value: new T.Vector3(span[0], span[1], span[2]) },
         uSprite: { value: this._tex('dustGrain', { repeat: false }) },
@@ -670,8 +671,8 @@ class WorldRenderer {
       const near = cloud === this.nearAir;
       u.uTime.value = t;
       u.uPresence.value = f.presence.air * (near ? 0.75 : 1);
-      // High-frequency energy lifts matter into the sky.
       u.uLift.value = high * 0.8 + onset * 0.4;
+      u.uBrightness.value = bright;
       u.uCentre.value.set(
         near ? this.camera.position.x : 0,
         near ? this.camera.position.y - 14 : 10,
@@ -711,7 +712,7 @@ class WorldRenderer {
       this.brightMaterial.uniforms.uKnee.value = mix(0.22, 0.38, medium);
     }
     c.uFocusDistance.value = f.focus;
-    c.uFocusRange.value = f.focusRange;
+    c.uFocusRange.value = f.focusRange * mix(0.8, 1.3, presence);
     c.uContrast.value = f.contrast;
     c.uVignette.value = mix(0.30, 0.44, 1 - presence);
     c.uHighContrast.value = this.highContrast ? 1 : 0;

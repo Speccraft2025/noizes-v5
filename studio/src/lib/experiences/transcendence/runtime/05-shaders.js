@@ -209,7 +209,8 @@ uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform vec3 uSkyColor;
 uniform vec3 uGroundColor;
-uniform vec3 uFogColor;
+uniform vec3 uFogNear;
+uniform vec3 uFogFar;
 uniform float uFogDensity;
 uniform float uExposure;
 uniform float uContrast;
@@ -321,11 +322,12 @@ void main(){
 
   // --- atmosphere ----------------------------------------------------------
   float dist = length(cameraPosition - vWorld);
-  float fog = 1.0 - exp(-dist * uFogDensity);
-  // Height fog: the valleys hold it and the summits stand clear of it.
+  float fog = 1.0 - exp(-pow(dist * uFogDensity, 2.0));
   float lowLying = exp(-max(0.0, vWorld.y) * 0.05);
   fog = clamp(fog * mix(0.72, 1.0, lowLying), 0.0, 0.985);
-  color = mix(color, uFogColor, fog);
+  float fogDepth = smoothstep(0.0, 1.0, fog);
+  vec3 fogCol = mix(uFogNear, uFogFar, fogDepth);
+  color = mix(color, fogCol, fog);
 
   gl_FragColor = vec4(color * uExposure * uContrast, 1.0);
 }
@@ -362,7 +364,8 @@ GLSL.landmarkFragment = /* glsl */`
 uniform sampler2D uText;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
-uniform vec3 uFogColor;
+uniform vec3 uFogNear;
+uniform vec3 uFogFar;
 uniform float uFogDensity;
 uniform float uReveal;
 uniform float uExposure;
@@ -389,8 +392,10 @@ void main(){
   float written = smoothstep(vUv.x - 0.07, vUv.x + 0.02, uReveal);
 
   float dist = length(cameraPosition - vWorld);
-  float fog = 1.0 - exp(-dist * uFogDensity);
-  color = mix(color, uFogColor, clamp(fog, 0.0, 0.96));
+  float fog = 1.0 - exp(-pow(dist * uFogDensity, 2.0));
+  float fogDepth = smoothstep(0.0, 1.0, clamp(fog, 0.0, 0.96));
+  vec3 fogCol = mix(uFogNear, uFogFar, fogDepth);
+  color = mix(color, fogCol, clamp(fog, 0.0, 0.96));
 
   // Legibility falls off with distance rather than degrading into a black
   // block: past the point where the letterforms resolve, the cut fades out.
@@ -464,6 +469,7 @@ void main(){
 GLSL.skyFragment = /* glsl */`
 uniform vec3 uSkyColor;
 uniform vec3 uHorizonColor;
+uniform vec3 uHorizonGlow;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform float uExposure;
@@ -480,6 +486,10 @@ void main(){
 
   // The wall: deep, slightly warm, darkening toward the floor.
   vec3 wall = mix(uHorizonColor * 0.30, uHorizonColor, smoothstep(-0.55, 0.35, up));
+
+  // Horizon glow: a warm luminance band where the terrain meets the sky.
+  float horizonBand = exp(-pow((up - 0.08) * 6.5, 2.0));
+  wall += uHorizonGlow * horizonBand;
 
   // The oculus: a broad soft disc of daylight directly overhead.
   float oculus = smoothstep(0.62, 0.93, up);
@@ -522,6 +532,9 @@ GLSL.plinthFragment = /* glsl */`
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform vec3 uSkyColor;
+uniform vec3 uFogNear;
+uniform vec3 uFogFar;
+uniform float uFogDensity;
 uniform float uExposure;
 uniform float uContrast;
 uniform float uSunPower;
@@ -554,7 +567,14 @@ void main(){
   float sheen = pow(clamp(1.0 - abs(dot(n, v)), 0.0, 1.0), 3.0);
   color += uSkyColor * sheen * mix(0.55, 0.22, onPlinth);
 
-  gl_FragColor = vec4(color * uExposure * uContrast, 1.0);
+  float dist = length(cameraPosition - vWorld);
+  float fog = 1.0 - exp(-pow(dist * uFogDensity, 2.0));
+  float fogDepth = smoothstep(0.0, 1.0, fog);
+  vec3 fogCol = mix(uFogNear, uFogFar, fogDepth);
+  color = mix(color, fogCol, fog);
+  float alpha = 1.0 - smoothstep(0.75, 0.98, fog);
+
+  gl_FragColor = vec4(color * uExposure * uContrast, alpha);
 }
 `;
 
@@ -674,7 +694,6 @@ uniform float uFocusRange;
 uniform float uDofStrength;
 uniform float uGrain;
 uniform float uVignette;
-uniform float uAberration;
 uniform float uNear;
 uniform float uFar;
 uniform float uContrast;
@@ -691,15 +710,7 @@ void main(){
   vec2 uv = vUv;
   vec2 centred = uv - 0.5;
 
-  vec3 scene;
-  if (uAberration > 0.0000001) {
-    vec2 offset = centred * uAberration * dot(centred, centred);
-    scene.r = texture2D(uScene, uv + offset).r;
-    scene.g = texture2D(uScene, uv).g;
-    scene.b = texture2D(uScene, uv - offset).b;
-  } else {
-    scene = texture2D(uScene, uv).rgb;
-  }
+  vec3 scene = texture2D(uScene, uv).rgb;
 
   if (uDofStrength > 0.0001) {
     float depth = linearDepth(uv);

@@ -19,19 +19,19 @@ const QUALITY_PROFILES = {
     label: 'Cinematic', pixelRatio: 1.75,
     gridX: 384, gridZ: 512, viewDistance: 2600, airGrains: 40000, nearGrains: 2200,
     lodEps: 0.55, detailScale: 1.0,
-    bloom: true, bloomIterations: 3, dof: 0.75, aberration: 0.0075, grain: 0.05,
+    bloom: true, bloomIterations: 3, dof: 0.75, grain: 0.05,
   },
   balanced: {
     label: 'Balanced', pixelRatio: 1.4,
     gridX: 288, gridZ: 384, viewDistance: 2100, airGrains: 22000, nearGrains: 1400,
     lodEps: 0.8, detailScale: 0.9,
-    bloom: true, bloomIterations: 2, dof: 0.6, aberration: 0.0055, grain: 0.045,
+    bloom: true, bloomIterations: 2, dof: 0.6, grain: 0.045,
   },
   lite: {
     label: 'Lite', pixelRatio: 1.0,
     gridX: 176, gridZ: 224, viewDistance: 1500, airGrains: 7000, nearGrains: 500,
     lodEps: 1.4, detailScale: 0.6,
-    bloom: false, bloomIterations: 1, dof: 0.0, aberration: 0.0, grain: 0.04,
+    bloom: false, bloomIterations: 1, dof: 0.0, grain: 0.04,
   },
 };
 
@@ -63,9 +63,9 @@ const ART = Object.assign({
  * set five colours independently reliably produces a worse world than any of
  * these three. */
 const PALETTES = {
-  alabaster: { sun: [1.000, 0.925, 0.845], sky: [0.070, 0.068, 0.066], horizon: [0.052, 0.044, 0.038], ground: [0.014, 0.013, 0.014], fog: [0.045, 0.040, 0.038] },
-  oxide:     { sun: [1.000, 0.842, 0.700], sky: [0.082, 0.058, 0.046], horizon: [0.064, 0.036, 0.026], ground: [0.020, 0.012, 0.009], fog: [0.056, 0.034, 0.026] },
-  frost:     { sun: [0.878, 0.936, 1.000], sky: [0.058, 0.066, 0.080], horizon: [0.038, 0.046, 0.060], ground: [0.011, 0.013, 0.017], fog: [0.034, 0.040, 0.052] },
+  alabaster: { sun: [1.000, 0.925, 0.845], sky: [0.070, 0.068, 0.066], horizon: [0.052, 0.044, 0.038], ground: [0.014, 0.013, 0.014], fogNear: [0.052, 0.046, 0.040], fogFar: [0.034, 0.032, 0.036], horizonGlow: [0.085, 0.065, 0.048] },
+  oxide:     { sun: [1.000, 0.842, 0.700], sky: [0.082, 0.058, 0.046], horizon: [0.064, 0.036, 0.026], ground: [0.020, 0.012, 0.009], fogNear: [0.068, 0.042, 0.028], fogFar: [0.038, 0.028, 0.030], horizonGlow: [0.110, 0.058, 0.030] },
+  frost:     { sun: [0.878, 0.936, 1.000], sky: [0.058, 0.066, 0.080], horizon: [0.038, 0.046, 0.060], ground: [0.011, 0.013, 0.017], fogNear: [0.040, 0.046, 0.056], fogFar: [0.028, 0.034, 0.050], horizonGlow: [0.055, 0.068, 0.095] },
 };
 
 /* World scale. These are the only numbers that convert the recording into
@@ -128,7 +128,9 @@ class WorldRenderer {
     this.sky = new T.Color(...palette.sky);            // the lit ceiling
     this.horizon = new T.Color(...palette.horizon);    // the dark warm wall
     this.ground = new T.Color(...palette.ground);      // the polished floor
-    this.fog = new T.Color(...palette.fog);
+    this.fogNear = new T.Color(...palette.fogNear);
+    this.fogFar = new T.Color(...palette.fogFar);
+    this.horizonGlow = new T.Color(...palette.horizonGlow);
 
     this.field = {
       uTerrain: { value: this._tex('terrain', { repeat: false }) },
@@ -157,8 +159,10 @@ class WorldRenderer {
       uSunColor: { value: this.sun.color },
       uSkyColor: { value: this.sky },
       uHorizonColor: { value: this.horizon },
+      uHorizonGlow: { value: this.horizonGlow },
       uGroundColor: { value: this.ground },
-      uFogColor: { value: this.fog },
+      uFogNear: { value: this.fogNear },
+      uFogFar: { value: this.fogFar },
       uFogDensity: { value: 0.0026 },
       uExposure: { value: 1 },
       uContrast: { value: 1 },
@@ -200,6 +204,7 @@ class WorldRenderer {
       uniforms: {
         uSkyColor: this.shared.uSkyColor,
         uHorizonColor: this.shared.uHorizonColor,
+        uHorizonGlow: this.shared.uHorizonGlow,
         uSunDir: this.shared.uSunDir,
         uSunColor: this.shared.uSunColor,
         uExposure: this.shared.uExposure,
@@ -224,10 +229,15 @@ class WorldRenderer {
     this.plinthMaterial = new T.ShaderMaterial({
       vertexShader: GLSL.common + GLSL.grooveVertexFallback,
       fragmentShader: GLSL.common + GLSL.plinthFragment,
+      transparent: true,
+      depthWrite: false,
       uniforms: {
         uSunDir: this.shared.uSunDir,
         uSunColor: this.shared.uSunColor,
         uSkyColor: this.shared.uSkyColor,
+        uFogNear: this.shared.uFogNear,
+        uFogFar: this.shared.uFogFar,
+        uFogDensity: this.shared.uFogDensity,
         uExposure: this.shared.uExposure,
         uContrast: this.shared.uContrast,
         uSunPower: this.shared.uSunPower,
@@ -385,7 +395,8 @@ class WorldRenderer {
           uLift: { value: 0.45 },
           uSunDir: this.shared.uSunDir,
           uSunColor: this.shared.uSunColor,
-          uFogColor: this.shared.uFogColor,
+          uFogNear: this.shared.uFogNear,
+          uFogFar: this.shared.uFogFar,
           uFogDensity: this.shared.uFogDensity,
           uExposure: this.shared.uExposure,
           uContrast: this.shared.uContrast,
@@ -480,7 +491,6 @@ class WorldRenderer {
       uFocusDistance: { value: 120 }, uFocusRange: { value: 260 }, uDofStrength: { value: this.profile.dof },
       uGrain: { value: this.profile.grain },
       uVignette: { value: 0.34 },
-      uAberration: { value: this.profile.aberration },
       uNear: { value: 0.6 }, uFar: { value: 2400 },
       uContrast: { value: 1 },
       uHighContrast: { value: this.highContrast ? 1 : 0 },
@@ -553,6 +563,9 @@ class WorldRenderer {
     if (patch.palette !== undefined) {
       var p = PALETTES[ART.palette] || PALETTES.alabaster;
       this.sun.color.setRGB(p.sun[0], p.sun[1], p.sun[2]);
+      this.fogNear.setRGB(p.fogNear[0], p.fogNear[1], p.fogNear[2]);
+      this.fogFar.setRGB(p.fogFar[0], p.fogFar[1], p.fogFar[2]);
+      this.horizonGlow.setRGB(p.horizonGlow[0], p.horizonGlow[1], p.horizonGlow[2]);
     }
     if (patch.terracing !== undefined) {
       this.field.uTerrace.value = ART.terracing ? 0.85 : 0;
@@ -617,12 +630,21 @@ class WorldRenderer {
     // carving always has something to stand against.
     this.sky.setRGB(mix(0.052, 0.105, medium), mix(0.050, 0.100, medium), mix(0.049, 0.094, medium));
     this.horizon.setRGB(mix(0.040, 0.070, medium), mix(0.034, 0.058, medium), mix(0.030, 0.048, medium));
-    // Distance must darken, not whiten: fog sits below the lit rock so the
-    // ranges keep their silhouette all the way to the horizon.
-    this.fog.setRGB(
-      mix(0.030, 0.058, medium) * f.atmosphere,
-      mix(0.027, 0.050, medium) * f.atmosphere,
-      mix(0.025, 0.045, medium) * f.atmosphere,
+    // Near fog is warmer, far fog is cooler — aerial perspective.
+    this.fogNear.setRGB(
+      mix(0.038, 0.068, medium) * f.atmosphere,
+      mix(0.034, 0.058, medium) * f.atmosphere,
+      mix(0.028, 0.046, medium) * f.atmosphere,
+    );
+    this.fogFar.setRGB(
+      mix(0.022, 0.042, medium) * f.atmosphere,
+      mix(0.022, 0.042, medium) * f.atmosphere,
+      mix(0.026, 0.050, medium) * f.atmosphere,
+    );
+    this.horizonGlow.setRGB(
+      mix(0.055, 0.110, medium) * f.atmosphere,
+      mix(0.042, 0.078, medium) * f.atmosphere,
+      mix(0.030, 0.054, medium) * f.atmosphere,
     );
 
     // Dynamics decide how tall the world is allowed to be.

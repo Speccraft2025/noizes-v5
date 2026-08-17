@@ -841,8 +841,10 @@ class ExperienceDirector {
     if (event.source !== window.parent) return;
     var d = event.data;
     if (!d || d.type !== 'ned:visual-update') return;
-    if (d.artDirection && typeof WorldRenderer.updateArt === 'function') {
+    if (d.artDirection) {
       WorldRenderer.updateArt(d.artDirection);
+      var w = window.__TX_DIRECTOR__ && window.__TX_DIRECTOR__.world;
+      if (w && typeof w.applyArt === 'function') w.applyArt(d.artDirection);
     }
   });
 

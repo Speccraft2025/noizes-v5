@@ -539,16 +539,16 @@ class WorldRenderer {
 
   static updateArt(patch) {
     if (patch.heightScale !== undefined) {
-      ART.heightScale = Number(patch.heightScale);
+      ART.heightScale = clamp(Number(patch.heightScale) || 1, 0.4, 2.2);
       HEIGHT_SCALE = 30 * ART.heightScale;
     }
-    if (patch.ridgeEmphasis !== undefined) ART.ridgeEmphasis = Number(patch.ridgeEmphasis);
-    if (patch.flightAltitude !== undefined) ART.flightAltitude = Number(patch.flightAltitude);
-    if (patch.sunElevation !== undefined) ART.sunElevation = Number(patch.sunElevation);
-    if (patch.sunAzimuth !== undefined) ART.sunAzimuth = Number(patch.sunAzimuth);
-    if (patch.palette !== undefined) ART.palette = String(patch.palette);
+    if (patch.ridgeEmphasis !== undefined) ART.ridgeEmphasis = clamp(Number(patch.ridgeEmphasis) || 1, 0, 2.5);
+    if (patch.flightAltitude !== undefined) ART.flightAltitude = clamp(Number(patch.flightAltitude) || 1, 0.5, 2.5);
+    if (patch.sunElevation !== undefined) ART.sunElevation = clamp(Number(patch.sunElevation) || 64, 8, 88);
+    if (patch.sunAzimuth !== undefined) ART.sunAzimuth = clamp(Number(patch.sunAzimuth) || -146, -180, 180);
+    if (patch.palette !== undefined && PALETTES[String(patch.palette)]) ART.palette = String(patch.palette);
     if (patch.terracing !== undefined) ART.terracing = !!patch.terracing;
-    if (patch.terraceStep !== undefined) ART.terraceStep = Number(patch.terraceStep);
+    if (patch.terraceStep !== undefined) ART.terraceStep = clamp(Number(patch.terraceStep) || 1.5, 0.5, 6);
   }
 
   applyArt(patch) {
@@ -564,6 +564,7 @@ class WorldRenderer {
     if (patch.palette !== undefined) {
       var p = PALETTES[ART.palette] || PALETTES.alabaster;
       this.sun.color.setRGB(p.sun[0], p.sun[1], p.sun[2]);
+      this.ground.setRGB(p.ground[0], p.ground[1], p.ground[2]);
       this.fogNear.setRGB(p.fogNear[0], p.fogNear[1], p.fogNear[2]);
       this.fogFar.setRGB(p.fogFar[0], p.fogFar[1], p.fogFar[2]);
       this.horizonGlow.setRGB(p.horizonGlow[0], p.horizonGlow[1], p.horizonGlow[2]);

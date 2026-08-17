@@ -728,11 +728,11 @@ class ExperienceDirector {
     };
 
     const nt = this.nedTracks;
-    if (nt.exposure) { const v = evaluateTrack(nt.exposure, exact); if (v !== null) frame.exposure = v; }
-    if (nt.relief) { const v = evaluateTrack(nt.relief, exact); if (v !== null) frame.relief = v; }
-    if (nt.atmosphere) { const v = evaluateTrack(nt.atmosphere, exact); if (v !== null) frame.atmosphere = v; }
-    if (nt.ahead) { const v = evaluateTrack(nt.ahead, exact); if (v !== null) frame.ahead = v; }
-    if (nt.air) { const v = evaluateTrack(nt.air, exact); if (v !== null) frame.presence.air = v; }
+    if (nt.exposure) { const v = evaluateTrack(nt.exposure, exact); if (v !== null) frame.exposure = clamp(v, 0, 2); }
+    if (nt.relief) { const v = evaluateTrack(nt.relief, exact); if (v !== null) frame.relief = clamp(v, 0, 2); }
+    if (nt.atmosphere) { const v = evaluateTrack(nt.atmosphere, exact); if (v !== null) frame.atmosphere = clamp(v, 0, 2); }
+    if (nt.ahead) { const v = evaluateTrack(nt.ahead, exact); if (v !== null) frame.ahead = clamp(v, 0, 2); }
+    if (nt.air) { const v = evaluateTrack(nt.air, exact); if (v !== null) frame.presence.air = clamp(v, 0, 2); }
 
     if (this.world && this.director) {
       const lens = this.director.update(state, dt, { attention });
@@ -877,7 +877,7 @@ class ExperienceDirector {
       var w = window.__TX_DIRECTOR__ && window.__TX_DIRECTOR__.world;
       if (w && typeof w.applyArt === 'function') w.applyArt(d.artDirection);
     }
-    if (d.type === 'ned:direction-tracks' && d.tracks) {
+    if (d.type === 'ned:direction-tracks' && d.tracks && typeof d.tracks === 'object') {
       var dir = window.__TX_DIRECTOR__;
       if (dir) dir.nedTracks = d.tracks;
     }

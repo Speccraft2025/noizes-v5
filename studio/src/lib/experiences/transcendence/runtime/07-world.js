@@ -650,7 +650,7 @@ class WorldRenderer {
     );
 
     // Dynamics decide how tall the world is allowed to be.
-    this.field.uHeightScale.value = HEIGHT_SCALE * mix(0.86, 1.16, medium) * f.relief * (1 + onset * 0.06);
+    this.field.uHeightScale.value = HEIGHT_SCALE * mix(0.86, 1.16, medium) * f.relief * (1 + onset * 0.04);
     this.field.uRidgeScale.value = 3.4 * ART.ridgeEmphasis * mix(0.7, 1.35, analysis.mean('voice', t, 0.8));
 
     // ---- the ground follows the camera -------------------------------------
@@ -672,7 +672,7 @@ class WorldRenderer {
       const near = cloud === this.nearAir;
       u.uTime.value = t;
       u.uPresence.value = f.presence.air * (near ? 0.75 : 1);
-      u.uLift.value = high * 0.8 + onset * 0.4;
+      u.uLift.value = high * 0.8 + onset * 0.25;
       u.uBrightness.value = bright;
       u.uCentre.value.set(
         near ? this.camera.position.x : 0,
@@ -707,10 +707,10 @@ class WorldRenderer {
     const c = this.compositeMaterial.uniforms;
     c.uTime.value = t;
     c.uExposure.value = f.exposure;
-    c.uBloomStrength.value = this.profile.bloom ? mix(0.22, 0.55, loud) + onset * 0.12 : 0;
+    c.uBloomStrength.value = this.profile.bloom ? mix(0.22, 0.48, loud) + onset * 0.08 : 0;
     if (this.profile.bloom) {
-      this.brightMaterial.uniforms.uThreshold.value = mix(0.78, 0.58, medium) - onset * 0.08;
-      this.brightMaterial.uniforms.uKnee.value = mix(0.22, 0.38, medium);
+      this.brightMaterial.uniforms.uThreshold.value = mix(0.78, 0.60, medium) - onset * 0.05;
+      this.brightMaterial.uniforms.uKnee.value = mix(0.22, 0.36, medium);
     }
     c.uFocusDistance.value = f.focus;
     c.uFocusRange.value = f.focusRange * mix(0.8, 1.3, presence);
@@ -719,7 +719,7 @@ class WorldRenderer {
       c.uDofStrength.value = this.profile.dof * mix(1.12, 0.88, altNorm);
     }
     c.uContrast.value = f.contrast;
-    c.uVignette.value = mix(0.36, 0.26, altNorm) * mix(1.0, 1.12, 1 - presence);
+    c.uVignette.value = mix(0.32, 0.24, altNorm) * mix(1.0, 1.08, 1 - presence);
     c.uGrain.value = this.profile.grain * mix(1.12, 0.88, medium);
     c.uHighContrast.value = this.highContrast ? 1 : 0;
     c.uNear.value = this.camera.near;

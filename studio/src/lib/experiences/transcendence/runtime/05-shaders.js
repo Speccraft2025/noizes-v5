@@ -398,29 +398,30 @@ void main(){
   float glyph = texture2D(uText, vec2(vUv.x, 1.0 - vUv.y)).a;
   if (glyph < 0.004) discard;
 
-  // The line is cut, so it is read by its edge rather than by its fill: a dark
-  // trough with one lit wall, as an inscription behaves in raking light.
   vec2 grad = vec2(dFdx(glyph), dFdy(glyph));
-  float edge = clamp(length(grad) * 30.0, 0.0, 1.0);
+  float dist = length(cameraPosition - vWorld);
+
+  float distAdapt = mix(1.0, 2.2, smoothstep(200.0, 700.0, dist));
+  float edge = clamp(length(grad) * 30.0 * distAdapt, 0.0, 1.0);
   vec3 l = normalize(uSunDir);
   float lit = clamp(dot(normalize(vec3(grad.x * 46.0, 1.0, grad.y * 46.0)), l), 0.0, 1.0);
 
-  vec3 cut = uSunColor * 0.055;                    // shaded stone inside the cut
-  vec3 rim = uSunColor * (0.34 + 0.66 * lit);      // the lit wall of the groove
+  float depth = smoothstep(0.1, 0.7, glyph);
+  vec3 cut = uSunColor * mix(0.065, 0.038, depth);
+  vec3 rim = uSunColor * (0.34 + 0.66 * lit);
   vec3 color = mix(cut, rim, edge * 0.95);
 
-  // Written progressively, left to right, as the line is sung.
   float written = smoothstep(vUv.x - 0.07, vUv.x + 0.02, uReveal);
 
-  float dist = length(cameraPosition - vWorld);
+  float front = smoothstep(0.12, 0.0, abs(vUv.x - uReveal)) * step(0.01, uReveal) * step(uReveal, 0.99);
+  color += uSunColor * front * 0.08 * edge;
+
   float fog = 1.0 - exp(-pow(dist * uFogDensity, 2.0));
   float fogDepth = smoothstep(0.0, 1.0, clamp(fog, 0.0, 0.96));
   vec3 fogCol = mix(uFogNear, uFogFar, fogDepth);
   color = mix(color, fogCol, clamp(fog, 0.0, 0.96));
 
-  // Legibility falls off with distance rather than degrading into a black
-  // block: past the point where the letterforms resolve, the cut fades out.
-  float legible = 1.0 - smoothstep(420.0, 900.0, dist);
+  float legible = 1.0 - smoothstep(380.0, 1000.0, dist);
   gl_FragColor = vec4(color * uExposure * uContrast, glyph * written * legible);
 }
 `;

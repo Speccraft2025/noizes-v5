@@ -716,6 +716,7 @@ class ExperienceDirector {
       const lens = this.director.update(state, dt, { attention });
       frame.focus = lens.focus;
       frame.focusRange = lens.focusRange;
+      frame.altitude = lens.altitude;
       this.world.update(frame);
       this.world.render(this.world.camera);
     } else if (this.essential) {

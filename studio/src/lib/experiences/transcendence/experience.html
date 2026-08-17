@@ -45,6 +45,7 @@
     <!-- Identity, kept to the corner. -->
     <div id="identity">
       <p class="identity-track">/* TX_TITLE */</p>
+      <hr class="identity-rule" aria-hidden="true">
       <p class="identity-sub">/* TX_SUBTITLE */</p>
       <p class="identity-time"><span id="hud-elapsed">0:00</span> / /* TX_DURATION_LABEL */</p>
     </div>
@@ -139,6 +140,7 @@
   <!-- Residue. The final state, after the recording stops for breath. -->
   <div id="residue" hidden role="group" aria-label="The pressed artefact">
     <p class="residue-label">Pressed copy</p>
+    <hr class="residue-rule" aria-hidden="true">
     <strong id="residue-hash">—</strong>
     <p id="residue-statement"></p>
     <button id="replay" type="button">Fly it again</button>

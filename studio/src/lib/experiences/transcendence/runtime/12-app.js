@@ -300,6 +300,23 @@ class ExperienceDirector {
     }
   }
 
+  _fillColophon() {
+    const el = dom.$('#colophon-text');
+    if (!el || !this.edition) return;
+    const e = this.edition;
+    const parts = [];
+    if (e.name) parts.push(e.name);
+    if (e.copy) parts.push(`Copy ${e.copy}`);
+    if (e.principle) parts.push(e.principle);
+    el.textContent = parts.join('. ') + (parts.length ? '.' : '');
+    if (e.edition_id) {
+      const id = document.createElement('span');
+      id.className = 'colophon-id';
+      id.textContent = e.edition_id;
+      el.after(id);
+    }
+  }
+
   _begin() {
     this._resize();
     dom.on(window, 'resize', () => this._resize());
@@ -314,6 +331,7 @@ class ExperienceDirector {
     });
     this._buildHud();
     this._setHud(true, true);
+    this._fillColophon();
     if (this.debug) this._buildInspector();
     this.running = true;
     this.lastFrameWall = performance.now() / 1000;
@@ -382,14 +400,14 @@ class ExperienceDirector {
     if (this.mode !== 'sealed') return;
     this.mode = 'world';
     this.el.stage.dataset.mode = 'world';
-    this.el.threshold.hidden = true;
+    this.el.threshold.dataset.crossing = 'true';
     // One gesture unlocks both the media element and the AudioContext.
     this.audio.unlock();
     const started = await this.clock.play();
     if (!started) {
       this.el.stage.dataset.blocked = 'true';
       this.a11y.status('Playback was blocked. Press and hold again to lower the stylus.');
-      this.el.threshold.hidden = false;
+      this.el.threshold.dataset.crossing = 'false';
       this.el.thresholdHint.textContent = 'The browser held the stylus back. Press and hold again.';
       this.mode = 'sealed';
       this.el.stage.dataset.mode = 'sealed';
@@ -397,6 +415,7 @@ class ExperienceDirector {
       this.holdStart = 0;
       return;
     }
+    setTimeout(() => { this.el.threshold.hidden = true; }, 650);
     this.director?.reset(this.cues.reduce(0));
     this.a11y.announce('The stylus is down. The recording begins.');
   }

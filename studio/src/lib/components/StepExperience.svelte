@@ -7,7 +7,8 @@
   import { onDestroy } from 'svelte';
   import { releaseProject, template, transcendence } from '$lib/stores/package.js';
   import { CANONICAL_TEMPLATE, TRANSCENDENCE_TEMPLATE } from '$lib/utils/project.js';
-  import { DEFAULT_ART_DIRECTION, PALETTES, QUALITY_PROFILES, normalizeArtDirection } from '$lib/utils/transcendence.js';
+  import { DEFAULT_ART_DIRECTION, PALETTES, QUALITY_PROFILES, normalizeArtDirection, buildTranscendenceHTML } from '$lib/utils/transcendence.js';
+  import { VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
   import { canDecodeAudio } from '$lib/analysis/index.js';
   import { buildLyricLines, defaultLandmarks, landmarkProblems } from '$lib/experiences/transcendence/landmarks.js';
   import HelpTip from './HelpTip.svelte';
@@ -109,7 +110,81 @@
     controller?.abort();
   }
 
-  onDestroy(() => controller?.abort());
+  onDestroy(() => {
+    controller?.abort();
+    closeNedPreview();
+  });
+
+  let nedPreview = null;
+  let nedPreviewFrame = null;
+  let nedPreviewSent = false;
+  let nedPreviewReady = false;
+  let nedPreviewLoading = false;
+  let nedPreviewError = '';
+
+  $: if (nedPreviewFrame && nedPreviewReady) {
+    nedPreviewFrame.contentWindow?.postMessage({ type: 'ned:visual-update', artDirection: art }, '*');
+  }
+
+  async function launchNedPreview() {
+    if (!analysis || !audioAsset?.file || !$transcendence.terrain) return;
+    nedPreviewLoading = true;
+    nedPreviewError = '';
+    nedPreviewSent = false;
+    nedPreviewReady = false;
+    try {
+      const audioPath = 'preview/audio';
+      const terrainPath = 'preview/terrain.png';
+      const result = await buildTranscendenceHTML({
+        identity: { title: selectedTrack?.title || 'Preview', artist: selectedTrack?.primary_artist || '', release_id: 'ned-preview' },
+        edition: {},
+        analysis,
+        track: {
+          track_id: selectedTrackId,
+          title: selectedTrack?.title || '',
+          primary_artist: selectedTrack?.primary_artist || '',
+          audio: { src: audioPath, mime: audioAsset.file.type || 'audio/mpeg' },
+          terrain: terrainPath,
+        },
+        timedLines,
+        landmarks,
+        artDirection: art,
+      });
+      const [audioBytes, terrainBytes] = await Promise.all([
+        audioAsset.file.arrayBuffer(),
+        $transcendence.terrain.arrayBuffer(),
+      ]);
+      nedPreview = {
+        html: result.html,
+        resources: [
+          { path: audioPath, mime: audioAsset.file.type || 'audio/mpeg', bytes: audioBytes },
+          { path: terrainPath, mime: 'image/png', bytes: terrainBytes },
+        ],
+      };
+    } catch (err) {
+      nedPreviewError = err?.message || String(err);
+    } finally {
+      nedPreviewLoading = false;
+    }
+  }
+
+  function loadNedPreviewFrame() {
+    if (!nedPreviewFrame?.contentWindow || !nedPreview || nedPreviewSent) return;
+    const resources = nedPreview.resources.map((r) => ({ ...r }));
+    nedPreviewFrame.contentWindow.postMessage({
+      type: 'noizes:viewer:load',
+      html: nedPreview.html,
+      resources,
+    }, '*', resources.map((r) => r.bytes));
+    nedPreviewSent = true;
+    nedPreviewReady = true;
+  }
+
+  function closeNedPreview() {
+    nedPreview = null;
+    nedPreviewSent = false;
+    nedPreviewReady = false;
+  }
 
   const timecode = (seconds) => {
     const total = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -299,6 +374,44 @@
               </label>
             {/if}
           </div>
+        </section>
+
+        <!-- NED Live Preview -->
+        <section>
+          <p class="t-caption mb-2">Live preview</p>
+          <p class="text-xs mb-3" style="color: var(--ink-muted);">
+            The real Transcendence world running in-place. Art direction changes above update the terrain instantly.
+          </p>
+          {#if nedPreviewLoading}
+            <div class="rounded-xl p-4" style="background: rgba(123,92,240,0.06); border: 1px solid rgba(123,92,240,0.25);">
+              <span class="text-xs font-bold text-white">Building preview…</span>
+            </div>
+          {:else if nedPreview}
+            <div class="relative rounded-xl overflow-hidden" style="aspect-ratio: 16/9; border: 1px solid rgba(123,92,240,0.35);">
+              <iframe
+                bind:this={nedPreviewFrame}
+                title="NED live preview"
+                srcdoc={VIEWER_FRAME_BOOTSTRAP}
+                on:load={loadNedPreviewFrame}
+                allow="autoplay"
+                sandbox="allow-scripts"
+                class="absolute inset-0 w-full h-full border-0"
+              ></iframe>
+            </div>
+            <div class="flex items-center gap-3 mt-2">
+              <span class="text-[11px]" style="color: var(--ink-muted);">
+                {nedPreviewReady ? 'Move the Height slider above to see it change in real time.' : 'Loading…'}
+              </span>
+              <button type="button" class="btn-ghost text-xs ml-auto" on:click={closeNedPreview}>Close</button>
+            </div>
+          {:else}
+            <button type="button" class="btn-spectral" disabled={!audioAsset} on:click={launchNedPreview}>
+              Launch live preview
+            </button>
+          {/if}
+          {#if nedPreviewError}
+            <p class="text-xs mt-2" style="color:#F08A8A;">{nedPreviewError}</p>
+          {/if}
         </section>
 
         <!-- 4. Where the words are cut -->

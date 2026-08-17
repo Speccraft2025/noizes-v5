@@ -837,6 +837,15 @@ class ExperienceDirector {
 /* ------------------------------------------------------------------ bootstrap */
 
 (function start() {
+  window.addEventListener('message', function(event) {
+    if (event.source !== window.parent) return;
+    var d = event.data;
+    if (!d || d.type !== 'ned:visual-update') return;
+    if (d.artDirection && typeof WorldRenderer.updateArt === 'function') {
+      WorldRenderer.updateArt(d.artDirection);
+    }
+  });
+
   const run = () => {
     const director = new ExperienceDirector();
     window.__TX_DIRECTOR__ = director;

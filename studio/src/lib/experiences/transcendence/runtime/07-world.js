@@ -73,7 +73,7 @@ const PALETTES = {
  * landmarks and the Essential fallback all agree. */
 const TIME_SCALE = 26 * ART.timeScale;      // world units per second of recording
 const BAND_WIDTH = 420;                     // world units across the whole frequency axis
-const HEIGHT_SCALE = 30 * ART.heightScale;  // world units at full energy in the lowest band
+let HEIGHT_SCALE = 30 * ART.heightScale;    // world units at full energy in the lowest band
 
 class WorldRenderer {
   constructor(canvas, options) {
@@ -525,6 +525,14 @@ class WorldRenderer {
   static zAt(seconds) { return -seconds * TIME_SCALE; }
   static xAtBand(band, bands = 128) { return (band / (bands - 1) - 0.5) * BAND_WIDTH; }
   static get scale() { return { TIME_SCALE, BAND_WIDTH, HEIGHT_SCALE }; }
+
+  static updateArt(patch) {
+    if (patch.heightScale !== undefined) {
+      ART.heightScale = Number(patch.heightScale);
+      HEIGHT_SCALE = 30 * ART.heightScale;
+    }
+    if (patch.ridgeEmphasis !== undefined) ART.ridgeEmphasis = Number(patch.ridgeEmphasis);
+  }
 
   /* Ground height at a world position — a CPU mirror of the shader's base term.
    * It deliberately omits the analytic fine relief: the flight needs the shape

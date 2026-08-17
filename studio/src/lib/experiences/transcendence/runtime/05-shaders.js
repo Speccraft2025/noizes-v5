@@ -336,7 +336,9 @@ void main(){
   float delta = vSeconds - uPlayhead;
   float heard = 1.0 - smoothstep(-0.4, 2.5, delta);
   float present = exp(-delta * delta * 0.06);
+  float unheard = 1.0 - heard;
   color *= mix(1.0 - uAhead * 0.7, 1.0, heard);
+  color = mix(color, uFogFar * 0.6, unheard * uAhead * 0.25);
   color += uSunColor * present * 0.06 * (0.3 + energy);
 
   // --- atmosphere ----------------------------------------------------------
@@ -433,11 +435,13 @@ uniform float uSize;
 uniform float uPixelRatio;
 uniform float uPresence;
 uniform float uLift;          // high-frequency energy lifting matter into the sky
+uniform float uBrightness;    // recording brightness for particle luminance
 uniform vec3  uCentre;
 uniform vec3  uSpan;
 attribute vec2 aSeed;
 attribute float aIndex;
 varying float vAlpha;
+varying float vDepth;
 
 void main(){
   float s1 = aSeed.x, s2 = aSeed.y;
@@ -455,7 +459,9 @@ void main(){
   float grain = 0.45 + hash11(aIndex * 0.0027) * 1.05;
   gl_PointSize = clamp(uSize * uPixelRatio * grain * (34.0 / max(dist, 0.6)), 0.6, 26.0);
 
+  vDepth = smoothstep(40.0, 550.0, dist);
   vAlpha = uPresence * (0.05 + 0.12 * grain)
+    * (1.0 + uBrightness * 0.35)
     * smoothstep(0.0, 0.12, rise) * (1.0 - smoothstep(0.70, 1.0, rise))
     * (1.0 - smoothstep(260.0, 620.0, dist));
 }
@@ -467,10 +473,14 @@ uniform vec3 uSunColor;
 uniform float uContrast;
 uniform float uExposure;
 varying float vAlpha;
+varying float vDepth;
 void main(){
   vec4 sprite = texture2D(uSprite, gl_PointCoord);
   if (sprite.a < 0.008) discard;
-  gl_FragColor = vec4(vec3(0.52, 0.50, 0.47) * uSunColor * uExposure * uContrast, sprite.a * vAlpha);
+  vec3 nearDust = vec3(0.56, 0.52, 0.46);
+  vec3 farDust = vec3(0.44, 0.46, 0.52);
+  vec3 dustColor = mix(nearDust, farDust, vDepth);
+  gl_FragColor = vec4(dustColor * uSunColor * uExposure * uContrast, sprite.a * vAlpha);
 }
 `;
 
@@ -733,8 +743,11 @@ void main(){
 
   if (uDofStrength > 0.0001) {
     float depth = linearDepth(uv);
-    float coc = clamp(abs(depth - uFocusDistance) / max(uFocusRange, 0.001), 0.0, 1.0);
-    coc = pow(coc, 1.5) * uDofStrength;
+    float delta = depth - uFocusDistance;
+    float range = max(uFocusRange, 0.001);
+    float coc = clamp(abs(delta) / range, 0.0, 1.0);
+    float farBias = step(0.0, delta) * 0.3;
+    coc = pow(coc, 1.5 - farBias) * uDofStrength;
     scene = mix(scene, texture2D(uBlur, uv).rgb, coc);
   }
 

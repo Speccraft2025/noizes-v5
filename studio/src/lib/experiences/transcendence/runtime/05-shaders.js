@@ -259,15 +259,21 @@ void main(){
   vec3 albedo = mix(cool, body, smoothstep(0.02, 0.42, vBand));
   albedo = mix(albedo, warm, smoothstep(0.44, 1.0, vBand));
 
+  // Energy warms the stone: loud passages are slightly more saturated.
+  albedo = mix(albedo, albedo * vec3(1.06, 0.99, 0.93), energy * 0.35);
+
   // Veining. Seams run through the block along its bedding plane and are
   // sharper where the recording was loud, as though the stone recorded its own
-  // stress. Faded with distance so they never become noise.
+  // stress. Faded with distance so they never become noise. Low bands carry
+  // deeper, wider veins; high bands carry finer crystalline fractures.
   float vclose = 1.0 - smoothstep(0.05, 0.42, vLod);
-  float vein = ridged2(vWorld.xz * vec2(0.42, 0.075) + vec2(vWorld.y * 0.14, 0.0));
-  vein = pow(clamp(vein, 0.0, 1.0), 3.4);
+  float veinScale = mix(0.28, 0.58, vBand);
+  float vein = ridged2(vWorld.xz * vec2(veinScale, 0.075) + vec2(vWorld.y * 0.14, 0.0));
+  vein = pow(clamp(vein, 0.0, 1.0), mix(2.6, 4.2, vBand));
   float vein2 = ridged2(vWorld.xz * vec2(0.11, 0.021) + 31.7);
   vein2 = pow(clamp(vein2, 0.0, 1.0), 6.0);
-  albedo *= 1.0 - (vein * 0.26 + vein2 * 0.34) * (0.45 + 0.55 * energy) * vclose;
+  float veinStrength = mix(0.32, 0.20, vBand);
+  albedo *= 1.0 - (vein * veinStrength + vein2 * 0.34) * (0.45 + 0.55 * energy) * vclose;
 
   // Quarry grain and the faint banding of a cut face.
   albedo *= 0.965 + 0.07 * fbm2(vWorld.xz * 0.55 + vWorld.y * 0.09) * vclose;
@@ -275,7 +281,10 @@ void main(){
 
   albedo = mix(albedo, albedo * vec3(1.05, 0.985, 0.925), transient * 0.6);
 
-  float rough = clamp(0.68 - harmonic * 0.16 - ridge * 0.07 + transient * 0.06, 0.30, 0.90);
+  // Low frequencies: dense, polished monumental stone. High frequencies:
+  // rougher, more crystalline, catching more scattered light.
+  float bandRough = mix(0.52, 0.82, pow(vBand, 0.7));
+  float rough = clamp(bandRough - harmonic * 0.16 - ridge * 0.07 + transient * 0.06, 0.30, 0.90);
 
   // --- light ---------------------------------------------------------------
   // A gallery: a broad soft source almost overhead, and the room returning
@@ -287,7 +296,12 @@ void main(){
   // but they cool as they fall away, which is the separation that reads.
   float wrapped = max(0.0, (dot(n, l) + 0.42) / 1.42);
   float key = mix(pow(wrapped, 1.6) * 0.62, ndl, 0.66);
-  float translucency = pow(clamp(1.0 - abs(dot(n, v)), 0.0, 1.0), 2.2) * 0.30;
+
+  // High bands are thinner stone — more light passes through. Loud passages
+  // drive more subsurface scatter, as though the stone is resonating.
+  float transluBase = mix(0.22, 0.38, pow(vBand, 0.6));
+  float translucency = pow(clamp(1.0 - abs(dot(n, v)), 0.0, 1.0), 2.2) * transluBase;
+  translucency *= 1.0 + energy * 0.25;
 
   vec3 shadowTint = vec3(0.72, 0.78, 0.92);
   vec3 lit = albedo * uSunColor;
@@ -295,7 +309,10 @@ void main(){
 
   vec3 color = mix(shade * 0.16, lit, key) * uSunPower;
   color += albedo * uSunColor * translucency * uSunPower * 0.42;
-  color += uSunColor * ggx(n, v, l, rough) * ndl * fresnel(max(dot(n, v), 0.0), 0.035) * 0.42;
+
+  // Low bands are denser, more reflective stone; high bands scatter softly.
+  float f0 = mix(0.048, 0.026, pow(vBand, 0.7));
+  color += uSunColor * ggx(n, v, l, rough) * ndl * fresnel(max(dot(n, v), 0.0), f0) * 0.42;
 
   // Hemisphere ambient: lit ceiling above, dark polished floor below.
   float up = n.y * 0.5 + 0.5;
@@ -308,8 +325,10 @@ void main(){
   float cavity = 1.0 - slope * 0.62;
   color *= mix(1.0, cavity, 0.82);
 
-  // Crests catch the ceiling.
-  color += uSunColor * pow(ridge, 1.4) * energy * 0.14 * smoothstep(0.35, 0.95, up);
+  // Crests catch the ceiling. Harmonic ridges glow more strongly than
+  // percussive ones — a sustained note holds its light.
+  float crestIntensity = mix(0.10, 0.18, harmonic);
+  color += uSunColor * pow(ridge, 1.4) * energy * crestIntensity * smoothstep(0.35, 0.95, up);
 
   // --- the playhead --------------------------------------------------------
   // Music already heard stays quietly lit behind the listener; music not yet

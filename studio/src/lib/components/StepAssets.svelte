@@ -335,11 +335,14 @@
           </div>
 
           {#if !selectedVersions.some((version) => version.is_primary)}
-            <label class="rounded-xl flex flex-col items-center justify-center py-7 cursor-pointer" style="border:1px dashed rgba(123,92,240,.35);background:rgba(123,92,240,.05);">
-              <span class="font-bold text-sm text-white">Upload primary master *<HelpTip field="primary_master" /></span>
-              <span class="text-xs mt-1" style="color:var(--ink-muted);">WAV · FLAC · MP3 · M4A</span>
-              <input class="hidden" type="file" accept="audio/*,.wav,.flac,.mp3,.m4a" on:change={(event) => attachAudio(event.currentTarget.files?.[0], 'primary_master')} />
-            </label>
+            <div class="relative">
+              <label class="rounded-xl flex flex-col items-center justify-center py-7 cursor-pointer" style="border:1px dashed rgba(123,92,240,.35);background:rgba(123,92,240,.05);">
+                <span class="font-bold text-sm text-white">Upload primary master *</span>
+                <span class="text-xs mt-1" style="color:var(--ink-muted);">WAV · FLAC · MP3 · M4A</span>
+                <input class="hidden" type="file" accept="audio/*,.wav,.flac,.mp3,.m4a" on:change={(event) => attachAudio(event.currentTarget.files?.[0], 'primary_master')} />
+              </label>
+              <span class="absolute top-2 right-3"><HelpTip field="primary_master" align="right" /></span>
+            </div>
           {/if}
 
           <div class="flex gap-2">

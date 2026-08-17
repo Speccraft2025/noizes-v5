@@ -87,12 +87,10 @@ class ExperienceDirector {
     if (!gl) return 'essential';
     const memory = navigator.deviceMemory || 4;
     const cores = navigator.hardwareConcurrency || 4;
-    // A coarse pointer is the reliable signal for a phone or tablet. Window
-    // size is not: this can be measured before the viewer has laid the frame
-    // out, and a small window on a fast desktop is still a fast desktop.
     const handheld = window.matchMedia('(pointer: coarse)').matches && window.matchMedia('(hover: none)').matches;
+    const narrow = window.innerWidth < 640;
     let quality = 'balanced';
-    if (handheld || memory <= 3 || cores <= 3) quality = 'lite';
+    if (handheld || narrow || memory <= 3 || cores <= 3) quality = 'lite';
     else if (memory >= 8 && cores >= 8 && window.devicePixelRatio >= 1.5) quality = 'cinematic';
     try { gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch {}
     return quality;
@@ -627,11 +625,15 @@ class ExperienceDirector {
   }
 
   _resize() {
-    const width = this.el.stage.clientWidth || window.innerWidth;
-    const height = this.el.stage.clientHeight || window.innerHeight;
-    const dpr = window.devicePixelRatio || 1;
-    this.world?.resize(width, height, dpr);
-    this.essential?.resize(width, height, dpr);
+    if (this._resizeTimer) return;
+    this._resizeTimer = setTimeout(() => {
+      this._resizeTimer = 0;
+      const width = this.el.stage.clientWidth || window.innerWidth;
+      const height = this.el.stage.clientHeight || window.innerHeight;
+      const dpr = window.devicePixelRatio || 1;
+      this.world?.resize(width, height, dpr);
+      this.essential?.resize(width, height, dpr);
+    }, 80);
   }
 
   /* ------------------------------------------------------------------ loop */
@@ -639,6 +641,7 @@ class ExperienceDirector {
   _loop() {
     if (!this.running) return;
     this.rafHandle = window.requestAnimationFrame(() => this._loop());
+    if (document.hidden) return;
     const started = performance.now();
     const wall = started / 1000;
     const dt = clamp(wall - this.lastFrameWall, 0, 0.1);

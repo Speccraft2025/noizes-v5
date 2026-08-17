@@ -538,17 +538,18 @@ class WorldRenderer {
   static get scale() { return { TIME_SCALE, BAND_WIDTH, HEIGHT_SCALE }; }
 
   static updateArt(patch) {
+    var n;
     if (patch.heightScale !== undefined) {
-      ART.heightScale = clamp(Number(patch.heightScale) || 1, 0.4, 2.2);
+      n = Number(patch.heightScale); ART.heightScale = clamp(n === n ? n : 1, 0.4, 2.2);
       HEIGHT_SCALE = 30 * ART.heightScale;
     }
-    if (patch.ridgeEmphasis !== undefined) ART.ridgeEmphasis = clamp(Number(patch.ridgeEmphasis) || 1, 0, 2.5);
-    if (patch.flightAltitude !== undefined) ART.flightAltitude = clamp(Number(patch.flightAltitude) || 1, 0.5, 2.5);
-    if (patch.sunElevation !== undefined) ART.sunElevation = clamp(Number(patch.sunElevation) || 64, 8, 88);
-    if (patch.sunAzimuth !== undefined) ART.sunAzimuth = clamp(Number(patch.sunAzimuth) || -146, -180, 180);
+    if (patch.ridgeEmphasis !== undefined) { n = Number(patch.ridgeEmphasis); ART.ridgeEmphasis = clamp(n === n ? n : 1, 0, 2.5); }
+    if (patch.flightAltitude !== undefined) { n = Number(patch.flightAltitude); ART.flightAltitude = clamp(n === n ? n : 1, 0.5, 2.5); }
+    if (patch.sunElevation !== undefined) { n = Number(patch.sunElevation); ART.sunElevation = clamp(n === n ? n : 64, 8, 88); }
+    if (patch.sunAzimuth !== undefined) { n = Number(patch.sunAzimuth); ART.sunAzimuth = clamp(n === n ? n : -146, -180, 180); }
     if (patch.palette !== undefined && PALETTES[String(patch.palette)]) ART.palette = String(patch.palette);
     if (patch.terracing !== undefined) ART.terracing = !!patch.terracing;
-    if (patch.terraceStep !== undefined) ART.terraceStep = clamp(Number(patch.terraceStep) || 1.5, 0.5, 6);
+    if (patch.terraceStep !== undefined) { n = Number(patch.terraceStep); ART.terraceStep = clamp(n === n ? n : 1.5, 0.5, 6); }
   }
 
   applyArt(patch) {

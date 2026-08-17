@@ -476,7 +476,7 @@ class WorldRenderer {
     });
 
     this.brightMaterial = pass(GLSL.brightPass, {
-      uScene: { value: null }, uThreshold: { value: 0.72 }, uKnee: { value: 0.32 },
+      uScene: { value: null }, uThreshold: { value: 0.72 }, uKnee: { value: 0.28 },
     });
     this.blurMaterial = pass(GLSL.blurPass, {
       uSource: { value: null }, uDirection: { value: new T.Vector2() },
@@ -706,6 +706,10 @@ class WorldRenderer {
     c.uTime.value = t;
     c.uExposure.value = f.exposure;
     c.uBloomStrength.value = this.profile.bloom ? mix(0.22, 0.55, loud) : 0;
+    if (this.profile.bloom) {
+      this.brightMaterial.uniforms.uThreshold.value = mix(0.78, 0.58, medium);
+      this.brightMaterial.uniforms.uKnee.value = mix(0.22, 0.38, medium);
+    }
     c.uFocusDistance.value = f.focus;
     c.uFocusRange.value = f.focusRange;
     c.uContrast.value = f.contrast;

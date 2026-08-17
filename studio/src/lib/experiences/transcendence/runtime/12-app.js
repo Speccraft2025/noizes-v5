@@ -87,12 +87,10 @@ class ExperienceDirector {
     if (!gl) return 'essential';
     const memory = navigator.deviceMemory || 4;
     const cores = navigator.hardwareConcurrency || 4;
-    // A coarse pointer is the reliable signal for a phone or tablet. Window
-    // size is not: this can be measured before the viewer has laid the frame
-    // out, and a small window on a fast desktop is still a fast desktop.
     const handheld = window.matchMedia('(pointer: coarse)').matches && window.matchMedia('(hover: none)').matches;
+    const narrow = window.innerWidth < 640;
     let quality = 'balanced';
-    if (handheld || memory <= 3 || cores <= 3) quality = 'lite';
+    if (handheld || narrow || memory <= 3 || cores <= 3) quality = 'lite';
     else if (memory >= 8 && cores >= 8 && window.devicePixelRatio >= 1.5) quality = 'cinematic';
     try { gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch {}
     return quality;
@@ -627,11 +625,15 @@ class ExperienceDirector {
   }
 
   _resize() {
-    const width = this.el.stage.clientWidth || window.innerWidth;
-    const height = this.el.stage.clientHeight || window.innerHeight;
-    const dpr = window.devicePixelRatio || 1;
-    this.world?.resize(width, height, dpr);
-    this.essential?.resize(width, height, dpr);
+    if (this._resizeTimer) return;
+    this._resizeTimer = setTimeout(() => {
+      this._resizeTimer = 0;
+      const width = this.el.stage.clientWidth || window.innerWidth;
+      const height = this.el.stage.clientHeight || window.innerHeight;
+      const dpr = window.devicePixelRatio || 1;
+      this.world?.resize(width, height, dpr);
+      this.essential?.resize(width, height, dpr);
+    }, 80);
   }
 
   /* ------------------------------------------------------------------ loop */
@@ -639,6 +641,7 @@ class ExperienceDirector {
   _loop() {
     if (!this.running) return;
     this.rafHandle = window.requestAnimationFrame(() => this._loop());
+    if (document.hidden) return;
     const started = performance.now();
     const wall = started / 1000;
     const dt = clamp(wall - this.lastFrameWall, 0, 0.1);
@@ -725,11 +728,11 @@ class ExperienceDirector {
     };
 
     const nt = this.nedTracks;
-    if (nt.exposure) { const v = evaluateTrack(nt.exposure, exact); if (v !== null) frame.exposure = v; }
-    if (nt.relief) { const v = evaluateTrack(nt.relief, exact); if (v !== null) frame.relief = v; }
-    if (nt.atmosphere) { const v = evaluateTrack(nt.atmosphere, exact); if (v !== null) frame.atmosphere = v; }
-    if (nt.ahead) { const v = evaluateTrack(nt.ahead, exact); if (v !== null) frame.ahead = v; }
-    if (nt.air) { const v = evaluateTrack(nt.air, exact); if (v !== null) frame.presence.air = v; }
+    if (nt.exposure) { const v = evaluateTrack(nt.exposure, exact); if (v !== null) frame.exposure = clamp(v, 0, 2); }
+    if (nt.relief) { const v = evaluateTrack(nt.relief, exact); if (v !== null) frame.relief = clamp(v, 0, 2); }
+    if (nt.atmosphere) { const v = evaluateTrack(nt.atmosphere, exact); if (v !== null) frame.atmosphere = clamp(v, 0, 2); }
+    if (nt.ahead) { const v = evaluateTrack(nt.ahead, exact); if (v !== null) frame.ahead = clamp(v, 0, 2); }
+    if (nt.air) { const v = evaluateTrack(nt.air, exact); if (v !== null) frame.presence.air = clamp(v, 0, 2); }
 
     if (this.world && this.director) {
       const lens = this.director.update(state, dt, { attention });
@@ -874,7 +877,7 @@ class ExperienceDirector {
       var w = window.__TX_DIRECTOR__ && window.__TX_DIRECTOR__.world;
       if (w && typeof w.applyArt === 'function') w.applyArt(d.artDirection);
     }
-    if (d.type === 'ned:direction-tracks' && d.tracks) {
+    if (d.type === 'ned:direction-tracks' && d.tracks && typeof d.tracks === 'object') {
       var dir = window.__TX_DIRECTOR__;
       if (dir) dir.nedTracks = d.tracks;
     }

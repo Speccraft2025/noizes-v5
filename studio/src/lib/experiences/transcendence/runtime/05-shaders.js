@@ -530,7 +530,7 @@ void main(){
   float ring = exp(-pow((up - 0.56) * 26.0, 2.0));
   float around = atan(d.z, d.x);
   float lamps = pow(max(0.0, sin(around * 14.0)), 90.0);
-  color += uSunColor * ring * lamps * 1.5 * uSunPower;
+  color += uSunColor * ring * lamps * 1.2 * uSunPower;
 
   // Dust and specks caught in the air against the dark wall.
   float speck = pow(hash21(floor(d.xz * 1150.0 + d.y * 407.0)), 120.0);
@@ -590,7 +590,7 @@ void main(){
 
   float ndl = max(dot(n, l), 0.0);
   vec3 color = albedo * uSunColor * ndl * uSunPower * 0.85;
-  color += uSunColor * ggx(n, v, l, rough) * ndl * fresnel(max(dot(n, v), 0.0), mix(0.04, 0.55, onPlinth)) * mix(1.2, 3.0, onPlinth);
+  color += uSunColor * ggx(n, v, l, rough) * ndl * fresnel(max(dot(n, v), 0.0), mix(0.04, 0.55, onPlinth)) * mix(1.2, 2.6, onPlinth);
   color += albedo * uSkyColor * 0.85;
 
   // A polished floor holds a soft vertical smear of whatever stands on it.

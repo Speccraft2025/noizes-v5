@@ -58,6 +58,7 @@ class ExperienceDirector {
     this.audio = new SpatialAudioSystem(this.el.audio, this.analysis);
 
     this.mode = 'sealed';
+    this.nedTracks = {};
     this.reducedMotion = this.a11y.reducedMotion;
     this.highContrast = this.a11y.highContrast;
     this.debug = new URLSearchParams(location.search).get('debug') === '1';
@@ -704,6 +705,13 @@ class ExperienceDirector {
       focus: 200, focusRange: 300,
     };
 
+    const nt = this.nedTracks;
+    if (nt.exposure) { const v = evaluateTrack(nt.exposure, exact); if (v !== null) frame.exposure = v; }
+    if (nt.relief) { const v = evaluateTrack(nt.relief, exact); if (v !== null) frame.relief = v; }
+    if (nt.atmosphere) { const v = evaluateTrack(nt.atmosphere, exact); if (v !== null) frame.atmosphere = v; }
+    if (nt.ahead) { const v = evaluateTrack(nt.ahead, exact); if (v !== null) frame.ahead = v; }
+    if (nt.air) { const v = evaluateTrack(nt.air, exact); if (v !== null) frame.presence.air = v; }
+
     if (this.world && this.director) {
       const lens = this.director.update(state, dt, { attention });
       frame.focus = lens.focus;
@@ -837,6 +845,21 @@ class ExperienceDirector {
 /* ------------------------------------------------------------------ bootstrap */
 
 (function start() {
+  window.addEventListener('message', function(event) {
+    if (event.source !== window.parent) return;
+    var d = event.data;
+    if (!d) return;
+    if (d.type === 'ned:visual-update' && d.artDirection) {
+      WorldRenderer.updateArt(d.artDirection);
+      var w = window.__TX_DIRECTOR__ && window.__TX_DIRECTOR__.world;
+      if (w && typeof w.applyArt === 'function') w.applyArt(d.artDirection);
+    }
+    if (d.type === 'ned:direction-tracks' && d.tracks) {
+      var dir = window.__TX_DIRECTOR__;
+      if (dir) dir.nedTracks = d.tracks;
+    }
+  });
+
   const run = () => {
     const director = new ExperienceDirector();
     window.__TX_DIRECTOR__ = director;

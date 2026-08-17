@@ -73,7 +73,7 @@ const PALETTES = {
  * landmarks and the Essential fallback all agree. */
 const TIME_SCALE = 26 * ART.timeScale;      // world units per second of recording
 const BAND_WIDTH = 420;                     // world units across the whole frequency axis
-const HEIGHT_SCALE = 30 * ART.heightScale;  // world units at full energy in the lowest band
+let HEIGHT_SCALE = 30 * ART.heightScale;    // world units at full energy in the lowest band
 
 class WorldRenderer {
   constructor(canvas, options) {
@@ -525,6 +525,42 @@ class WorldRenderer {
   static zAt(seconds) { return -seconds * TIME_SCALE; }
   static xAtBand(band, bands = 128) { return (band / (bands - 1) - 0.5) * BAND_WIDTH; }
   static get scale() { return { TIME_SCALE, BAND_WIDTH, HEIGHT_SCALE }; }
+
+  static updateArt(patch) {
+    if (patch.heightScale !== undefined) {
+      ART.heightScale = Number(patch.heightScale);
+      HEIGHT_SCALE = 30 * ART.heightScale;
+    }
+    if (patch.ridgeEmphasis !== undefined) ART.ridgeEmphasis = Number(patch.ridgeEmphasis);
+    if (patch.flightAltitude !== undefined) ART.flightAltitude = Number(patch.flightAltitude);
+    if (patch.sunElevation !== undefined) ART.sunElevation = Number(patch.sunElevation);
+    if (patch.sunAzimuth !== undefined) ART.sunAzimuth = Number(patch.sunAzimuth);
+    if (patch.palette !== undefined) ART.palette = String(patch.palette);
+    if (patch.terracing !== undefined) ART.terracing = !!patch.terracing;
+    if (patch.terraceStep !== undefined) ART.terraceStep = Number(patch.terraceStep);
+  }
+
+  applyArt(patch) {
+    if (patch.sunElevation !== undefined || patch.sunAzimuth !== undefined) {
+      var el = ART.sunElevation * Math.PI / 180;
+      var az = ART.sunAzimuth * Math.PI / 180;
+      this.sun.dir.set(
+        Math.cos(el) * Math.sin(az),
+        Math.sin(el),
+        Math.cos(el) * Math.cos(az),
+      ).normalize();
+    }
+    if (patch.palette !== undefined) {
+      var p = PALETTES[ART.palette] || PALETTES.alabaster;
+      this.sun.color.setRGB(p.sun[0], p.sun[1], p.sun[2]);
+    }
+    if (patch.terracing !== undefined) {
+      this.field.uTerrace.value = ART.terracing ? 0.85 : 0;
+    }
+    if (patch.terraceStep !== undefined) {
+      this.field.uTerraceStep.value = ART.terraceStep;
+    }
+  }
 
   /* Ground height at a world position — a CPU mirror of the shader's base term.
    * It deliberately omits the analytic fine relief: the flight needs the shape

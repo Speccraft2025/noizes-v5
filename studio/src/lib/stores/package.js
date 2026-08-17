@@ -245,6 +245,7 @@ export const transcendence = writable({
   analysis: null,         // object, session only
   landmarks: [],
   art_direction: {},
+  direction_tracks: {},
   arc_end_seconds: null,
   quality_preview: 'balanced',
 });
@@ -254,6 +255,7 @@ export const draftableTranscendence = (value) => ({
   track_id: value.track_id || '',
   landmarks: value.landmarks || [],
   art_direction: value.art_direction || {},
+  direction_tracks: value.direction_tracks || {},
   arc_end_seconds: value.arc_end_seconds ?? null,
   quality_preview: value.quality_preview || 'balanced',
 });

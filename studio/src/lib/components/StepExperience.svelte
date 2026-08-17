@@ -7,7 +7,8 @@
   import { onDestroy } from 'svelte';
   import { releaseProject, template, transcendence } from '$lib/stores/package.js';
   import { CANONICAL_TEMPLATE, TRANSCENDENCE_TEMPLATE } from '$lib/utils/project.js';
-  import { DEFAULT_ART_DIRECTION, PALETTES, QUALITY_PROFILES, normalizeArtDirection } from '$lib/utils/transcendence.js';
+  import { DEFAULT_ART_DIRECTION, PALETTES, QUALITY_PROFILES, normalizeArtDirection, buildTranscendenceHTML } from '$lib/utils/transcendence.js';
+  import { VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
   import { canDecodeAudio } from '$lib/analysis/index.js';
   import { buildLyricLines, defaultLandmarks, landmarkProblems } from '$lib/experiences/transcendence/landmarks.js';
   import HelpTip from './HelpTip.svelte';
@@ -109,7 +110,122 @@
     controller?.abort();
   }
 
-  onDestroy(() => controller?.abort());
+  onDestroy(() => {
+    controller?.abort();
+    closeNedPreview();
+  });
+
+  let nedPreview = null;
+  let nedPreviewFrame = null;
+  let nedPreviewSent = false;
+  let nedPreviewReady = false;
+  let nedPreviewLoading = false;
+  let nedPreviewError = '';
+
+  $: if (nedPreviewFrame && nedPreviewReady) {
+    nedPreviewFrame.contentWindow?.postMessage({ type: 'ned:visual-update', artDirection: art }, '*');
+  }
+
+  const DIRECTION_TARGETS = [
+    { key: 'exposure', label: 'Exposure', min: 0, max: 2, step: 0.05, initial: 1 },
+    { key: 'relief', label: 'Relief', min: 0, max: 2, step: 0.05, initial: 1 },
+    { key: 'atmosphere', label: 'Atmosphere', min: 0, max: 2, step: 0.05, initial: 1 },
+    { key: 'ahead', label: 'Ahead', min: 0, max: 2, step: 0.05, initial: 1 },
+    { key: 'air', label: 'Air', min: 0, max: 2, step: 0.05, initial: 1 },
+  ];
+
+  $: directionTracks = $transcendence.direction_tracks ?? {};
+
+  $: if (nedPreviewFrame && nedPreviewReady && directionTracks) {
+    nedPreviewFrame.contentWindow?.postMessage({ type: 'ned:direction-tracks', tracks: directionTracks }, '*');
+  }
+
+  function addKeyframe(target, time, value) {
+    const tracks = { ...$transcendence.direction_tracks };
+    const existing = [...(tracks[target] || [])];
+    existing.push({ time: Number(time), value: Number(value) });
+    existing.sort((a, b) => a.time - b.time);
+    tracks[target] = existing;
+    update({ direction_tracks: tracks });
+  }
+
+  function removeKeyframe(target, index) {
+    const tracks = { ...$transcendence.direction_tracks };
+    const existing = [...(tracks[target] || [])];
+    existing.splice(index, 1);
+    tracks[target] = existing.length ? existing : undefined;
+    const cleaned = Object.fromEntries(Object.entries(tracks).filter(([, v]) => v));
+    update({ direction_tracks: Object.keys(cleaned).length ? cleaned : {} });
+  }
+
+  function updateKeyframe(target, index, patch) {
+    const tracks = { ...$transcendence.direction_tracks };
+    const existing = [...(tracks[target] || [])];
+    existing[index] = { ...existing[index], ...patch };
+    existing.sort((a, b) => a.time - b.time);
+    tracks[target] = existing;
+    update({ direction_tracks: tracks });
+  }
+
+  async function launchNedPreview() {
+    if (!analysis || !audioAsset?.file || !$transcendence.terrain) return;
+    nedPreviewLoading = true;
+    nedPreviewError = '';
+    nedPreviewSent = false;
+    nedPreviewReady = false;
+    try {
+      const audioPath = 'preview/audio';
+      const terrainPath = 'preview/terrain.png';
+      const result = await buildTranscendenceHTML({
+        identity: { title: selectedTrack?.title || 'Preview', artist: selectedTrack?.primary_artist || '', release_id: 'ned-preview' },
+        edition: {},
+        analysis,
+        track: {
+          track_id: selectedTrackId,
+          title: selectedTrack?.title || '',
+          primary_artist: selectedTrack?.primary_artist || '',
+          audio: { src: audioPath, mime: audioAsset.file.type || 'audio/mpeg' },
+          terrain: terrainPath,
+        },
+        timedLines,
+        landmarks,
+        artDirection: art,
+      });
+      const [audioBytes, terrainBytes] = await Promise.all([
+        audioAsset.file.arrayBuffer(),
+        $transcendence.terrain.arrayBuffer(),
+      ]);
+      nedPreview = {
+        html: result.html,
+        resources: [
+          { path: audioPath, mime: audioAsset.file.type || 'audio/mpeg', bytes: audioBytes },
+          { path: terrainPath, mime: 'image/png', bytes: terrainBytes },
+        ],
+      };
+    } catch (err) {
+      nedPreviewError = err?.message || String(err);
+    } finally {
+      nedPreviewLoading = false;
+    }
+  }
+
+  function loadNedPreviewFrame() {
+    if (!nedPreviewFrame?.contentWindow || !nedPreview || nedPreviewSent) return;
+    const resources = nedPreview.resources.map((r) => ({ ...r }));
+    nedPreviewFrame.contentWindow.postMessage({
+      type: 'noizes:viewer:load',
+      html: nedPreview.html,
+      resources,
+    }, '*', resources.map((r) => r.bytes));
+    nedPreviewSent = true;
+    nedPreviewReady = true;
+  }
+
+  function closeNedPreview() {
+    nedPreview = null;
+    nedPreviewSent = false;
+    nedPreviewReady = false;
+  }
 
   const timecode = (seconds) => {
     const total = Math.max(0, Math.floor(Number(seconds) || 0));
@@ -299,6 +415,104 @@
               </label>
             {/if}
           </div>
+        </section>
+
+        <!-- NED Live Preview -->
+        <section>
+          <p class="t-caption mb-2">Live preview</p>
+          <p class="text-xs mb-3" style="color: var(--ink-muted);">
+            The real Transcendence world running in-place. Art direction changes above update the terrain instantly.
+          </p>
+          {#if nedPreviewLoading}
+            <div class="rounded-xl p-4" style="background: rgba(123,92,240,0.06); border: 1px solid rgba(123,92,240,0.25);">
+              <span class="text-xs font-bold text-white">Building preview…</span>
+            </div>
+          {:else if nedPreview}
+            <div class="relative rounded-xl overflow-hidden" style="aspect-ratio: 16/9; border: 1px solid rgba(123,92,240,0.35);">
+              <iframe
+                bind:this={nedPreviewFrame}
+                title="NED live preview"
+                srcdoc={VIEWER_FRAME_BOOTSTRAP}
+                on:load={loadNedPreviewFrame}
+                allow="autoplay"
+                sandbox="allow-scripts"
+                class="absolute inset-0 w-full h-full border-0"
+              ></iframe>
+            </div>
+            <div class="flex items-center gap-3 mt-2">
+              <span class="text-[11px]" style="color: var(--ink-muted);">
+                {nedPreviewReady ? 'Art direction and direction tracks update the world in real time.' : 'Loading…'}
+              </span>
+              <button type="button" class="btn-ghost text-xs ml-auto" on:click={closeNedPreview}>Close</button>
+            </div>
+          {:else}
+            <button type="button" class="btn-spectral" disabled={!audioAsset} on:click={launchNedPreview}>
+              Launch live preview
+            </button>
+          {/if}
+          {#if nedPreviewError}
+            <p class="text-xs mt-2" style="color:#F08A8A;">{nedPreviewError}</p>
+          {/if}
+        </section>
+
+        <!-- NED Direction Tracks -->
+        <section>
+          <p class="t-caption mb-2">Direction</p>
+          <p class="text-xs mb-4" style="color: var(--ink-muted);">
+            Time-varying controls. Each track overrides its property at the given time during playback.
+            Add keyframes to shape how the world changes through the recording.
+          </p>
+          {#each DIRECTION_TARGETS as target}
+            {@const keyframes = directionTracks[target.key] || []}
+            <div class="mb-4 rounded-xl p-3" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-dim);">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-white">{target.label}</span>
+                <button type="button" class="text-[10px] px-2 py-0.5 rounded-lg"
+                  style="background: rgba(123,92,240,0.15); color: rgba(123,92,240,0.9); border: 1px solid rgba(123,92,240,0.3);"
+                  on:click={() => addKeyframe(target.key, duration * 0.5, target.initial)}>+ keyframe</button>
+              </div>
+              {#if keyframes.length === 0}
+                <p class="text-[11px]" style="color: var(--ink-muted);">No keyframes — using default choreography.</p>
+              {:else}
+                <!-- Visual timeline bar -->
+                <div class="relative h-6 rounded-lg mb-2 cursor-pointer"
+                  style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);"
+                  on:click={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const t = ((e.clientX - rect.left) / rect.width) * duration;
+                    addKeyframe(target.key, Math.max(0, Math.min(duration, t)), target.initial);
+                  }}>
+                  {#each keyframes as kf, i}
+                    <div class="absolute top-0.5 w-2.5 h-5 rounded-sm"
+                      style="left: {duration > 0 ? (kf.time / duration) * 100 : 0}%; transform: translateX(-50%);
+                        background: rgba(123,92,240,{0.4 + kf.value * 0.3});"
+                      title="{timecode(kf.time)} → {kf.value.toFixed(2)}"></div>
+                  {/each}
+                </div>
+                <!-- Keyframe list -->
+                <div class="space-y-1.5">
+                  {#each keyframes as kf, i}
+                    <div class="flex items-center gap-2">
+                      <label class="flex items-center gap-1 text-[11px] shrink-0" style="color: var(--ink-muted); width: 70px;">
+                        <input type="number" min="0" max={duration} step="0.1" class="w-14 text-[11px] rounded px-1 py-0.5"
+                          style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: white;"
+                          value={kf.time.toFixed(1)}
+                          on:change={(e) => updateKeyframe(target.key, i, { time: Number(e.currentTarget.value) })}>
+                        s
+                      </label>
+                      <input type="range" min={target.min} max={target.max} step={target.step} class="flex-1"
+                        value={kf.value}
+                        on:input={(e) => updateKeyframe(target.key, i, { value: Number(e.currentTarget.value) })}>
+                      <span class="text-[11px] font-mono shrink-0 w-8 text-right" style="color: var(--ink-muted);">{kf.value.toFixed(2)}</span>
+                      <button type="button" class="text-[11px] px-1.5 py-0.5 rounded"
+                        style="color: rgba(240,138,138,0.8);"
+                        on:click={() => removeKeyframe(target.key, i)}>x</button>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/each}
         </section>
 
         <!-- 4. Where the words are cut -->

@@ -40,6 +40,22 @@ const ease = {
   settle: t => 1 - Math.pow(1 - t, 4) * (1 - 0.12 * Math.sin(t * Math.PI * 3)),
 };
 
+function evaluateTrack(keyframes, time) {
+  if (!keyframes || keyframes.length === 0) return null;
+  if (keyframes.length === 1) return keyframes[0].value;
+  if (time <= keyframes[0].time) return keyframes[0].value;
+  var last = keyframes[keyframes.length - 1];
+  if (time >= last.time) return last.value;
+  var lo = 0, hi = keyframes.length - 1;
+  while (lo < hi - 1) {
+    var mid = (lo + hi) >> 1;
+    if (keyframes[mid].time <= time) lo = mid; else hi = mid;
+  }
+  var a = keyframes[lo], b = keyframes[hi];
+  var t = (time - a.time) / (b.time - a.time);
+  return a.value + (b.value - a.value) * t;
+}
+
 /* Deterministic 32-bit PRNG. The runtime never calls Math.random: every grain
  * of dust derives from a fixed seed so that two playbacks of the same second
  * are identical, which is what makes seeking and the determinism test real. */

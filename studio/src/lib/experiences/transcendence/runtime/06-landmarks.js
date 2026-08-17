@@ -48,9 +48,13 @@ class LandmarkField {
       if (width > maxWidth) { size = Math.floor(size * maxWidth / width); width = fit(); }
 
       ctx.clearRect(0, 0, RASTER_W, RASTER_H);
+      ctx.letterSpacing = '0.02em';
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#fff';
+      ctx.strokeText(line.text, RASTER_W / 2, RASTER_H * 0.55);
       ctx.fillText(line.text, RASTER_W / 2, RASTER_H * 0.55);
 
       // The line runs *along* the flight, so its long axis is time. A phrase of

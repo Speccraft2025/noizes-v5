@@ -329,6 +329,23 @@ describe('finalizePublication', () => {
     await expect(publish(sb)).rejects.toMatchObject({ status: 403 });
   });
 
+  it('seeds the release row before slug reservation so the FK is satisfiable', async () => {
+    const sb = db();
+    let releaseExistedBeforeSlug = false;
+    const origInsert = sb.write.bind(sb);
+    const writes = [];
+    const realWrite = sb.write.bind(sb);
+    sb.write = function (table, row, mode) {
+      writes.push(table);
+      if (table === 'release_slugs') {
+        releaseExistedBeforeSlug = sb.rows('releases').some((r) => r.id === RELEASE_ID);
+      }
+      return realWrite(table, row, mode);
+    };
+    await publish(sb);
+    expect(releaseExistedBeforeSlug).toBe(true);
+  });
+
   it('never drops a live release back to draft mid-flight', async () => {
     // A re-publish of a release with checkouts in progress must not remove it
     // from the Exchange while the new package is being recorded.

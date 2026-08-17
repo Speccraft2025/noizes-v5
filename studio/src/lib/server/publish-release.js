@@ -257,6 +257,24 @@ export async function finalizePublication(sb, {
 
   const alreadyLive = existing?.status === 'published';
 
+  // For a first publish the release row does not exist yet. Seed a minimal
+  // draft so the release_slugs FK (release_id → releases.id) is satisfiable.
+  // The full upsert after slug reservation overwrites every column.
+  if (!existing) {
+    const { error: seedErr } = await sb.from('releases').insert({
+      id: releaseId,
+      artist_id: artistId,
+      artist_name: releaseRow.artist_name ?? '',
+      title: releaseRow.title ?? '',
+      status: 'draft',
+    });
+    if (seedErr && String(seedErr.code) !== '23505') {
+      throw new PublishError(`Could not initialize the release: ${seedErr.message}`, {
+        stage: 'Validating package',
+      });
+    }
+  }
+
   onStage('Reserving Drop Page address');
   const address = await reserveDropSlug(sb, {
     releaseId,

@@ -619,6 +619,7 @@ class WorldRenderer {
     const presence = analysis.mean('presence', t, 0.6);
     const onset = analysis.onsetEnergy(t, 0.35);
     const high = analysis.at('high', t);
+    const low = analysis.mean('low', t, 1.2);
 
     this.shared.uSunPower.value = (0.80 + medium * 0.60 + onset * 0.12) * f.exposure;
     this.shared.uExposure.value = f.exposure;
@@ -626,7 +627,7 @@ class WorldRenderer {
 
     // Silence is distance: when the record breathes, the air thins and the
     // horizon retreats.
-    this.shared.uFogDensity.value = mix(0.0016, 0.0007, presence) * f.atmosphere;
+    this.shared.uFogDensity.value = mix(0.0016, 0.0007, presence) * f.atmosphere * (1 + low * 0.15);
     // The ceiling brightens with the recording; the wall stays dark so the
     // carving always has something to stand against.
     this.sky.setRGB(mix(0.052, 0.105, medium), mix(0.050, 0.100, medium), mix(0.049, 0.094, medium));
@@ -649,7 +650,7 @@ class WorldRenderer {
     );
 
     // Dynamics decide how tall the world is allowed to be.
-    this.field.uHeightScale.value = HEIGHT_SCALE * mix(0.86, 1.16, medium) * f.relief;
+    this.field.uHeightScale.value = HEIGHT_SCALE * mix(0.86, 1.16, medium) * f.relief * (1 + onset * 0.06);
     this.field.uRidgeScale.value = 3.4 * ART.ridgeEmphasis * mix(0.7, 1.35, analysis.mean('voice', t, 0.8));
 
     // ---- the ground follows the camera -------------------------------------
@@ -706,9 +707,9 @@ class WorldRenderer {
     const c = this.compositeMaterial.uniforms;
     c.uTime.value = t;
     c.uExposure.value = f.exposure;
-    c.uBloomStrength.value = this.profile.bloom ? mix(0.22, 0.55, loud) : 0;
+    c.uBloomStrength.value = this.profile.bloom ? mix(0.22, 0.55, loud) + onset * 0.12 : 0;
     if (this.profile.bloom) {
-      this.brightMaterial.uniforms.uThreshold.value = mix(0.78, 0.58, medium);
+      this.brightMaterial.uniforms.uThreshold.value = mix(0.78, 0.58, medium) - onset * 0.08;
       this.brightMaterial.uniforms.uKnee.value = mix(0.22, 0.38, medium);
     }
     c.uFocusDistance.value = f.focus;

@@ -301,7 +301,7 @@ void main(){
   // drive more subsurface scatter, as though the stone is resonating.
   float transluBase = mix(0.22, 0.38, pow(vBand, 0.6));
   float translucency = pow(clamp(1.0 - abs(dot(n, v)), 0.0, 1.0), 2.2) * transluBase;
-  translucency *= 1.0 + energy * 0.25;
+  translucency *= 1.0 + energy * 0.35;
 
   vec3 shadowTint = vec3(0.72, 0.78, 0.92);
   vec3 lit = albedo * uSunColor;
@@ -310,8 +310,8 @@ void main(){
   vec3 color = mix(shade * 0.16, lit, key) * uSunPower;
   color += albedo * uSunColor * translucency * uSunPower * 0.42;
 
-  // Low bands are denser, more reflective stone; high bands scatter softly.
   float f0 = mix(0.048, 0.026, pow(vBand, 0.7));
+  f0 *= 1.0 + energy * 0.18;
   color += uSunColor * ggx(n, v, l, rough) * ndl * fresnel(max(dot(n, v), 0.0), f0) * 0.42;
 
   // Hemisphere ambient: lit ceiling above, dark polished floor below.

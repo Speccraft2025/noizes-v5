@@ -191,6 +191,7 @@ varying vec4 vTerrain;
 varying float vBand;
 varying float vSeconds;
 varying float vLod;
+varying vec3 vSmoothNormal;
 
 void main(){
   vec3 world = position + uGridOrigin;
@@ -200,6 +201,7 @@ void main(){
   vTerrain = terrainSampleLod(world.xz, aLod);
   vBand = clamp(world.x / uBandWidth + 0.5, 0.0, 1.0);
   vSeconds = secondsAt(world.z);
+  vSmoothNormal = terrainNormal(world.xz, 0.8, aLod);
   gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
 }
 `;
@@ -215,32 +217,31 @@ uniform float uFogDensity;
 uniform float uExposure;
 uniform float uContrast;
 uniform float uSunPower;
-uniform float uAhead;         // how much of the unheard music stays obscured
+uniform float uAhead;
 uniform float uLodEps;
 varying vec3 vWorld;
 varying vec4 vTerrain;
 varying float vBand;
 varying float vSeconds;
 varying float vLod;
+varying vec3 vSmoothNormal;
 
 void main(){
-  // The surface normal comes from the screen-space derivatives of the
-  // interpolated world position. It is exact for the geometry actually being
-  // drawn, it costs nothing, and it tracks the mesh's own level of detail —
-  // where sampling the height field again per pixel would cost twenty-five
-  // texture fetches and describe detail the triangles do not have.
-  vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
-  if (n.y < 0.0) n = -n;
+  vec3 flatN = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+  if (flatN.y < 0.0) flatN = -flatN;
+  vec3 smoothN = normalize(vSmoothNormal);
+  if (smoothN.y < 0.0) smoothN = -smoothN;
+  float flatMix = smoothstep(0.22, 0.0, vLod) * 0.30;
+  vec3 n = normalize(mix(smoothN, flatN, flatMix));
   vec3 v = normalize(cameraPosition - vWorld);
 
-  // Close to the eye, add the micro-relief the geometry is too coarse to hold.
   float nearField = 1.0 - smoothstep(0.03, 0.30, vLod);
   if (nearField > 0.01) {
     float e = 0.9;
     float g0 = fbm2(vWorld.xz * 0.42);
     float gx = fbm2((vWorld.xz + vec2(e, 0.0)) * 0.42) - g0;
     float gz = fbm2((vWorld.xz + vec2(0.0, e)) * 0.42) - g0;
-    n = normalize(n + vec3(-gx, 0.0, -gz) * 2.6 * nearField);
+    n = normalize(n + vec3(-gx, 0.0, -gz) * 2.2 * nearField);
   }
 
   float energy = vTerrain.r;
@@ -248,91 +249,95 @@ void main(){
   float transient = vTerrain.b;
   float ridge = vTerrain.a;
 
-  // --- alabaster -----------------------------------------------------------
-  // Carved stone: a high, warm, near-white body with cool shadows. The tonal
-  // separation between a lit face and a shaded one is what makes marble read
-  // as marble, so the shadow is tinted rather than merely darkened.
-  vec3 body = vec3(0.520, 0.494, 0.452);
-  vec3 cool = vec3(0.430, 0.442, 0.468);
-  vec3 warm = vec3(0.560, 0.516, 0.438);
+  float dist = length(cameraPosition - vWorld);
+  float slope = 1.0 - clamp(n.y, 0.0, 1.0);
+  float height = max(0.0, vWorld.y);
+  float depthZone = smoothstep(30.0, 650.0, dist);
+  float heightZone = smoothstep(1.5, 45.0, height);
 
-  vec3 albedo = mix(cool, body, smoothstep(0.02, 0.42, vBand));
-  albedo = mix(albedo, warm, smoothstep(0.44, 1.0, vBand));
+  // --- color regions -------------------------------------------------------
+  vec3 nearBody = vec3(0.56, 0.52, 0.46);
+  vec3 midBody  = vec3(0.51, 0.49, 0.47);
+  vec3 farBody  = vec3(0.44, 0.46, 0.51);
+  vec3 body = mix(nearBody, mix(midBody, farBody, smoothstep(0.35, 0.85, depthZone)), depthZone);
 
-  // Energy warms the stone: loud passages are slightly more saturated.
-  albedo = mix(albedo, albedo * vec3(1.06, 0.99, 0.93), energy * 0.35);
+  vec3 cliffTone = vec3(0.36, 0.38, 0.43);
+  body = mix(body, cliffTone, slope * slope * 0.65);
 
-  // Veining. Seams run through the block along its bedding plane and are
-  // sharper where the recording was loud, as though the stone recorded its own
-  // stress. Faded with distance so they never become noise. Low bands carry
-  // deeper, wider veins; high bands carry finer crystalline fractures.
+  body *= mix(0.72, 1.18, heightZone * (1.0 - slope * 0.4));
+
+  body *= mix(vec3(1.06, 0.98, 0.91), vec3(0.91, 0.95, 1.06), smoothstep(0.08, 0.92, vBand));
+
+  // --- material texture ----------------------------------------------------
   float vclose = 1.0 - smoothstep(0.05, 0.42, vLod);
+
+  float macroTone = fbm2(vWorld.xz * 0.011 + vec2(height * 0.025, 0.0));
+  body *= 0.86 + macroTone * 0.28;
+
+  float streak = ridged2(vWorld.xz * vec2(0.032, 0.007) + vec2(height * 0.04, vBand * 1.8));
+  streak = pow(clamp(streak, 0.0, 1.0), 2.0);
+  body *= 1.0 - streak * 0.20 * vclose;
+
+  float mesoNoise = fbm2(vWorld.xz * 0.09 + vec2(vBand * 5.0, height * 0.08));
+  body *= 0.92 + mesoNoise * 0.16 * vclose;
+
+  body = mix(body, body * vec3(1.08, 0.98, 0.90), energy * 0.42);
+
   float veinScale = mix(0.28, 0.58, vBand);
   float vein = ridged2(vWorld.xz * vec2(veinScale, 0.075) + vec2(vWorld.y * 0.14, 0.0));
   vein = pow(clamp(vein, 0.0, 1.0), mix(2.6, 4.2, vBand));
   float vein2 = ridged2(vWorld.xz * vec2(0.11, 0.021) + 31.7);
   vein2 = pow(clamp(vein2, 0.0, 1.0), 6.0);
-  float veinStrength = mix(0.32, 0.20, vBand);
-  albedo *= 1.0 - (vein * veinStrength + vein2 * 0.34) * (0.45 + 0.55 * energy) * vclose;
+  float veinStrength = mix(0.34, 0.22, vBand);
+  body *= 1.0 - (vein * veinStrength + vein2 * 0.36) * (0.45 + 0.55 * energy) * vclose;
 
-  // Quarry grain and the faint banding of a cut face.
-  albedo *= 0.965 + 0.07 * fbm2(vWorld.xz * 0.55 + vWorld.y * 0.09) * vclose;
-  albedo *= 1.0 - 0.05 * vclose * (0.5 + 0.5 * sin(vWorld.y * 2.4));
+  body *= 0.965 + 0.07 * fbm2(vWorld.xz * 0.55 + vWorld.y * 0.09) * vclose;
+  body *= 1.0 - 0.05 * vclose * (0.5 + 0.5 * sin(vWorld.y * 2.4));
 
-  albedo = mix(albedo, albedo * vec3(1.05, 0.985, 0.925), transient * 0.6);
+  body = mix(body, body * vec3(1.05, 0.985, 0.925), transient * 0.6);
 
-  // Low frequencies: dense, polished monumental stone. High frequencies:
-  // rougher, more crystalline, catching more scattered light.
-  float bandRough = mix(0.52, 0.82, pow(vBand, 0.7));
-  float rough = clamp(bandRough - harmonic * 0.16 - ridge * 0.07 + transient * 0.06, 0.30, 0.90);
+  vec3 albedo = body;
+
+  float bandRough = mix(0.48, 0.84, pow(vBand, 0.7));
+  float rough = clamp(bandRough - harmonic * 0.16 - ridge * 0.07 + transient * 0.06
+    + slope * 0.10 - heightZone * 0.06, 0.26, 0.92);
 
   // --- light ---------------------------------------------------------------
-  // A gallery: a broad soft source almost overhead, and the room returning
-  // light from every direction. Nothing here is a hard sun.
   vec3 l = normalize(uSunDir);
   float ndl = max(dot(n, l), 0.0);
 
-  // Marble scatters, so shadowed faces stay luminous instead of going black —
-  // but they cool as they fall away, which is the separation that reads.
   float wrapped = max(0.0, (dot(n, l) + 0.42) / 1.42);
   float key = mix(pow(wrapped, 1.6) * 0.62, ndl, 0.66);
 
-  // High bands are thinner stone — more light passes through. Loud passages
-  // drive more subsurface scatter, as though the stone is resonating.
   float transluBase = mix(0.22, 0.38, pow(vBand, 0.6));
   float translucency = pow(clamp(1.0 - abs(dot(n, v)), 0.0, 1.0), 2.2) * transluBase;
   translucency *= 1.0 + energy * 0.35;
 
-  vec3 shadowTint = vec3(0.72, 0.78, 0.92);
+  vec3 shadowTint = vec3(0.66, 0.72, 0.88);
   vec3 lit = albedo * uSunColor;
   vec3 shade = albedo * shadowTint;
 
-  vec3 color = mix(shade * 0.16, lit, key) * uSunPower;
+  vec3 color = mix(shade * 0.13, lit, key) * uSunPower;
   color += albedo * uSunColor * translucency * uSunPower * 0.42;
 
   float f0 = mix(0.048, 0.026, pow(vBand, 0.7));
   f0 *= 1.0 + energy * 0.18;
   color += uSunColor * ggx(n, v, l, rough) * ndl * fresnel(max(dot(n, v), 0.0), f0) * 0.42;
 
-  // Hemisphere ambient: lit ceiling above, dark polished floor below.
   float up = n.y * 0.5 + 0.5;
   color += albedo * mix(uGroundColor, uSkyColor, up) * 0.95;
 
-  // Crevice occlusion. Steep ground and the insides of the terraces are where
-  // a real carving holds its shadow, and this is most of what makes the
-  // stepping read as stepping.
-  float slope = 1.0 - clamp(n.y, 0.0, 1.0);
-  float cavity = 1.0 - slope * 0.62;
-  color *= mix(1.0, cavity, 0.82);
+  float cavity = 1.0 - slope * 0.70;
+  float valleyDark = smoothstep(10.0, 1.5, height) * 0.28;
+  color *= mix(1.0, cavity, 0.86) * (1.0 - valleyDark);
 
-  // Crests catch the ceiling. Harmonic ridges glow more strongly than
-  // percussive ones — a sustained note holds its light.
-  float crestIntensity = mix(0.10, 0.18, harmonic);
+  float crestIntensity = mix(0.12, 0.22, harmonic);
   color += uSunColor * pow(ridge, 1.4) * energy * crestIntensity * smoothstep(0.35, 0.95, up);
 
+  float rimLight = pow(clamp(1.0 - dot(n, v), 0.0, 1.0), 3.5);
+  color += uSunColor * rimLight * 0.06 * heightZone * uSunPower;
+
   // --- the playhead --------------------------------------------------------
-  // Music already heard stays quietly lit behind the listener; music not yet
-  // reached is held back in atmosphere. The band between them is the present.
   float delta = vSeconds - uPlayhead;
   float heard = 1.0 - smoothstep(-0.4, 2.5, delta);
   float present = exp(-delta * delta * 0.06);
@@ -342,12 +347,14 @@ void main(){
   color += uSunColor * present * 0.06 * (0.3 + energy);
 
   // --- atmosphere ----------------------------------------------------------
-  float dist = length(cameraPosition - vWorld);
   float fog = 1.0 - exp(-pow(dist * uFogDensity, 2.0));
-  float lowLying = exp(-max(0.0, vWorld.y) * 0.05);
-  fog = clamp(fog * mix(0.72, 1.0, lowLying), 0.0, 0.985);
+  float lowLying = exp(-height * 0.045);
+  float valleyFog = exp(-height * 0.028) * 0.25;
+  fog = clamp(fog * mix(0.70, 1.0, lowLying) + valleyFog * fog, 0.0, 0.985);
   float fogDepth = smoothstep(0.0, 1.0, fog);
   vec3 fogCol = mix(uFogNear, uFogFar, fogDepth);
+  vec3 groundMist = mix(uFogNear * 1.12, uFogFar * 0.92, clamp(height * 0.035, 0.0, 1.0));
+  fogCol = mix(groundMist, fogCol, smoothstep(0.0, 18.0, height));
   color = mix(color, fogCol, fog);
 
   gl_FragColor = vec4(color * uExposure * uContrast, 1.0);
@@ -507,34 +514,32 @@ uniform float uContrast;
 uniform float uSunPower;
 varying vec3 vDir;
 
-/* The room. The terrain is not outdoors — it is installed in a rotunda: a dark
- * curved wall, an oculus of soft light overhead, a rail of small warm gallery
- * lamps around the rim, and fine dust hanging in the air. */
 void main(){
   vec3 d = normalize(vDir);
   float up = clamp(d.y, -1.0, 1.0);
 
-  // The wall: deep, slightly warm, darkening toward the floor.
-  vec3 wall = mix(uHorizonColor * 0.30, uHorizonColor, smoothstep(-0.55, 0.35, up));
+  vec3 wall = mix(uHorizonColor * 0.26, uHorizonColor, smoothstep(-0.55, 0.35, up));
 
-  // Horizon glow: a warm luminance band where the terrain meets the sky.
-  float horizonBand = exp(-pow((up - 0.08) * 6.5, 2.0));
-  wall += uHorizonGlow * horizonBand;
+  float horizonBand = exp(-pow((up - 0.06) * 5.5, 2.0));
+  wall += uHorizonGlow * horizonBand * 1.3;
 
-  // The oculus: a broad soft disc of daylight directly overhead.
+  float horizonHaze = exp(-pow((up - 0.12) * 3.2, 2.0));
+  wall += uHorizonGlow * horizonHaze * 0.4;
+
   float oculus = smoothstep(0.62, 0.93, up);
   vec3 ceiling = uSkyColor * (1.0 + oculus * 3.0);
   vec3 color = mix(wall, ceiling, smoothstep(0.30, 0.80, up));
 
-  // The lighting rail: small warm lamps at a constant height around the room.
   float ring = exp(-pow((up - 0.56) * 26.0, 2.0));
   float around = atan(d.z, d.x);
   float lamps = pow(max(0.0, sin(around * 14.0)), 90.0);
   color += uSunColor * ring * lamps * 1.2 * uSunPower;
 
-  // Dust and specks caught in the air against the dark wall.
   float speck = pow(hash21(floor(d.xz * 1150.0 + d.y * 407.0)), 120.0);
   color += vec3(0.80, 0.78, 0.74) * speck * (1.0 - oculus) * 0.22;
+
+  float dustLayer = fbm2(vec2(around * 2.0, up * 3.0 + 0.5)) * 0.04;
+  color += uHorizonGlow * dustLayer * (1.0 - smoothstep(0.3, 0.7, up));
 
   gl_FragColor = vec4(color * uExposure * uContrast, 1.0);
 }

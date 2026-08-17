@@ -133,6 +133,21 @@ const SHOTS = {
     to:   { band: 0.0, alt: 340, lead: 320, look: 900, lookBand: 0.0, lookAlt: -240, fov: 28, roll: -0.15 },
     ease: 'inOutSine', still: 0.5, specimen: true,
   },
+  closePass: {
+    from: { band: -0.12, alt: 5.8, lead: 8, look: 110, lookBand: -0.18, lookAlt: 3.5, fov: 56, roll: 0.7 },
+    to:   { band: -0.22, alt: 4.2, lead: 5, look: 85, lookBand: -0.24, lookAlt: 2.0, fov: 62, roll: -0.5 },
+    ease: 'inOutCubic', still: 0.55,
+  },
+  monumentalWide: {
+    from: { band: 0.0, alt: 280, lead: 180, look: 800, lookBand: -0.08, lookAlt: -80, fov: 42, roll: 0.3 },
+    to:   { band: -0.04, alt: 320, lead: 220, look: 900, lookBand: 0.0, lookAlt: -120, fov: 38, roll: 0 },
+    ease: 'inOutSine', still: 0.45,
+  },
+  corridor: {
+    from: { band: -0.15, alt: 6.5, lead: 10, look: 140, lookBand: -0.15, lookAlt: 4, fov: 48, roll: 0.2 },
+    to:   { band: -0.15, alt: 5.0, lead: 7, look: 100, lookBand: -0.16, lookAlt: 3, fov: 52, roll: -0.3 },
+    ease: 'inOutSine', still: 0.5,
+  },
 };
 
 /* CueEngine — reduces the authored sequence to a world state for any time.

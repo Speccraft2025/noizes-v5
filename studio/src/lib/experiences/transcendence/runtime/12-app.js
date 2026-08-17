@@ -62,6 +62,7 @@ class ExperienceDirector {
     this.reducedMotion = this.a11y.reducedMotion;
     this.highContrast = this.a11y.highContrast;
     this.debug = new URLSearchParams(location.search).get('debug') === '1';
+    this._shotOverride = new URLSearchParams(location.search).get('shot') || null;
     this.descent = 0;
     this.contact = 0;
     this.lastFrameWall = 0;
@@ -699,6 +700,7 @@ class ExperienceDirector {
     const time = this.clock.sample(wall);
     const exact = this.clock.exact;
     const state = this.cues.reduce(exact);
+    if (this._shotOverride && SHOTS[this._shotOverride]) state.shot = this._shotOverride;
 
     this.timeline.time(clamp(exact, 0, TX.slice.end));
     const c = this.chore;
@@ -838,6 +840,8 @@ class ExperienceDirector {
       setQuality: q => this._applyQuality(q, 'listener'),
       archive: () => this.archive.summary(),
       notes: () => this._notes || [],
+      setShot: name => { this._shotOverride = SHOTS[name] ? name : null; if (this.director) this.director.initialised = false; },
+      shots: () => Object.keys(SHOTS),
     };
   }
 

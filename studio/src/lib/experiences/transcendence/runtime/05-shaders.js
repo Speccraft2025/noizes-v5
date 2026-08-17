@@ -759,7 +759,8 @@ void main(){
   color = pow(color, vec3(mix(1.0, 0.86, uHighContrast)));
   color *= uContrast;
 
-  float v = 1.0 - uVignette * dot(centred, centred) * 2.1;
+  vec2 vig = centred * vec2(1.0, 1.08);
+  float v = 1.0 - uVignette * dot(vig, vig) * 2.1;
   color *= clamp(v, 0.0, 1.0);
 
   vec3 noise = texture2D(uNoise, uv * uResolution / 128.0 + vec2(fract(uTime * 7.3), fract(uTime * 5.1))).rgb;

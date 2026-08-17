@@ -713,8 +713,13 @@ class WorldRenderer {
     }
     c.uFocusDistance.value = f.focus;
     c.uFocusRange.value = f.focusRange * mix(0.8, 1.3, presence);
+    const altNorm = clamp01((f.altitude || 100) / 180);
+    if (this.profile.dof > 0) {
+      c.uDofStrength.value = this.profile.dof * mix(1.12, 0.88, altNorm);
+    }
     c.uContrast.value = f.contrast;
-    c.uVignette.value = mix(0.30, 0.44, 1 - presence);
+    c.uVignette.value = mix(0.36, 0.26, altNorm) * mix(1.0, 1.12, 1 - presence);
+    c.uGrain.value = this.profile.grain * mix(1.12, 0.88, medium);
     c.uHighContrast.value = this.highContrast ? 1 : 0;
     c.uNear.value = this.camera.near;
     c.uFar.value = this.camera.far;

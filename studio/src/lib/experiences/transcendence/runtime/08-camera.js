@@ -79,13 +79,15 @@ class CameraDirector {
     let py = groundHere + alt;
     let ty = groundThere + f.lookAlt;
 
+    let fov = f.fov, roll = f.roll;
     if (!this.reducedMotion) {
-      // A very slow breathing drift, so no frame is ever mechanically still.
       const breathe = this.analysis.mean('loudness_medium', seconds, 2.4);
       py += Math.sin(seconds * 0.21) * alt * 0.012 * (0.4 + breathe);
+      fov += (breathe - 0.35) * 2.2;
+      roll += Math.sin(seconds * 0.13) * 0.22 * breathe;
     }
 
-    return { px: x, py, pz: z, tx: lookX, ty, tz: lookZ, fov: f.fov, roll: f.roll, alt };
+    return { px: x, py, pz: z, tx: lookX, ty, tz: lookZ, fov, roll, alt };
   }
 
   reset(state) {
@@ -124,10 +126,13 @@ class CameraDirector {
     this.position.applyTo(this._pos);
     this.target.applyTo(this._tgt);
 
-    // The flight never clips the ground it is flying over.
     if (this.world) {
       const floor = this.world.groundNear(this._pos.x, this._pos.z) + 3.2;
-      if (this._pos.y < floor) { this._pos.y = floor; this.position.y.reset(floor); }
+      if (this._pos.y < floor) {
+        this._pos.y = floor;
+        this.position.y.value = floor;
+        this.position.y.velocity = Math.max(this.position.y.velocity, 0);
+      }
     }
 
     this.camera.position.copy(this._pos);
@@ -140,6 +145,7 @@ class CameraDirector {
     return {
       focus: distance * 0.55,
       focusRange: mix(90, 520, clamp01(distance / 700)),
+      altitude: f.alt,
     };
   }
 }

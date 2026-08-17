@@ -127,7 +127,7 @@ class CameraDirector {
     this.target.applyTo(this._tgt);
 
     if (this.world) {
-      const floor = this.world.groundNear(this._pos.x, this._pos.z) + 3.2;
+      const floor = this.world.groundNear(this._pos.x, this._pos.z) + 1.6;
       if (this._pos.y < floor) {
         this._pos.y = floor;
         this.position.y.value = floor;

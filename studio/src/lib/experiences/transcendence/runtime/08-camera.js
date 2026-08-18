@@ -80,12 +80,6 @@ class CameraDirector {
     let ty = groundThere + f.lookAlt;
 
     let fov = f.fov, roll = f.roll;
-    if (!this.reducedMotion) {
-      const breathe = this.analysis.mean('loudness_medium', seconds, 2.4);
-      py += Math.sin(seconds * 0.21) * alt * 0.012 * (0.4 + breathe);
-      fov += (breathe - 0.35) * 2.2;
-      roll += Math.sin(seconds * 0.13) * 0.22 * breathe;
-    }
 
     return { px: x, py, pz: z, tx: lookX, ty, tz: lookZ, fov, roll, alt };
   }
@@ -115,8 +109,8 @@ class CameraDirector {
     // Springs give the flight weight. The half-life scales with altitude so a
     // ground-level pass is responsive while an atlas move stays majestic.
     const heavy = clamp01(f.alt / 200);
-    this.position.halfLife = this.reducedMotion ? 0.85 : mix(0.24, 0.75, heavy);
-    this.target.halfLife = this.reducedMotion ? 0.95 : mix(0.32, 0.9, heavy);
+    this.position.halfLife = this.reducedMotion ? 0.85 : mix(0.38, 0.90, heavy);
+    this.target.halfLife = this.reducedMotion ? 0.95 : mix(0.48, 1.05, heavy);
 
     this.position.step(f.px, py, f.pz, dt);
     this.target.step(f.tx, f.ty, tz, dt);

@@ -34,6 +34,8 @@ export const DEFAULT_ART_DIRECTION = {
   sunElevation: 64.32,
   sunAzimuth: -146.31,
   flightAltitude: 1,
+  worldStability: 0.7,
+  musicResponse: 0.3,
 };
 
 /** Clamp art direction to ranges the world actually looks good in. */
@@ -53,6 +55,8 @@ export function normalizeArtDirection(input = {}) {
     sunElevation: number(input.sunElevation, DEFAULT_ART_DIRECTION.sunElevation, 8, 88),
     sunAzimuth: number(input.sunAzimuth, DEFAULT_ART_DIRECTION.sunAzimuth, -180, 180),
     flightAltitude: number(input.flightAltitude, 1, 0.5, 2.5),
+    worldStability: number(input.worldStability, 0.7, 0, 1),
+    musicResponse: number(input.musicResponse, 0.3, 0, 1),
   };
 }
 

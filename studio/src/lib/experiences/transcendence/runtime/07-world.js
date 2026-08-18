@@ -56,6 +56,8 @@ const ART = Object.assign({
   sunElevation: 64.32,     // degrees above the horizon
   sunAzimuth: -146.31,     // degrees, 0 = straight down the time axis
   flightAltitude: 1,       // multiplies every shot's altitude
+  worldStability: 0.7,     // 0 = fully reactive, 1 = completely static world
+  musicResponse: 0.3,      // scales how much audio analysis moves the environment
 }, (typeof TX !== 'undefined' && TX.artDirection) || {});
 
 /* Three fixed palettes, not colour pickers. Each is a coherent lighting design —
@@ -550,6 +552,8 @@ class WorldRenderer {
     if (patch.palette !== undefined && PALETTES[String(patch.palette)]) ART.palette = String(patch.palette);
     if (patch.terracing !== undefined) ART.terracing = !!patch.terracing;
     if (patch.terraceStep !== undefined) { n = Number(patch.terraceStep); ART.terraceStep = clamp(n === n ? n : 1.5, 0.5, 6); }
+    if (patch.worldStability !== undefined) { n = Number(patch.worldStability); ART.worldStability = clamp(n === n ? n : 0.7, 0, 1); }
+    if (patch.musicResponse !== undefined) { n = Number(patch.musicResponse); ART.musicResponse = clamp(n === n ? n : 0.3, 0, 1); }
   }
 
   applyArt(patch) {
@@ -580,14 +584,16 @@ class WorldRenderer {
 
   /* Ground height at a world position — a CPU mirror of the shader's base term.
    * It deliberately omits the analytic fine relief: the flight needs the shape
-   * of the land, not its gravel. */
+   * of the land, not its gravel. Uses the mass-region sculpt parameters as a
+   * conservative upper bound so the camera never sinks through the terrain. */
   heightAt(x, z) {
     const seconds = -z / TIME_SCALE;
     const band = clamp01(x / BAND_WIDTH + 0.5);
     const T = this.analysis.terrainAt(seconds / this.analysis.duration, band);
     const mass = mix(1.45, 0.48, Math.pow(band, 0.70));
-    let h = Math.pow(T.energy, this.field.uHeightGamma.value) * this.field.uHeightScale.value * mass;
-    h += T.ridge * T.energy * this.field.uRidgeScale.value * mix(0.6, 1.9, band);
+    const gamma = this.field.uHeightGamma.value + 0.3;
+    let h = Math.pow(T.energy, gamma) * this.field.uHeightScale.value * mass * 1.55;
+    h += T.ridge * T.energy * this.field.uRidgeScale.value * mix(0.6, 1.9, band) * 0.65;
     return Math.max(h, this.field.uBaseHeight.value);
   }
 
@@ -614,46 +620,44 @@ class WorldRenderer {
     this.field.uPlayhead.value = t;
 
     // ---- climate ------------------------------------------------------------
-    // Loudness controls environmental force, not decoration.
-    const loud = analysis.at('loudness_short', t);
-    const medium = analysis.mean('loudness_medium', t, 2.0);
-    const bright = analysis.mean('brightness', t, 1.5);
-    const presence = analysis.mean('presence', t, 0.6);
-    const onset = analysis.onsetEnergy(t, 0.35);
-    const high = analysis.at('high', t);
-    const low = analysis.mean('low', t, 1.2);
+    // Slow environmental drift: the world changes over passages, not beats.
+    // Long averaging windows (6–8 s) absorb transients so no single kick,
+    // snare or vocal onset produces a visible twitch.
+    const stab = ART.worldStability;
+    const resp = ART.musicResponse;
+    const window = mix(6.0, 14.0, stab);
+    const medium = mix(0.5, analysis.mean('loudness_medium', t, window), resp);
+    const bright = mix(0.5, analysis.mean('brightness', t, mix(4.0, 10.0, stab)), resp);
+    const presence = mix(0.5, analysis.mean('presence', t, mix(4.0, 10.0, stab)), resp);
+    const high = analysis.at('high', t) * resp;
 
-    this.shared.uSunPower.value = (0.80 + medium * 0.60 + onset * 0.12) * f.exposure;
+    this.shared.uSunPower.value = (0.88 + medium * 0.18) * f.exposure;
     this.shared.uExposure.value = f.exposure;
     this.shared.uContrast.value = f.contrast;
 
-    // Silence is distance: when the record breathes, the air thins and the
-    // horizon retreats.
-    this.shared.uFogDensity.value = mix(0.0016, 0.0007, presence) * f.atmosphere * (1 + low * 0.15);
-    // The ceiling brightens with the recording; the wall stays dark so the
-    // carving always has something to stand against.
-    this.sky.setRGB(mix(0.052, 0.105, medium), mix(0.050, 0.100, medium), mix(0.049, 0.094, medium));
-    this.horizon.setRGB(mix(0.040, 0.070, medium), mix(0.034, 0.058, medium), mix(0.030, 0.048, medium));
-    // Near fog is warmer, far fog is cooler — aerial perspective.
+    this.shared.uFogDensity.value = mix(0.0014, 0.0008, presence) * f.atmosphere;
+    this.sky.setRGB(mix(0.058, 0.088, medium), mix(0.056, 0.084, medium), mix(0.054, 0.080, medium));
+    this.horizon.setRGB(mix(0.042, 0.060, medium), mix(0.036, 0.050, medium), mix(0.032, 0.042, medium));
     this.fogNear.setRGB(
-      mix(0.038, 0.068, medium) * f.atmosphere,
-      mix(0.034, 0.058, medium) * f.atmosphere,
-      mix(0.028, 0.046, medium) * f.atmosphere,
+      mix(0.040, 0.058, medium) * f.atmosphere,
+      mix(0.036, 0.050, medium) * f.atmosphere,
+      mix(0.030, 0.040, medium) * f.atmosphere,
     );
     this.fogFar.setRGB(
-      mix(0.022, 0.042, medium) * f.atmosphere,
-      mix(0.022, 0.042, medium) * f.atmosphere,
-      mix(0.026, 0.050, medium) * f.atmosphere,
+      mix(0.024, 0.038, medium) * f.atmosphere,
+      mix(0.024, 0.038, medium) * f.atmosphere,
+      mix(0.028, 0.044, medium) * f.atmosphere,
     );
     this.horizonGlow.setRGB(
-      mix(0.055, 0.110, medium) * f.atmosphere,
-      mix(0.042, 0.078, medium) * f.atmosphere,
-      mix(0.030, 0.054, medium) * f.atmosphere,
+      mix(0.060, 0.095, medium) * f.atmosphere,
+      mix(0.046, 0.068, medium) * f.atmosphere,
+      mix(0.034, 0.048, medium) * f.atmosphere,
     );
 
-    // Dynamics decide how tall the world is allowed to be.
-    this.field.uHeightScale.value = HEIGHT_SCALE * mix(0.86, 1.16, medium) * f.relief * (1 + onset * 0.04);
-    this.field.uRidgeScale.value = 3.4 * ART.ridgeEmphasis * mix(0.7, 1.35, analysis.mean('voice', t, 0.8));
+    // Terrain height and ridge scale are constant during playback — the macro
+    // terrain is stable, monumental, and does not pump with the beat.
+    this.field.uHeightScale.value = HEIGHT_SCALE * f.relief;
+    this.field.uRidgeScale.value = 3.4 * ART.ridgeEmphasis;
 
     // ---- the ground follows the camera -------------------------------------
     const origin = this.terrainMaterial.uniforms.uGridOrigin.value;
@@ -674,7 +678,7 @@ class WorldRenderer {
       const near = cloud === this.nearAir;
       u.uTime.value = t;
       u.uPresence.value = f.presence.air * (near ? 0.75 : 1);
-      u.uLift.value = high * 0.8 + onset * 0.25;
+      u.uLift.value = high * 0.6;
       u.uBrightness.value = bright;
       u.uCentre.value.set(
         near ? this.camera.position.x : 0,
@@ -709,10 +713,10 @@ class WorldRenderer {
     const c = this.compositeMaterial.uniforms;
     c.uTime.value = t;
     c.uExposure.value = f.exposure;
-    c.uBloomStrength.value = this.profile.bloom ? mix(0.22, 0.48, loud) + onset * 0.08 : 0;
+    c.uBloomStrength.value = this.profile.bloom ? mix(0.26, 0.38, medium) : 0;
     if (this.profile.bloom) {
-      this.brightMaterial.uniforms.uThreshold.value = mix(0.78, 0.60, medium) - onset * 0.05;
-      this.brightMaterial.uniforms.uKnee.value = mix(0.22, 0.36, medium);
+      this.brightMaterial.uniforms.uThreshold.value = mix(0.74, 0.64, medium);
+      this.brightMaterial.uniforms.uKnee.value = mix(0.24, 0.32, medium);
     }
     c.uFocusDistance.value = f.focus;
     c.uFocusRange.value = f.focusRange * mix(0.8, 1.3, presence);

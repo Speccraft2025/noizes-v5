@@ -155,18 +155,30 @@ float terrainHeight(vec2 worldXZ, float lod){
   float macro = max(peakHeight, foothills);
   macro *= mix(0.3, 1.0, energy);
 
+  // ── DELIBERATE VALLEY CORRIDOR ──────────────────────────────────
+  // One exaggerated test valley at band ~-0.15 (x ≈ -31).  Broad
+  // floor, towering flanks, micro-terrain suppressed on the floor.
+  float vCenterX = -31.0;
+  float vDist = abs(worldXZ.x - vCenterX);
+  float vEdge = fbm2(vec2(worldXZ.y * 0.0012 + 77.0, worldXZ.x * 0.001 + 77.0)) * 10.0;
+  float vEffDist = max(0.0, vDist - abs(vEdge));
+  float vFloor = 1.0 - smoothstep(10.0, 35.0, vEffDist);
+  float vWallZone = smoothstep(30.0, 55.0, vEffDist) * (1.0 - smoothstep(55.0, 130.0, vEffDist));
+  macro *= mix(1.0, 0.04, vFloor);
+  macro += vWallZone * uHeightScale * 3.5;
+
   // ── SPECTRAL SURFACE LAYER ───────────────────────────────────────
   float hasMacro = smoothstep(2.0, 25.0, macro);
   float spectral = pow(T.r, uHeightGamma + 0.5) * uHeightScale * mass * 0.12;
-  spectral *= mix(0.1, 1.0, hasMacro);
+  spectral *= mix(0.1, 1.0, hasMacro) * mix(1.0, 0.15, vFloor);
 
   float sRidge = T.a * T.r * uRidgeScale * mix(0.6, 1.9, band) * 0.08;
-  sRidge *= mix(0.1, 1.0, hasMacro);
+  sRidge *= mix(0.1, 1.0, hasMacro) * mix(1.0, 0.1, vFloor);
 
   float h = macro + spectral + sRidge;
 
-  // Micro-relief: suppressed at distance and in basins.
-  float detail = uDetailScale * (1.0 - smoothstep(0.10, 0.55, lod)) * mix(0.1, 1.0, hasMacro);
+  // Micro-relief: suppressed at distance, in basins, and on the valley floor.
+  float detail = uDetailScale * (1.0 - smoothstep(0.10, 0.55, lod)) * mix(0.1, 1.0, hasMacro) * mix(1.0, 0.05, vFloor);
   float strata = fbm2(worldXZ * 0.055 + vec2(0.0, band * 3.0)) - 0.5;
   float broken = ridged2(worldXZ * 0.21) - 0.5;
   h += mix(broken, strata, T.g) * detail * (0.25 + T.r * 1.5);

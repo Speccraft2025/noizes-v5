@@ -123,62 +123,82 @@ vec4 terrainSampleLod(vec2 worldXZ, float lod){
 /* Elevation in world units. The single source of truth for the shape of the
  * world: the ground, the lyric landmarks, the specimen and the flight camera
  * all evaluate this, so a landmark can never float above the ridge it is cut
- * into and the camera can never sink through the rock. */
+ * into and the camera can never sink through the rock.
+ *
+ * MACRO FORM vs SPECTRAL SURFACE — the two layers are architecturally
+ * separate. Procedural noise fields generate the geological vocabulary:
+ * plateaus, escarpments, elongated ridges, mounds. The recording's spectral
+ * data articulates their surfaces — it does not determine the silhouette. */
 float terrainHeight(vec2 worldXZ, float lod){
   vec4 T = terrainSampleLod(worldXZ, lod);
   float band = clamp(worldXZ.x / uBandWidth + 0.5, 0.0, 1.0);
-
-  // Compositional sculpting: a slow spatial noise field shapes the landscape
-  // into a small number of monumental masses separated by negative space.
-  // The field determines WHERE the recording's energy is allowed to build
-  // height — it never invents structure the recording does not contain.
-  float sculpt = fbm2(worldXZ * vec2(0.0055, 0.0018) + 7.3);
-  float sculptMod = smoothstep(0.30, 0.62, sculpt);
-
-  // Low frequencies carry monumental geological mass; high frequencies are
-  // light, sharp and delicate. This is a scale choice, not invented data.
   float mass = mix(1.45, 0.48, pow(band, 0.70));
+  float energy = T.r * mass;
 
-  // Variable gamma: void regions flatten everything but the loudest moments
-  // into negative space; mass regions preserve dynamic range so the recording's
-  // concentrated power produces tall, dominant structures.
-  float gamma = mix(3.4, uHeightGamma + 0.3, sculptMod);
-  float base = pow(T.r, gamma) * uHeightScale * mass;
-  base *= mix(0.30, 1.55, sculptMod);
+  // ── MACRO FORM LAYER ─────────────────────────────────────────────
+  // Three noise fields at different scales and orientations. Their
+  // intersections produce unique geological forms across the landscape.
+  float n1 = fbm2(worldXZ * vec2(0.0018, 0.0008) + 2.7);
+  float n2 = fbm2(worldXZ * vec2(0.0040, 0.0025) + 17.3);
+  float n3 = ridged2(worldXZ * vec2(0.0055, 0.0010) + 31.7);
 
-  // Ridge as surface articulation on the masses, not structural.
-  base += T.a * T.r * uRidgeScale * mix(0.6, 1.9, band) * mix(0.10, 0.65, sculptMod);
+  // Hero massif / plateau: broad flat-topped form, the dominant class.
+  // A smoothstep band creates a mesa — steep flanks, level summit.
+  float heroMask = smoothstep(0.38, 0.52, n1) * (1.0 - smoothstep(0.58, 0.74, n1));
+  float hero = min(heroMask * uHeightScale * 5.0, uHeightScale * 3.5);
 
-  // Micro-relief is dropped as the cells coarsen; at the horizon it is pure
-  // aliasing and nothing else. Harmonic ground is smooth and stratified,
-  // percussive ground is broken. Suppressed in void regions.
-  float detail = uDetailScale * (1.0 - smoothstep(0.10, 0.55, lod)) * mix(0.25, 1.0, sculptMod);
+  // Escarpment / wall: thin vertical face where n2 crosses an isoline.
+  float wallDist = abs(n2 - 0.47);
+  float wall = (1.0 - smoothstep(0.0, 0.038, wallDist)) * uHeightScale * 3.0;
+
+  // Elongated ridge: ridged noise stretched along the time axis.
+  float longRidge = n3 * n3 * uHeightScale * 1.8;
+
+  // Smooth mound: rounded secondary from a different region of n2.
+  float moundMask = smoothstep(0.58, 0.78, n2);
+  float mound = moundMask * moundMask * uHeightScale * 1.4;
+
+  // Union of forms — max produces clean intersections, not averaged mush.
+  float macro = max(hero, max(wall, max(longRidge, mound)));
+
+  // Song energy scales amplitude: louder sections build taller forms,
+  // but even quiet passages retain visible geology (0.25 floor).
+  macro *= mix(0.25, 1.0, energy);
+
+  // ── SPECTRAL SURFACE LAYER ───────────────────────────────────────
+  // The recording's detail becomes texture on the macro forms.
+  float hasMacro = smoothstep(1.0, 10.0, macro);
+  float spectral = pow(T.r, uHeightGamma + 0.5) * uHeightScale * mass * 0.15;
+  spectral *= mix(0.15, 1.0, hasMacro);
+
+  float sRidge = T.a * T.r * uRidgeScale * mix(0.6, 1.9, band) * 0.10;
+  sRidge *= mix(0.1, 1.0, hasMacro);
+
+  float h = macro + spectral + sRidge;
+
+  // Micro-relief: suppressed at distance and in basins.
+  float detail = uDetailScale * (1.0 - smoothstep(0.10, 0.55, lod)) * mix(0.1, 1.0, hasMacro);
   float strata = fbm2(worldXZ * 0.055 + vec2(0.0, band * 3.0)) - 0.5;
   float broken = ridged2(worldXZ * 0.21) - 0.5;
-  base += mix(broken, strata, T.g) * detail * (0.25 + T.r * 1.5);
+  h += mix(broken, strata, T.g) * detail * (0.25 + T.r * 1.5);
 
-  // The carving stands on its own base plate. Without it the massifs float on
-  // the gallery floor; with it they are one piece of stone that was cut.
-  base = max(base, uBaseHeight);
+  // Base plate.
+  h = max(h, uBaseHeight);
 
-  // Contour terracing. The lower slopes are cut into level steps, the way a
-  // topographic model is built up from sheets, while the summits stay smooth.
-  // This is what makes the massifs read as carved rather than as a heightfield.
+  // Contour terracing on the lower slopes.
   float stepH = uTerraceStep;
-  float terraced = floor(base / stepH) * stepH + stepH * 0.5;
-  float carve = (1.0 - smoothstep(uTerraceFrom, uTerraceTo, base)) * uTerrace;
-  // Terracing is a near-field reading; at distance it is just more aliasing.
+  float terraced = floor(h / stepH) * stepH + stepH * 0.5;
+  float carve = (1.0 - smoothstep(uTerraceFrom, uTerraceTo, h)) * uTerrace;
   carve *= 1.0 - smoothstep(0.08, 0.42, lod);
-  base = mix(base, terraced, carve);
+  h = mix(h, terraced, carve);
 
-  // The plate ends where the recording does. NB both smoothstep edges ascend:
-  // edge0 > edge1 is undefined in GLSL and was tearing holes in the plate.
+  // Edge margins.
   float u = secondsAt(worldXZ.y) / uDuration;
   float v = worldXZ.x / uBandWidth + 0.5;
   float margin = 0.012;
   float inside = smoothstep(0.0, margin, u) * (1.0 - smoothstep(1.0 - margin, 1.0, u))
                * smoothstep(0.0, margin, v) * (1.0 - smoothstep(1.0 - margin, 1.0, v));
-  return base * inside;
+  return h * inside;
 }
 
 vec3 terrainNormal(vec2 worldXZ, float eps, float lod){

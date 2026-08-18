@@ -582,19 +582,23 @@ class WorldRenderer {
     }
   }
 
-  /* Ground height at a world position — a CPU mirror of the shader's base term.
-   * It deliberately omits the analytic fine relief: the flight needs the shape
-   * of the land, not its gravel. Uses the mass-region sculpt parameters as a
-   * conservative upper bound so the camera never sinks through the terrain. */
+  /* Ground height at a world position — a CPU upper bound of the shader's
+   * macro-form + spectral-surface layers. The macro forms are noise-driven
+   * in the shader and cannot be cheaply evaluated on the CPU, so this uses
+   * the maximum possible macro height (hero plateau) scaled by the local
+   * energy. The camera never clips through terrain; it may ride slightly
+   * higher over basins, which is acceptable. */
   heightAt(x, z) {
     const seconds = -z / TIME_SCALE;
     const band = clamp01(x / BAND_WIDTH + 0.5);
     const T = this.analysis.terrainAt(seconds / this.analysis.duration, band);
     const mass = mix(1.45, 0.48, Math.pow(band, 0.70));
-    const gamma = this.field.uHeightGamma.value + 0.3;
-    let h = Math.pow(T.energy, gamma) * this.field.uHeightScale.value * mass * 1.55;
-    h += T.ridge * T.energy * this.field.uRidgeScale.value * mix(0.6, 1.9, band) * 0.65;
-    return Math.max(h, this.field.uBaseHeight.value);
+    const energy = T.energy * mass;
+    const hs = this.field.uHeightScale.value;
+    const macro = hs * 3.5 * mix(0.25, 1.0, energy);
+    const spectral = Math.pow(T.energy, this.field.uHeightGamma.value + 0.5) * hs * mass * 0.15;
+    const sRidge = T.ridge * T.energy * this.field.uRidgeScale.value * mix(0.6, 1.9, band) * 0.10;
+    return Math.max(macro + spectral + sRidge, this.field.uBaseHeight.value);
   }
 
   /* The height the flight should clear: the highest ground in a short window

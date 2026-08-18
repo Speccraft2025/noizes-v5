@@ -898,20 +898,29 @@ class TerrainLandmarks {
         ];
         const isPeak = neighbours.every(n => cell.h > n.h) && cell.h > 15;
         const isTrough = neighbours.every(n => cell.h < n.h);
-        if (!isPeak && !isTrough) continue;
 
-        let prominence;
+        let type, prominence;
         if (isPeak) {
           const minNeighbour = Math.min(...neighbours.map(n => n.h));
           prominence = cell.h - minNeighbour;
           if (prominence < 3) continue;
-        } else {
+          type = 'peak';
+        } else if (isTrough) {
           const maxNeighbour = Math.max(...neighbours.map(n => n.h));
           prominence = maxNeighbour - cell.h;
           if (prominence < 1) continue;
+          type = 'trough';
+        } else {
+          const left = grid[r][c - 1].h, right = grid[r][c + 1].h;
+          const fwd = grid[r - 1][c].h, back = grid[r + 1][c].h;
+          const lateralDrop = cell.h - Math.max(left, right);
+          const axialVar = Math.min(Math.abs(cell.h - fwd), Math.abs(cell.h - back));
+          if (cell.h < 18 || lateralDrop < 3 || axialVar > 5) continue;
+          type = 'ridge';
+          prominence = lateralDrop;
         }
         raw.push({
-          type: isPeak ? 'peak' : 'trough',
+          type,
           x: cell.x, z: cell.z, h: cell.h,
           prominence,
           seconds: -cell.z / TIME_SCALE,
@@ -922,7 +931,7 @@ class TerrainLandmarks {
 
     const merged = this._merge(raw, stepX * 1.8, stepZ * 1.8);
 
-    const maxProm = { peak: 0, trough: 0 };
+    const maxProm = { peak: 0, trough: 0, ridge: 0 };
     for (const lm of merged) {
       if (lm.prominence > maxProm[lm.type]) maxProm[lm.type] = lm.prominence;
     }
@@ -932,14 +941,15 @@ class TerrainLandmarks {
 
     merged.sort((a, b) => a.seconds - b.seconds);
 
-    const counts = { peak: 0, trough: 0 };
+    const counts = { peak: 0, trough: 0, ridge: 0 };
     for (const lm of merged) {
       counts[lm.type]++;
       const idx = String(counts[lm.type]).padStart(2, '0');
       lm.id = `${lm.type}-${idx}`;
       lm.position = [lm.x, lm.h, lm.z];
-      lm.entry = [lm.x, lm.h + (lm.type === 'peak' ? 20 : -5), lm.z + 60];
-      lm.exit = [lm.x, lm.h + (lm.type === 'peak' ? 20 : -5), lm.z - 60];
+      const entryAlt = lm.type === 'peak' ? 20 : lm.type === 'ridge' ? 10 : -5;
+      lm.entry = [lm.x, lm.h + entryAlt, lm.z + 60];
+      lm.exit = [lm.x, lm.h + entryAlt, lm.z - 60];
       lm.contentSlots = [];
     }
 
@@ -1132,6 +1142,152 @@ class RouteBuilder {
       world: { air: 0.5, relief: 0.4, atmosphere: 0.25, ahead: 0.7 },
     });
 
+    this.sequence.sort((a, b) => a.time - b.time);
+    return this;
+  }
+
+  planTraversal(t0, t1) {
+    const all = this.landmarks.inRange(t0, t1);
+    const peaks = all.filter(l => l.type === 'peak');
+    const troughs = all.filter(l => l.type === 'trough');
+    const ridges = all.filter(l => l.type === 'ridge');
+    const highs = [...ridges, ...peaks].sort((a, b) => a.seconds - b.seconds);
+
+    if (troughs.length === 0 || highs.length === 0) {
+      this.traversal = [];
+      return this.plan(t0, t1);
+    }
+
+    this.route = [];
+    this.traversal = [];
+
+    const midpoint = (t0 + t1) * 0.5;
+    const firstHalf = troughs.filter(t => t.seconds < midpoint);
+    const troughA = firstHalf.length > 0
+      ? firstHalf.reduce((best, t) => t.prominence > best.prominence ? t : best)
+      : troughs[0];
+
+    const highLandmark = highs.find(h => h.seconds > troughA.seconds + 4);
+    const afterHigh = highLandmark ? highLandmark.seconds + 4 : troughA.seconds + 8;
+    const troughB = troughs.find(t => t.seconds > afterHigh && t.id !== troughA.id);
+
+    this.traversal.push({ phase: 'atlas', seconds: t0 });
+    this.traversal.push({ phase: 'descent', seconds: Math.max(t0 + 3, troughA.seconds - 4) });
+
+    this.route.push(troughA);
+    this.traversal.push({ phase: 'trough-a', landmark: troughA, seconds: troughA.seconds });
+
+    if (highLandmark) {
+      this.traversal.push({ phase: 'climb', seconds: (troughA.seconds + highLandmark.seconds) * 0.5 });
+      this.route.push(highLandmark);
+      this.traversal.push({ phase: 'ridge', landmark: highLandmark, seconds: highLandmark.seconds });
+      this.traversal.push({ phase: 'atlas-return', seconds: highLandmark.seconds + 4 });
+    }
+
+    if (troughB) {
+      this.route.push(troughB);
+      this.traversal.push({ phase: 'trough-b', landmark: troughB, seconds: troughB.seconds });
+    }
+
+    const lastLM = this.route[this.route.length - 1];
+    this.traversal.push({ phase: 'reveal', seconds: lastLM.seconds + 4 });
+    this.traversal.sort((a, b) => a.seconds - b.seconds);
+    return this;
+  }
+
+  generateTraversalShots() {
+    if (!this.traversal || this.traversal.length === 0) return this.generateShots();
+    this.shots = {};
+    const troughAPhase = this.traversal.find(p => p.phase === 'trough-a');
+    const ridgePhase = this.traversal.find(p => p.phase === 'ridge');
+    const troughBPhase = this.traversal.find(p => p.phase === 'trough-b');
+
+    this.shots['route-atlas'] = {
+      from: { band: -0.05, alt: 200, lead: 100, look: 600, lookBand: 0, lookAlt: -50, fov: 52, roll: 0 },
+      to:   { band: 0, alt: 170, lead: 80, look: 550, lookBand: 0.02, lookAlt: -40, fov: 50, roll: -0.3 },
+      ease: 'inOutSine', still: 0.4,
+    };
+
+    const dBand = troughAPhase ? troughAPhase.landmark.band : 0;
+    this.shots['route-descent'] = {
+      from: { band: 0, alt: 170, lead: 80, look: 550, lookBand: dBand, lookAlt: -30, fov: 50, roll: -0.3 },
+      to:   { band: dBand, alt: 35, lead: 22, look: 280, lookBand: dBand, lookAlt: 6, fov: 46, roll: 0.3 },
+      ease: 'inOutQuint', still: 0.6,
+    };
+
+    if (troughAPhase) {
+      const b = troughAPhase.landmark.band;
+      this.shots['route-trough-a'] = {
+        from: { band: b - 0.01, alt: 4, lead: 8, look: 120, lookBand: b, lookAlt: 3, fov: 52, roll: 0 },
+        to:   { band: b + 0.01, alt: 2.8, lead: 5, look: 90, lookBand: b, lookAlt: 1.5, fov: 56, roll: 0.1 },
+        ease: 'inOutSine', still: 0.5,
+      };
+    }
+
+    if (ridgePhase) {
+      const fromBand = troughAPhase ? troughAPhase.landmark.band : 0;
+      const toBand = ridgePhase.landmark.band;
+      this.shots['route-climb'] = {
+        from: { band: fromBand, alt: 4, lead: 8, look: 140, lookBand: toBand, lookAlt: 8, fov: 48, roll: 0.15 },
+        to:   { band: toBand, alt: 55, lead: 28, look: 380, lookBand: toBand, lookAlt: -6, fov: 50, roll: -0.3 },
+        ease: 'inOutQuint', still: 0.65,
+      };
+      const b = ridgePhase.landmark.band;
+      this.shots['route-ridge'] = {
+        from: { band: b - 0.08, alt: 12, lead: 14, look: 260, lookBand: b, lookAlt: 0, fov: 46, roll: 0.4 },
+        to:   { band: b + 0.06, alt: 8, lead: 10, look: 200, lookBand: b + 0.04, lookAlt: -2, fov: 44, roll: -0.3 },
+        ease: 'inOutCubic', still: 0.55,
+      };
+    }
+
+    this.shots['route-atlas-return'] = {
+      from: { band: 0, alt: 50, lead: 28, look: 380, lookBand: 0, lookAlt: -10, fov: 48, roll: 0.2 },
+      to:   { band: 0, alt: 180, lead: 90, look: 600, lookBand: 0, lookAlt: -50, fov: 52, roll: -0.15 },
+      ease: 'inOutQuint', still: 0.55,
+    };
+
+    if (troughBPhase) {
+      const b = troughBPhase.landmark.band;
+      this.shots['route-trough-b'] = {
+        from: { band: b - 0.01, alt: 4, lead: 8, look: 120, lookBand: b, lookAlt: 3, fov: 52, roll: 0 },
+        to:   { band: b + 0.01, alt: 2.8, lead: 5, look: 90, lookBand: b, lookAlt: 1.5, fov: 56, roll: 0.1 },
+        ease: 'inOutSine', still: 0.5,
+      };
+    }
+
+    const last = this.route[this.route.length - 1];
+    const rBand = last ? last.band : 0;
+    this.shots['route-reveal'] = {
+      from: { band: rBand, alt: 50, lead: 30, look: 400, lookBand: 0, lookAlt: -20, fov: 52, roll: 0.2 },
+      to:   { band: 0, alt: 140, lead: 70, look: 650, lookBand: 0, lookAlt: -55, fov: 54, roll: -0.15 },
+      ease: 'outCubic', still: 0.55,
+    };
+
+    return this;
+  }
+
+  generateTraversalSequence() {
+    if (!this.traversal || this.traversal.length === 0) return this.generateSequence();
+    this.sequence = [];
+    const presets = {
+      'atlas':        { air: 0.4, relief: 0.3, atmosphere: 0.2, ahead: 0.7 },
+      'descent':      { air: 0.35, relief: 0.5, atmosphere: 0.3, ahead: 0.6 },
+      'trough-a':     { air: 0.2, relief: 0.7, atmosphere: 0.5, ahead: 0.4 },
+      'climb':        { air: 0.35, relief: 0.55, atmosphere: 0.35, ahead: 0.55 },
+      'ridge':        { air: 0.3, relief: 0.6, atmosphere: 0.3, ahead: 0.5 },
+      'atlas-return': { air: 0.4, relief: 0.3, atmosphere: 0.2, ahead: 0.65 },
+      'trough-b':     { air: 0.2, relief: 0.7, atmosphere: 0.5, ahead: 0.4 },
+      'reveal':       { air: 0.5, relief: 0.3, atmosphere: 0.2, ahead: 0.7 },
+    };
+    for (const p of this.traversal) {
+      this.sequence.push({
+        time: p.seconds,
+        id: `route-${p.phase}`,
+        shot: `route-${p.phase}`,
+        phase: 'route',
+        world: presets[p.phase] || { air: 0.3, relief: 0.5, atmosphere: 0.3, ahead: 0.5 },
+      });
+    }
     this.sequence.sort((a, b) => a.time - b.time);
     return this;
   }

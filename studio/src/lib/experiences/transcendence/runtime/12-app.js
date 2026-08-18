@@ -63,6 +63,7 @@ class ExperienceDirector {
     this.highContrast = this.a11y.highContrast;
     this.debug = new URLSearchParams(location.search).get('debug') === '1';
     this._shotOverride = new URLSearchParams(location.search).get('shot') || null;
+    this._routeMode = new URLSearchParams(location.search).get('route') === '1';
     this.descent = 0;
     this.contact = 0;
     this.lastFrameWall = 0;
@@ -147,6 +148,7 @@ class ExperienceDirector {
       this._watchContextLoss();
 
       this._buildLandmarks();
+      if (this._routeMode) this._buildRoute();
     }
 
     return this._begin();
@@ -176,6 +178,22 @@ class ExperienceDirector {
       bands: 128,
     }).build();
     if (this.world) this.world.attachLandmarks(this.landmarkField.marks);
+  }
+
+  _buildRoute() {
+    if (!this.world) return;
+    const scanner = new TerrainLandmarks().scan(this.world, TX.slice.end);
+    const t0 = 10, t1 = Math.min(TX.slice.end - 5, 50);
+    const builder = new RouteBuilder(scanner, this.world).plan(t0, t1).generateShots().generateSequence();
+    if (builder.sequence.length === 0) {
+      this._note('route: no landmarks found in range');
+      return;
+    }
+    for (const [name, shot] of Object.entries(builder.shots)) SHOTS[name] = shot;
+    this.cues = new CueEngine(builder.sequence, this.analysis);
+    this.terrainLandmarks = scanner;
+    this.routeBuilder = builder;
+    this._note(`route: ${builder.route.length} landmarks, ${builder.sequence.length} cues`);
   }
 
   /* ------------------------------------------------------- instrument layer */
@@ -842,6 +860,8 @@ class ExperienceDirector {
       notes: () => this._notes || [],
       setShot: name => { this._shotOverride = SHOTS[name] ? name : null; if (this.director) this.director.initialised = false; },
       shots: () => Object.keys(SHOTS),
+      route: () => this.routeBuilder ? { landmarks: this.routeBuilder.route, sequence: this.routeBuilder.sequence } : null,
+      terrainLandmarks: () => this.terrainLandmarks ? this.terrainLandmarks.landmarks : [],
     };
   }
 

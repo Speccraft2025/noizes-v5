@@ -162,8 +162,11 @@ float terrainHeight(vec2 worldXZ, float lod){
   float vDist = abs(worldXZ.x - vCenterX);
   float vEdge = fbm2(vec2(worldXZ.y * 0.0012 + 77.0, worldXZ.x * 0.001 + 77.0)) * 10.0;
   float vEffDist = max(0.0, vDist - abs(vEdge));
-  float vFloor = 1.0 - smoothstep(10.0, 35.0, vEffDist);
-  float vWallZone = smoothstep(30.0, 55.0, vEffDist) * (1.0 - smoothstep(55.0, 130.0, vEffDist));
+  float vWidth = 0.7 + 0.25 * sin(worldXZ.y * 0.013 + 1.0) + 0.15 * sin(worldXZ.y * 0.031 + 2.7)
+               + fbm2(vec2(worldXZ.y * 0.004, 29.0)) * 0.15;
+  vWidth = clamp(vWidth, 0.45, 1.2);
+  float vFloor = 1.0 - smoothstep(10.0, 35.0 * vWidth, vEffDist);
+  float vWallZone = smoothstep(30.0 * vWidth, 55.0 * vWidth, vEffDist) * (1.0 - smoothstep(55.0 * vWidth, 130.0, vEffDist));
   macro *= mix(1.0, 0.04, vFloor);
   macro += vWallZone * uHeightScale * 3.5;
 
@@ -325,22 +328,27 @@ void main(){
   float strata = sin(height * 0.35 + fbm2(vWorld.xz * 0.008 + 5.0) * 12.0) * 0.5 + 0.5;
   body *= mix(1.0, 0.68 + strata * 0.64, slope * slope * 0.55);
 
-  float streak = ridged2(vWorld.xz * vec2(0.028, 0.006) + vec2(height * 0.04, vBand * 1.8));
+  vec2 diagUV = mat2(0.82, 0.57, -0.57, 0.82) * vWorld.xz;
+  float streak = ridged2(diagUV * vec2(0.018, 0.015) + vec2(height * 0.03, vBand * 1.2));
   streak = pow(clamp(streak, 0.0, 1.0), 2.0);
-  body *= 1.0 - streak * 0.26 * vclose;
+  body *= 1.0 - streak * 0.22 * vclose;
+
+  float patch = fbm2(vWorld.xz * 0.0018 + vec2(vWorld.y * 0.005, vBand * 2.5));
+  body *= 0.88 + patch * 0.24;
 
   float mesoNoise = fbm2(vWorld.xz * 0.07 + vec2(vBand * 5.0, height * 0.06));
   body *= 0.86 + mesoNoise * 0.28 * vclose;
 
   body = mix(body, body * vec3(1.12, 1.04, 0.88), energy * 0.5);
 
-  float veinScale = mix(0.28, 0.58, vBand);
-  float vein = ridged2(vWorld.xz * vec2(veinScale, 0.075) + vec2(vWorld.y * 0.14, 0.0));
-  vein = pow(clamp(vein, 0.0, 1.0), mix(2.6, 4.2, vBand));
-  float vein2 = ridged2(vWorld.xz * vec2(0.11, 0.021) + 31.7);
-  vein2 = pow(clamp(vein2, 0.0, 1.0), 6.0);
-  float veinStrength = mix(0.34, 0.22, vBand);
-  body *= 1.0 - (vein * veinStrength + vein2 * 0.36) * (0.45 + 0.55 * energy) * vclose;
+  vec2 oblique1 = mat2(0.57, 0.82, -0.82, 0.57) * vWorld.xz;
+  float vein = ridged2(oblique1 * vec2(0.15, 0.12) + vec2(vWorld.y * 0.10, 0.0));
+  vein = pow(clamp(vein, 0.0, 1.0), mix(2.8, 4.0, vBand));
+  vec2 oblique2 = mat2(0.91, -0.42, 0.42, 0.91) * vWorld.xz;
+  float vein2 = ridged2(oblique2 * vec2(0.10, 0.08) + 31.7);
+  vein2 = pow(clamp(vein2, 0.0, 1.0), 5.0);
+  float veinStrength = mix(0.30, 0.18, vBand);
+  body *= 1.0 - (vein * veinStrength + vein2 * 0.30) * (0.45 + 0.55 * energy) * vclose;
 
   body *= 0.96 + 0.08 * fbm2(vWorld.xz * 0.55 + vWorld.y * 0.09) * vclose;
 

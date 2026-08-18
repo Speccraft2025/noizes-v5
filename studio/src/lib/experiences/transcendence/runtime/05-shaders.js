@@ -137,6 +137,17 @@ float terrainHeight(vec2 worldXZ, float lod){
   float energy = T.r * mass;
 
   // ── MACRO FORM LAYER ─────────────────────────────────────────────
+  // Continental envelope: broad mountain ranges and basins.
+  float continent = ridged2(worldXZ * vec2(0.00035, 0.00012) + 3.7);
+  continent = pow(continent, 1.2);
+  float basinMod = fbm2(worldXZ * vec2(0.0003, 0.00018) + 11.0);
+  float rangeEnvelope = smoothstep(0.10, 0.55, continent) * mix(0.55, 1.0, basinMod);
+
+  // Broad shoulders and massifs connecting peaks.
+  float shoulder = fbm2(worldXZ * vec2(0.0012, 0.0004) + 7.5);
+  shoulder = pow(max(shoulder, 0.0), 1.3);
+
+  // Meso-scale peaks riding on the ranges.
   float range1 = ridged2(worldXZ * vec2(0.0020, 0.0005) + 5.3);
   range1 = pow(range1, 1.6);
 
@@ -147,12 +158,14 @@ float terrainHeight(vec2 worldXZ, float lod){
 
   float mountain = max(range1 * mix(0.4, 1.0, peakMod), range2);
   mountain = pow(max(mountain, 0.0), 1.5);
-  float peakHeight = mountain * uHeightScale * 8.0;
+  float peakHeight = mountain * uHeightScale * 8.0 * mix(0.25, 1.0, rangeEnvelope);
+  float shoulderHeight = shoulder * uHeightScale * 3.5 * rangeEnvelope;
 
   float foothills = fbm2(worldXZ * vec2(0.0030, 0.0015) + 41.0);
   foothills = foothills * foothills * uHeightScale * 0.5;
 
-  float macro = max(peakHeight, foothills);
+  float macro = max(max(peakHeight, shoulderHeight), foothills);
+  macro += rangeEnvelope * uHeightScale * 2.0;
   macro *= mix(0.3, 1.0, energy);
 
   // ── DELIBERATE VALLEY CORRIDOR ──────────────────────────────────
@@ -294,57 +307,63 @@ void main(){
   float depthZone = smoothstep(30.0, 650.0, dist);
   float heightZone = smoothstep(1.5, 45.0, height);
 
-  // --- color regions: green mountain palette --------------------------------
-  vec3 cDeepShadow = vec3(0.045, 0.065, 0.035);
-  vec3 cDarkForest = vec3(0.08, 0.15, 0.06);
-  vec3 cOlive      = vec3(0.14, 0.22, 0.09);
-  vec3 cMidGreen   = vec3(0.18, 0.32, 0.12);
-  vec3 cPaleGreen  = vec3(0.30, 0.40, 0.22);
-  vec3 cHighlight  = vec3(0.50, 0.56, 0.42);
+  // --- color regions: deep emerald mountain palette -------------------------
+  vec3 cDeepShadow = vec3(0.032, 0.052, 0.028);
+  vec3 cDarkForest = vec3(0.065, 0.13, 0.048);
+  vec3 cOlive      = vec3(0.12, 0.20, 0.075);
+  vec3 cMidGreen   = vec3(0.16, 0.30, 0.10);
+  vec3 cMoss       = vec3(0.22, 0.34, 0.14);
+  vec3 cPaleGreen  = vec3(0.32, 0.42, 0.22);
+  vec3 cGoldHigh   = vec3(0.48, 0.50, 0.34);
 
   vec3 body = cDeepShadow;
-  body = mix(body, cDarkForest, smoothstep(2.0, 10.0, height));
-  body = mix(body, cOlive, smoothstep(8.0, 28.0, height));
-  body = mix(body, cMidGreen, smoothstep(22.0, 55.0, height));
-  body = mix(body, cPaleGreen, smoothstep(48.0, 100.0, height));
-  body = mix(body, cHighlight, smoothstep(90.0, 180.0, height));
+  body = mix(body, cDarkForest, smoothstep(1.5, 8.0, height));
+  body = mix(body, cOlive, smoothstep(6.0, 22.0, height));
+  body = mix(body, cMidGreen, smoothstep(18.0, 45.0, height));
+  body = mix(body, cMoss, smoothstep(38.0, 75.0, height));
+  body = mix(body, cPaleGreen, smoothstep(65.0, 130.0, height));
+  body = mix(body, cGoldHigh, smoothstep(120.0, 220.0, height));
 
-  vec3 cliffTone = mix(cDarkForest, cDeepShadow, 0.5);
-  body = mix(body, cliffTone, slope * slope * 0.55);
+  vec3 cliffTone = mix(vec3(0.055, 0.08, 0.04), cDeepShadow, 0.6);
+  body = mix(body, cliffTone, slope * slope * 0.60);
 
-  body *= mix(vec3(1.08, 1.0, 0.88), vec3(0.88, 1.0, 1.08), smoothstep(0.08, 0.92, vBand));
+  body *= mix(vec3(1.10, 1.0, 0.86), vec3(0.86, 1.0, 1.10), smoothstep(0.08, 0.92, vBand));
 
-  // --- material texture: large-scale tonal variation -----------------------
+  // --- material: painterly sculptural treatment ----------------------------
   float vclose = 1.0 - smoothstep(0.05, 0.42, vLod);
 
-  float macroTone = fbm2(vWorld.xz * 0.003 + vec2(height * 0.008, 0.0));
-  float macroTone2 = fbm2(vWorld.xz * vec2(0.002, 0.005) + 37.0);
-  body *= 0.80 + macroTone * 0.40;
-  body = mix(body, body * vec3(1.12, 1.02, 0.82), macroTone2 * 0.45);
+  // Macro tonal zones: large coherent color regions.
+  float macroTone = fbm2(vWorld.xz * 0.002 + vec2(height * 0.006, 0.0));
+  float macroTone2 = fbm2(vWorld.xz * vec2(0.0015, 0.004) + 37.0);
+  body *= 0.78 + macroTone * 0.44;
+  body = mix(body, body * vec3(1.14, 1.04, 0.80), macroTone2 * 0.50);
 
-  float strata = sin(height * 0.35 + fbm2(vWorld.xz * 0.008 + 5.0) * 12.0) * 0.5 + 0.5;
-  body *= mix(1.0, 0.68 + strata * 0.64, slope * slope * 0.55);
+  // Geological strata: broad horizontal banding on cliff faces.
+  float strata = sin(height * 0.28 + fbm2(vWorld.xz * 0.006 + 5.0) * 14.0) * 0.5 + 0.5;
+  body *= mix(1.0, 0.65 + strata * 0.70, slope * slope * 0.50);
 
-  float streak = ridged2(vWorld.xz * vec2(0.028, 0.006) + vec2(height * 0.04, vBand * 1.8));
-  streak = pow(clamp(streak, 0.0, 1.0), 2.0);
-  body *= 1.0 - streak * 0.26 * vclose;
+  // Directional rock structure: geological not decorative.
+  float rockGrain = ridged2(vWorld.xz * vec2(0.018, 0.008) + vec2(height * 0.03, vBand * 1.4));
+  rockGrain = pow(clamp(rockGrain, 0.0, 1.0), 2.2);
+  body *= 1.0 - rockGrain * 0.20 * vclose;
 
-  float mesoNoise = fbm2(vWorld.xz * 0.07 + vec2(vBand * 5.0, height * 0.06));
-  body *= 0.86 + mesoNoise * 0.28 * vclose;
+  // Meso surface patches: broad rock variation.
+  float mesoNoise = fbm2(vWorld.xz * 0.045 + vec2(vBand * 4.0, height * 0.04));
+  body *= 0.84 + mesoNoise * 0.32 * vclose;
 
-  body = mix(body, body * vec3(1.12, 1.04, 0.88), energy * 0.5);
+  // Energy warmth: audio-active areas shift toward gold.
+  body = mix(body, body * vec3(1.16, 1.06, 0.86), energy * 0.55);
 
-  float veinScale = mix(0.28, 0.58, vBand);
-  float vein = ridged2(vWorld.xz * vec2(veinScale, 0.075) + vec2(vWorld.y * 0.14, 0.0));
-  vein = pow(clamp(vein, 0.0, 1.0), mix(2.6, 4.2, vBand));
-  float vein2 = ridged2(vWorld.xz * vec2(0.11, 0.021) + 31.7);
-  vein2 = pow(clamp(vein2, 0.0, 1.0), 6.0);
-  float veinStrength = mix(0.34, 0.22, vBand);
-  body *= 1.0 - (vein * veinStrength + vein2 * 0.36) * (0.45 + 0.55 * energy) * vclose;
+  // Mineral veins: sparse geological seams, not curtain textures.
+  float veinScale = mix(0.15, 0.35, vBand);
+  float vein = ridged2(vWorld.xz * vec2(veinScale, 0.045) + vec2(vWorld.y * 0.10, 0.0));
+  vein = pow(clamp(vein, 0.0, 1.0), mix(3.2, 5.0, vBand));
+  body *= 1.0 - vein * 0.22 * (0.4 + 0.6 * energy) * vclose;
 
-  body *= 0.96 + 0.08 * fbm2(vWorld.xz * 0.55 + vWorld.y * 0.09) * vclose;
+  // Micro roughness: fine surface articulation near camera.
+  body *= 0.95 + 0.10 * fbm2(vWorld.xz * 0.40 + vWorld.y * 0.07) * vclose;
 
-  body = mix(body, body * vec3(1.06, 1.02, 0.92), transient * 0.5);
+  body = mix(body, body * vec3(1.06, 1.02, 0.92), transient * 0.45);
 
   vec3 albedo = body;
 
@@ -352,40 +371,47 @@ void main(){
   float rough = clamp(bandRough - harmonic * 0.12 - ridge * 0.05 + transient * 0.04
     + slope * 0.08 - heightZone * 0.04, 0.34, 0.94);
 
-  // --- lighting: strong directional relief ---------------------------------
+  // --- lighting: dramatic directional relief --------------------------------
   vec3 l = normalize(uSunDir);
   float ndl = max(dot(n, l), 0.0);
 
-  float wrapped = max(0.0, (dot(n, l) + 0.22) / 1.22);
-  float key = mix(pow(wrapped, 2.0) * 0.50, ndl, 0.72);
+  float wrapped = max(0.0, (dot(n, l) + 0.18) / 1.18);
+  float key = mix(pow(wrapped, 2.4) * 0.42, ndl, 0.78);
 
-  float transluBase = mix(0.16, 0.28, pow(vBand, 0.6));
+  float transluBase = mix(0.14, 0.24, pow(vBand, 0.6));
   float translucency = pow(clamp(1.0 - abs(dot(n, v)), 0.0, 1.0), 2.2) * transluBase;
-  translucency *= 1.0 + energy * 0.30;
+  translucency *= 1.0 + energy * 0.25;
 
-  vec3 shadowTint = vec3(0.35, 0.52, 0.42);
+  vec3 shadowTint = vec3(0.28, 0.46, 0.36);
   vec3 lit = albedo * uSunColor;
   vec3 shade = albedo * shadowTint;
 
-  vec3 color = mix(shade * 0.09, lit, key) * uSunPower;
-  color += albedo * uSunColor * translucency * uSunPower * 0.30;
+  vec3 color = mix(shade * 0.065, lit, key) * uSunPower;
+  color += albedo * uSunColor * translucency * uSunPower * 0.28;
 
   float f0 = mix(0.036, 0.018, pow(vBand, 0.7));
   f0 *= 1.0 + energy * 0.12;
-  color += uSunColor * ggx(n, v, l, rough) * ndl * fresnel(max(dot(n, v), 0.0), f0) * 0.28;
+  color += uSunColor * ggx(n, v, l, rough) * ndl * fresnel(max(dot(n, v), 0.0), f0) * 0.32;
 
   float up = n.y * 0.5 + 0.5;
-  color += albedo * mix(uGroundColor, uSkyColor, up) * 1.1;
+  color += albedo * mix(uGroundColor, uSkyColor, up) * 0.9;
 
-  float cavity = 1.0 - slope * 0.60;
-  float valleyDark = smoothstep(12.0, 2.0, height) * 0.20;
-  color *= mix(1.0, cavity, 0.80) * (1.0 - valleyDark);
+  float cavity = 1.0 - slope * 0.65;
+  float valleyDark = smoothstep(14.0, 2.0, height) * 0.26;
+  color *= mix(1.0, cavity, 0.85) * (1.0 - valleyDark);
 
-  float crestIntensity = mix(0.08, 0.16, harmonic);
-  color += uSunColor * pow(ridge, 1.4) * energy * crestIntensity * smoothstep(0.35, 0.95, up);
+  // Golden edge lighting: mountain silhouettes catching warm light.
+  vec3 goldTint = vec3(1.0, 0.88, 0.58);
+  float rimLight = pow(clamp(1.0 - dot(n, v), 0.0, 1.0), 3.0);
+  float rimSun = max(0.0, dot(normalize(cross(n, v)), l)) * 0.5 + 0.5;
+  color += goldTint * uSunColor * rimLight * 0.14 * heightZone * uSunPower * rimSun;
 
-  float rimLight = pow(clamp(1.0 - dot(n, v), 0.0, 1.0), 3.5);
-  color += uSunColor * rimLight * 0.04 * heightZone * uSunPower;
+  // Golden path: ridge crests and mineral seams catching golden light.
+  float ridgeGlow = pow(ridge, 1.2) * energy;
+  float crestIntensity = mix(0.14, 0.30, harmonic);
+  color += goldTint * ridgeGlow * crestIntensity * smoothstep(0.25, 0.85, up);
+  float mineralSeam = pow(energy, 2.2) * ridge * 0.12;
+  color += goldTint * mineralSeam * heightZone * smoothstep(0.3, 0.8, up);
 
   // --- the playhead --------------------------------------------------------
   float delta = vSeconds - uPlayhead;
@@ -396,16 +422,34 @@ void main(){
   color = mix(color, uFogFar * 0.6, unheard * uAhead * 0.25);
   color += uSunColor * present * 0.06 * (0.3 + energy);
 
-  // --- atmosphere ----------------------------------------------------------
+  // --- atmosphere: layered depth -------------------------------------------
   float fog = 1.0 - exp(-pow(dist * uFogDensity, 2.0));
   float lowLying = exp(-height * 0.032);
   float valleyFog = exp(-height * 0.018) * 0.38;
-  fog = clamp(fog * mix(0.75, 1.0, lowLying) + valleyFog * fog, 0.0, 0.985);
+  fog = clamp(fog * mix(0.75, 1.0, lowLying) + valleyFog * fog, 0.0, 0.99);
   float fogDepth = smoothstep(0.0, 1.0, fog);
-  vec3 fogCol = mix(uFogNear, uFogFar, fogDepth);
-  vec3 valleyHaze = vec3(0.016, 0.026, 0.016);
-  vec3 groundMist = mix(valleyHaze, uFogNear, clamp(height * 0.022, 0.0, 1.0));
-  fogCol = mix(groundMist, fogCol, smoothstep(0.0, 24.0, height));
+
+  // Four-layer atmospheric perspective.
+  vec3 valleyHaze = vec3(0.014, 0.024, 0.014);
+  vec3 nearAtmo = mix(valleyHaze, uFogNear, clamp(height * 0.022, 0.0, 1.0));
+  vec3 midAtmo = uFogNear * vec3(1.05, 1.08, 1.0);
+  vec3 farAtmo = uFogFar;
+  vec3 distantSilhouette = uFogFar * vec3(0.7, 0.8, 0.75) + vec3(0.008, 0.012, 0.006);
+
+  float nearZone = smoothstep(0.0, 0.25, fogDepth);
+  float midZone = smoothstep(0.20, 0.55, fogDepth);
+  float farZone = smoothstep(0.50, 0.82, fogDepth);
+
+  vec3 fogCol = nearAtmo;
+  fogCol = mix(fogCol, midAtmo, nearZone);
+  fogCol = mix(fogCol, farAtmo, midZone);
+  fogCol = mix(fogCol, distantSilhouette, farZone);
+  fogCol = mix(fogCol, fogCol, smoothstep(0.0, 24.0, height));
+
+  // Warm golden horizon haze at extreme distance.
+  float horizonWarm = smoothstep(0.7, 0.95, fog) * smoothstep(5.0, 40.0, height);
+  fogCol += goldTint * 0.008 * horizonWarm;
+
   color = mix(color, fogCol, fog);
 
   gl_FragColor = vec4(color * uExposure * uContrast, 1.0);
@@ -569,27 +613,25 @@ void main(){
   vec3 d = normalize(vDir);
   float up = clamp(d.y, -1.0, 1.0);
 
-  vec3 wall = mix(uHorizonColor * 0.26, uHorizonColor, smoothstep(-0.55, 0.35, up));
+  vec3 wall = mix(uHorizonColor * 0.20, uHorizonColor, smoothstep(-0.55, 0.35, up));
 
   float horizonBand = exp(-pow((up - 0.06) * 5.5, 2.0));
-  wall += uHorizonGlow * horizonBand * 1.3;
+  wall += uHorizonGlow * horizonBand * 1.1;
 
   float horizonHaze = exp(-pow((up - 0.12) * 3.2, 2.0));
-  wall += uHorizonGlow * horizonHaze * 0.4;
+  wall += uHorizonGlow * horizonHaze * 0.35;
 
   float oculus = smoothstep(0.62, 0.93, up);
-  vec3 ceiling = uSkyColor * (1.0 + oculus * 3.0);
+  vec3 ceiling = uSkyColor * (0.8 + oculus * 2.5);
   vec3 color = mix(wall, ceiling, smoothstep(0.30, 0.80, up));
 
-  float ring = exp(-pow((up - 0.56) * 26.0, 2.0));
   float around = atan(d.z, d.x);
-  float lamps = pow(max(0.0, sin(around * 14.0)), 90.0);
-  color += uSunColor * ring * lamps * 1.2 * uSunPower;
 
-  float speck = pow(hash21(floor(d.xz * 1150.0 + d.y * 407.0)), 120.0);
-  color += vec3(0.80, 0.78, 0.74) * speck * (1.0 - oculus) * 0.22;
+  // Sparse subtle particles instead of dominant star field.
+  float speck = pow(hash21(floor(d.xz * 1150.0 + d.y * 407.0)), 160.0);
+  color += vec3(0.75, 0.78, 0.68) * speck * (1.0 - oculus) * 0.15;
 
-  float dustLayer = fbm2(vec2(around * 2.0, up * 3.0 + 0.5)) * 0.04;
+  float dustLayer = fbm2(vec2(around * 2.0, up * 3.0 + 0.5)) * 0.03;
   color += uHorizonGlow * dustLayer * (1.0 - smoothstep(0.3, 0.7, up));
 
   gl_FragColor = vec4(color * uExposure * uContrast, 1.0);

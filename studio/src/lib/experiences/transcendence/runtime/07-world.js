@@ -53,7 +53,7 @@ const ART = Object.assign({
   // These two reproduce the reference edition's sun vector exactly: a broad soft
   // key almost overhead, slightly forward, so the massifs cast relief toward the
   // viewer. A gallery, not a landscape at noon.
-  sunElevation: 64.32,     // degrees above the horizon
+  sunElevation: 31.5,      // degrees above the horizon — low raking light for mountain relief
   sunAzimuth: -146.31,     // degrees, 0 = straight down the time axis
   flightAltitude: 1,       // multiplies every shot's altitude
   worldStability: 0.7,     // 0 = fully reactive, 1 = completely static world
@@ -76,6 +76,37 @@ const PALETTES = {
 const TIME_SCALE = 26 * ART.timeScale;      // world units per second of recording
 const BAND_WIDTH = 420;                     // world units across the whole frequency axis
 let HEIGHT_SCALE = 30 * ART.heightScale;    // world units at full energy in the lowest band
+
+const _fract = x => x - Math.floor(x);
+const _hash21 = (px, py) => {
+  let x = _fract(px * 0.1031), y = _fract(py * 0.1031), z = x;
+  const d = x * (y + 33.33) + y * (z + 33.33) + z * (x + 33.33);
+  x += d; y += d; z += d;
+  return _fract((x + y) * z);
+};
+const _vnoise = (px, py) => {
+  const ix = Math.floor(px), iy = Math.floor(py);
+  const fx = px - ix, fy = py - iy;
+  const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const a = _hash21(ix, iy), b = _hash21(ix + 1, iy);
+  const c = _hash21(ix, iy + 1), d = _hash21(ix + 1, iy + 1);
+  return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+};
+const _ridged2 = (px, py) => {
+  let s = 0, a = 0.5;
+  for (let i = 0; i < 4; i++) {
+    const n = 1 - Math.abs(_vnoise(px, py) * 2 - 1);
+    s += a * n * n; px *= 2.07; py *= 2.07; a *= 0.5;
+  }
+  return s;
+};
+const _fbm2 = (px, py) => {
+  let s = 0, a = 0.5;
+  for (let i = 0; i < 5; i++) {
+    s += a * _vnoise(px, py); px *= 2.03; py *= 2.03; a *= 0.5;
+  }
+  return s;
+};
 
 class WorldRenderer {
   constructor(canvas, options) {
@@ -111,11 +142,9 @@ class WorldRenderer {
     this.scene = new T.Scene();
     this.camera = new T.PerspectiveCamera(46, 1, 0.6, this.profile.viewDistance * 1.7);
 
-    // One motivated source, low and raking, so the ranges cast their length
-    // across the world instead of being lit flat from overhead.
-    // A gallery, not a landscape at noon: the key is a broad soft source almost
-    // overhead through the oculus, slightly forward so the massifs cast their
-    // relief toward the viewer.
+    // Low raking light so the mountains cast long relief across the world.
+    // Forward and slightly left so the viewer sees the shadow side of the
+    // ranges — the massifs read as depth, not as flat lit faces.
     const palette = PALETTES[ART.palette] || PALETTES.alabaster;
     const elevation = ART.sunElevation * Math.PI / 180;
     const azimuth = ART.sunAzimuth * Math.PI / 180;
@@ -582,12 +611,6 @@ class WorldRenderer {
     }
   }
 
-  /* Ground height at a world position — a CPU upper bound of the shader's
-   * macro-form + spectral-surface layers. The macro forms are noise-driven
-   * in the shader and cannot be cheaply evaluated on the CPU, so this uses
-   * the maximum possible macro height (hero plateau) scaled by the local
-   * energy. The camera never clips through terrain; it may ride slightly
-   * higher over basins, which is acceptable. */
   heightAt(x, z) {
     const seconds = -z / TIME_SCALE;
     const band = clamp01(x / BAND_WIDTH + 0.5);
@@ -595,9 +618,17 @@ class WorldRenderer {
     const mass = mix(1.45, 0.48, Math.pow(band, 0.70));
     const energy = T.energy * mass;
     const hs = this.field.uHeightScale.value;
-    const macro = hs * 3.5 * mix(0.25, 1.0, energy);
-    const spectral = Math.pow(T.energy, this.field.uHeightGamma.value + 0.5) * hs * mass * 0.15;
-    const sRidge = T.ridge * T.energy * this.field.uRidgeScale.value * mix(0.6, 1.9, band) * 0.10;
+    const range1 = Math.pow(_ridged2(x * 0.0020 + 5.3, z * 0.0005 + 5.3), 1.6);
+    const range2 = Math.pow(_ridged2(x * 0.0008 + 19.1, z * 0.0012 + 19.1), 1.8) * 0.65;
+    const peakMod = _fbm2(x * 0.0007 + 2.7, z * 0.0005 + 2.7);
+    let mountain = Math.max(range1 * mix(0.4, 1.0, peakMod), range2);
+    mountain = Math.pow(Math.max(mountain, 0), 1.5);
+    const peakHeight = mountain * hs * 8.0;
+    const foot = Math.pow(_fbm2(x * 0.0030 + 41.0, z * 0.0015 + 41.0), 2) * hs * 0.5;
+    let macro = Math.max(peakHeight, foot);
+    macro *= mix(0.3, 1.0, energy);
+    const spectral = Math.pow(T.energy, this.field.uHeightGamma.value + 0.5) * hs * mass * 0.12;
+    const sRidge = T.ridge * T.energy * this.field.uRidgeScale.value * mix(0.6, 1.9, band) * 0.08;
     return Math.max(macro + spectral + sRidge, this.field.uBaseHeight.value);
   }
 

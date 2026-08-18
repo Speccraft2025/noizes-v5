@@ -127,8 +127,9 @@ vec4 terrainSampleLod(vec2 worldXZ, float lod){
  *
  * MACRO FORM vs SPECTRAL SURFACE — the two layers are architecturally
  * separate. Procedural noise fields generate the geological vocabulary:
- * plateaus, escarpments, elongated ridges, mounds. The recording's spectral
- * data articulates their surfaces — it does not determine the silhouette. */
+ * broad mountains, connected ridges, deep navigable valleys. The
+ * recording's spectral data articulates their surfaces — it does not
+ * determine the silhouette. */
 float terrainHeight(vec2 worldXZ, float lod){
   vec4 T = terrainSampleLod(worldXZ, lod);
   float band = clamp(worldXZ.x / uBandWidth + 0.5, 0.0, 1.0);
@@ -136,42 +137,30 @@ float terrainHeight(vec2 worldXZ, float lod){
   float energy = T.r * mass;
 
   // ── MACRO FORM LAYER ─────────────────────────────────────────────
-  // Three noise fields at different scales and orientations. Their
-  // intersections produce unique geological forms across the landscape.
-  float n1 = fbm2(worldXZ * vec2(0.0018, 0.0008) + 2.7);
-  float n2 = fbm2(worldXZ * vec2(0.0040, 0.0025) + 17.3);
-  float n3 = ridged2(worldXZ * vec2(0.0055, 0.0010) + 31.7);
+  float range1 = ridged2(worldXZ * vec2(0.0020, 0.0005) + 5.3);
+  range1 = pow(range1, 1.6);
 
-  // Hero massif / plateau: broad flat-topped form, the dominant class.
-  // A smoothstep band creates a mesa — steep flanks, level summit.
-  float heroMask = smoothstep(0.38, 0.52, n1) * (1.0 - smoothstep(0.58, 0.74, n1));
-  float hero = min(heroMask * uHeightScale * 5.0, uHeightScale * 3.5);
+  float range2 = ridged2(worldXZ * vec2(0.0008, 0.0012) + 19.1);
+  range2 = pow(range2, 1.8) * 0.65;
 
-  // Escarpment / wall: thin vertical face where n2 crosses an isoline.
-  float wallDist = abs(n2 - 0.47);
-  float wall = (1.0 - smoothstep(0.0, 0.038, wallDist)) * uHeightScale * 3.0;
+  float peakMod = fbm2(worldXZ * vec2(0.0007, 0.0005) + 2.7);
 
-  // Elongated ridge: ridged noise stretched along the time axis.
-  float longRidge = n3 * n3 * uHeightScale * 1.8;
+  float mountain = max(range1 * mix(0.4, 1.0, peakMod), range2);
+  mountain = pow(max(mountain, 0.0), 1.5);
+  float peakHeight = mountain * uHeightScale * 8.0;
 
-  // Smooth mound: rounded secondary from a different region of n2.
-  float moundMask = smoothstep(0.58, 0.78, n2);
-  float mound = moundMask * moundMask * uHeightScale * 1.4;
+  float foothills = fbm2(worldXZ * vec2(0.0030, 0.0015) + 41.0);
+  foothills = foothills * foothills * uHeightScale * 0.5;
 
-  // Union of forms — max produces clean intersections, not averaged mush.
-  float macro = max(hero, max(wall, max(longRidge, mound)));
-
-  // Song energy scales amplitude: louder sections build taller forms,
-  // but even quiet passages retain visible geology (0.25 floor).
-  macro *= mix(0.25, 1.0, energy);
+  float macro = max(peakHeight, foothills);
+  macro *= mix(0.3, 1.0, energy);
 
   // ── SPECTRAL SURFACE LAYER ───────────────────────────────────────
-  // The recording's detail becomes texture on the macro forms.
-  float hasMacro = smoothstep(1.0, 10.0, macro);
-  float spectral = pow(T.r, uHeightGamma + 0.5) * uHeightScale * mass * 0.15;
-  spectral *= mix(0.15, 1.0, hasMacro);
+  float hasMacro = smoothstep(2.0, 25.0, macro);
+  float spectral = pow(T.r, uHeightGamma + 0.5) * uHeightScale * mass * 0.12;
+  spectral *= mix(0.1, 1.0, hasMacro);
 
-  float sRidge = T.a * T.r * uRidgeScale * mix(0.6, 1.9, band) * 0.10;
+  float sRidge = T.a * T.r * uRidgeScale * mix(0.6, 1.9, band) * 0.08;
   sRidge *= mix(0.1, 1.0, hasMacro);
 
   float h = macro + spectral + sRidge;

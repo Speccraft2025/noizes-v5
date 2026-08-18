@@ -92,13 +92,13 @@ const SHOTS = {
     ease: 'inOutQuint', still: 0.68,
   },
   trough: {
-    from: { band: -0.145, alt: 5.0, lead: 9, look: 140, lookBand: -0.145, lookAlt: 4, fov: 42, roll: 0 },
-    to:   { band: -0.150, alt: 3.8, lead: 6, look: 110, lookBand: -0.150, lookAlt: 2.5, fov: 44, roll: 0.15 },
+    from: { band: -0.148, alt: 2.8, lead: 8, look: 130, lookBand: -0.148, lookAlt: 3, fov: 50, roll: 0 },
+    to:   { band: -0.150, alt: 2.2, lead: 5, look: 100, lookBand: -0.150, lookAlt: 1.5, fov: 54, roll: 0.1 },
     ease: 'inOutSine', still: 0.5,
   },
   rise: {
-    from: { band: -0.150, alt: 3.5, lead: 6, look: 120, lookBand: -0.150, lookAlt: 2.5, fov: 44, roll: 0.15 },
-    to:   { band: -0.10, alt: 78, lead: 36, look: 460, lookBand: -0.04, lookAlt: -14, fov: 52, roll: -0.4 },
+    from: { band: -0.150, alt: 2.5, lead: 6, look: 120, lookBand: -0.06, lookAlt: 8, fov: 46, roll: 0.15 },
+    to:   { band: 0.02, alt: 14, lead: 24, look: 340, lookBand: 0.04, lookAlt: -6, fov: 50, roll: -0.3 },
     ease: 'inOutQuint', still: 0.7,
   },
   highTraverse: {
@@ -133,8 +133,8 @@ const SHOTS = {
     ease: 'inOutSine', still: 0.5, specimen: true,
   },
   closePass: {
-    from: { band: -0.12, alt: 4.2, lead: 7, look: 95, lookBand: -0.18, lookAlt: 2.5, fov: 58, roll: 0.8 },
-    to:   { band: -0.22, alt: 3.0, lead: 4, look: 70, lookBand: -0.24, lookAlt: 1.5, fov: 64, roll: -0.6 },
+    from: { band: -0.22, alt: 3.0, lead: 7, look: 100, lookBand: -0.26, lookAlt: 3, fov: 62, roll: 0.7 },
+    to:   { band: -0.28, alt: 2.2, lead: 4, look: 70, lookBand: -0.30, lookAlt: 1.5, fov: 68, roll: -0.5 },
     ease: 'inOutCubic', still: 0.55,
   },
   monumentalWide: {
@@ -148,18 +148,18 @@ const SHOTS = {
     ease: 'inOutSine', still: 0.5,
   },
   valleyEnter: {
-    from: { band: -0.20, alt: 28, lead: 18, look: 280, lookBand: -0.14, lookAlt: 6, fov: 46, roll: 0.3 },
-    to:   { band: -0.14, alt: 5.5, lead: 8, look: 130, lookBand: -0.15, lookAlt: 3, fov: 42, roll: 0 },
+    from: { band: -0.22, alt: 34, lead: 20, look: 300, lookBand: -0.15, lookAlt: 4, fov: 46, roll: 0.3 },
+    to:   { band: -0.148, alt: 3.5, lead: 7, look: 120, lookBand: -0.15, lookAlt: 2, fov: 48, roll: 0 },
     ease: 'inOutQuint', still: 0.65,
   },
   crest: {
-    from: { band: -0.06, alt: 22, lead: 14, look: 200, lookBand: -0.08, lookAlt: -6, fov: 48, roll: 0.3 },
-    to:   { band: -0.04, alt: 30, lead: 20, look: 340, lookBand: -0.02, lookAlt: -18, fov: 52, roll: -0.2 },
+    from: { band: 0.02, alt: 10, lead: 16, look: 240, lookBand: 0.06, lookAlt: -10, fov: 48, roll: -0.2 },
+    to:   { band: 0.06, alt: 8, lead: 12, look: 200, lookBand: 0.10, lookAlt: -16, fov: 46, roll: 0.2 },
     ease: 'inOutCubic', still: 0.55,
   },
   reveal: {
-    from: { band: -0.04, alt: 30, lead: 20, look: 340, lookBand: -0.02, lookAlt: -18, fov: 52, roll: -0.2 },
-    to:   { band: 0.0, alt: 72, lead: 34, look: 480, lookBand: 0.02, lookAlt: -28, fov: 50, roll: 0.3 },
+    from: { band: 0.06, alt: 12, lead: 16, look: 300, lookBand: 0.10, lookAlt: -12, fov: 50, roll: 0.2 },
+    to:   { band: 0.12, alt: 45, lead: 30, look: 460, lookBand: 0.08, lookAlt: -24, fov: 52, roll: -0.15 },
     ease: 'outCubic', still: 0.6,
   },
 };

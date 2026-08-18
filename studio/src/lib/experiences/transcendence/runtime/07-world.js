@@ -627,8 +627,16 @@ class WorldRenderer {
     const foot = Math.pow(_fbm2(x * 0.0030 + 41.0, z * 0.0015 + 41.0), 2) * hs * 0.5;
     let macro = Math.max(peakHeight, foot);
     macro *= mix(0.3, 1.0, energy);
-    const spectral = Math.pow(T.energy, this.field.uHeightGamma.value + 0.5) * hs * mass * 0.12;
-    const sRidge = T.ridge * T.energy * this.field.uRidgeScale.value * mix(0.6, 1.9, band) * 0.08;
+    const vCenterX = -31;
+    const vDist = Math.abs(x - vCenterX);
+    const vEdge = _fbm2(z * 0.0012 + 77, x * 0.001 + 77) * 10;
+    const vEffDist = Math.max(0, vDist - Math.abs(vEdge));
+    const vFloor = 1 - smoothstep(10, 35, vEffDist);
+    const vWallZone = smoothstep(30, 55, vEffDist) * (1 - smoothstep(55, 130, vEffDist));
+    macro *= mix(1, 0.04, vFloor);
+    macro += vWallZone * hs * 3.5;
+    const spectral = Math.pow(T.energy, this.field.uHeightGamma.value + 0.5) * hs * mass * 0.12 * mix(1, 0.15, vFloor);
+    const sRidge = T.ridge * T.energy * this.field.uRidgeScale.value * mix(0.6, 1.9, band) * 0.08 * mix(1, 0.1, vFloor);
     return Math.max(macro + spectral + sRidge, this.field.uBaseHeight.value);
   }
 

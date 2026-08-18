@@ -31,7 +31,7 @@ export const DEFAULT_ART_DIRECTION = {
   terracing: true,
   terraceStep: 1.5,
   palette: 'alabaster',
-  sunElevation: 64.32,
+  sunElevation: 31.5,
   sunAzimuth: -146.31,
   flightAltitude: 1,
   worldStability: 0.7,

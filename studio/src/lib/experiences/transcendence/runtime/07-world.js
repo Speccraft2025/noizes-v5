@@ -49,7 +49,7 @@ const ART = Object.assign({
   timeScale: 1,            // multiplies world distance per second of recording
   terracing: true,         // contour steps on the lower slopes
   terraceStep: 1.5,        // world units per step
-  palette: 'alabaster',
+  palette: 'evergreen',
   // These two reproduce the reference edition's sun vector exactly: a broad soft
   // key almost overhead, slightly forward, so the massifs cast relief toward the
   // viewer. A gallery, not a landscape at noon.
@@ -68,6 +68,7 @@ const PALETTES = {
   alabaster: { sun: [1.000, 0.925, 0.845], sky: [0.070, 0.068, 0.066], horizon: [0.052, 0.044, 0.038], ground: [0.014, 0.013, 0.014], fogNear: [0.052, 0.046, 0.040], fogFar: [0.034, 0.032, 0.036], horizonGlow: [0.085, 0.065, 0.048] },
   oxide:     { sun: [1.000, 0.842, 0.700], sky: [0.082, 0.058, 0.046], horizon: [0.064, 0.036, 0.026], ground: [0.020, 0.012, 0.009], fogNear: [0.068, 0.042, 0.028], fogFar: [0.038, 0.028, 0.030], horizonGlow: [0.110, 0.058, 0.030] },
   frost:     { sun: [0.878, 0.936, 1.000], sky: [0.058, 0.066, 0.080], horizon: [0.038, 0.046, 0.060], ground: [0.011, 0.013, 0.017], fogNear: [0.040, 0.046, 0.056], fogFar: [0.028, 0.034, 0.050], horizonGlow: [0.055, 0.068, 0.095] },
+  evergreen: { sun: [1.000, 0.945, 0.825], sky: [0.032, 0.055, 0.038], horizon: [0.025, 0.042, 0.028], ground: [0.014, 0.022, 0.012], fogNear: [0.032, 0.048, 0.034], fogFar: [0.020, 0.034, 0.028], horizonGlow: [0.042, 0.065, 0.038] },
 };
 
 /* World scale. These are the only numbers that convert the recording into
@@ -679,22 +680,22 @@ class WorldRenderer {
     this.shared.uContrast.value = f.contrast;
 
     this.shared.uFogDensity.value = mix(0.0014, 0.0008, presence) * f.atmosphere;
-    this.sky.setRGB(mix(0.058, 0.088, medium), mix(0.056, 0.084, medium), mix(0.054, 0.080, medium));
-    this.horizon.setRGB(mix(0.042, 0.060, medium), mix(0.036, 0.050, medium), mix(0.032, 0.042, medium));
+    this.sky.setRGB(mix(0.025, 0.042, medium), mix(0.042, 0.068, medium), mix(0.028, 0.048, medium));
+    this.horizon.setRGB(mix(0.020, 0.034, medium), mix(0.034, 0.052, medium), mix(0.022, 0.036, medium));
     this.fogNear.setRGB(
+      mix(0.026, 0.040, medium) * f.atmosphere,
       mix(0.040, 0.058, medium) * f.atmosphere,
-      mix(0.036, 0.050, medium) * f.atmosphere,
-      mix(0.030, 0.040, medium) * f.atmosphere,
+      mix(0.028, 0.042, medium) * f.atmosphere,
     );
     this.fogFar.setRGB(
-      mix(0.024, 0.038, medium) * f.atmosphere,
-      mix(0.024, 0.038, medium) * f.atmosphere,
-      mix(0.028, 0.044, medium) * f.atmosphere,
+      mix(0.016, 0.026, medium) * f.atmosphere,
+      mix(0.028, 0.042, medium) * f.atmosphere,
+      mix(0.022, 0.036, medium) * f.atmosphere,
     );
     this.horizonGlow.setRGB(
-      mix(0.060, 0.095, medium) * f.atmosphere,
-      mix(0.046, 0.068, medium) * f.atmosphere,
-      mix(0.034, 0.048, medium) * f.atmosphere,
+      mix(0.034, 0.055, medium) * f.atmosphere,
+      mix(0.050, 0.078, medium) * f.atmosphere,
+      mix(0.030, 0.048, medium) * f.atmosphere,
     );
 
     // Terrain height and ridge scale are constant during playback — the macro
@@ -756,10 +757,10 @@ class WorldRenderer {
     const c = this.compositeMaterial.uniforms;
     c.uTime.value = t;
     c.uExposure.value = f.exposure;
-    c.uBloomStrength.value = this.profile.bloom ? mix(0.26, 0.38, medium) : 0;
+    c.uBloomStrength.value = this.profile.bloom ? mix(0.14, 0.22, medium) : 0;
     if (this.profile.bloom) {
-      this.brightMaterial.uniforms.uThreshold.value = mix(0.74, 0.64, medium);
-      this.brightMaterial.uniforms.uKnee.value = mix(0.24, 0.32, medium);
+      this.brightMaterial.uniforms.uThreshold.value = mix(0.84, 0.72, medium);
+      this.brightMaterial.uniforms.uKnee.value = mix(0.20, 0.28, medium);
     }
     c.uFocusDistance.value = f.focus;
     c.uFocusRange.value = f.focusRange * mix(0.8, 1.3, presence);

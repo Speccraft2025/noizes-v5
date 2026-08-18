@@ -128,19 +128,31 @@ float terrainHeight(vec2 worldXZ, float lod){
   vec4 T = terrainSampleLod(worldXZ, lod);
   float band = clamp(worldXZ.x / uBandWidth + 0.5, 0.0, 1.0);
 
+  // Compositional sculpting: a slow spatial noise field shapes the landscape
+  // into a small number of monumental masses separated by negative space.
+  // The field determines WHERE the recording's energy is allowed to build
+  // height — it never invents structure the recording does not contain.
+  float sculpt = fbm2(worldXZ * vec2(0.0055, 0.0018) + 7.3);
+  float sculptMod = smoothstep(0.30, 0.62, sculpt);
+
   // Low frequencies carry monumental geological mass; high frequencies are
   // light, sharp and delicate. This is a scale choice, not invented data.
   float mass = mix(1.45, 0.48, pow(band, 0.70));
-  float base = pow(T.r, uHeightGamma) * uHeightScale * mass;
 
-  // Ridge salience turns a harmonic series into distinct parallel ranges
-  // instead of one smooth swell.
-  base += T.a * T.r * uRidgeScale * mix(0.6, 1.9, band);
+  // Variable gamma: void regions flatten everything but the loudest moments
+  // into negative space; mass regions preserve dynamic range so the recording's
+  // concentrated power produces tall, dominant structures.
+  float gamma = mix(3.4, uHeightGamma + 0.3, sculptMod);
+  float base = pow(T.r, gamma) * uHeightScale * mass;
+  base *= mix(0.30, 1.55, sculptMod);
+
+  // Ridge as surface articulation on the masses, not structural.
+  base += T.a * T.r * uRidgeScale * mix(0.6, 1.9, band) * mix(0.10, 0.65, sculptMod);
 
   // Micro-relief is dropped as the cells coarsen; at the horizon it is pure
   // aliasing and nothing else. Harmonic ground is smooth and stratified,
-  // percussive ground is broken.
-  float detail = uDetailScale * (1.0 - smoothstep(0.10, 0.55, lod));
+  // percussive ground is broken. Suppressed in void regions.
+  float detail = uDetailScale * (1.0 - smoothstep(0.10, 0.55, lod)) * mix(0.25, 1.0, sculptMod);
   float strata = fbm2(worldXZ * 0.055 + vec2(0.0, band * 3.0)) - 0.5;
   float broken = ridged2(worldXZ * 0.21) - 0.5;
   base += mix(broken, strata, T.g) * detail * (0.25 + T.r * 1.5);

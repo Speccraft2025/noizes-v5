@@ -632,12 +632,8 @@ class WorldRenderer {
     const vDist = Math.abs(x - vCenterX);
     const vEdge = _fbm2(z * 0.0012 + 77, x * 0.001 + 77) * 10;
     const vEffDist = Math.max(0, vDist - Math.abs(vEdge));
-    const vWidth = Math.max(0.45, Math.min(1.2,
-      0.7 + 0.25 * Math.sin(z * 0.013 + 1.0) + 0.15 * Math.sin(z * 0.031 + 2.7)
-      + _fbm2(z * 0.004, 29) * 0.15
-    ));
-    const vFloor = 1 - smoothstep(10, 35 * vWidth, vEffDist);
-    const vWallZone = smoothstep(30 * vWidth, 55 * vWidth, vEffDist) * (1 - smoothstep(55 * vWidth, 130, vEffDist));
+    const vFloor = 1 - smoothstep(10, 35, vEffDist);
+    const vWallZone = smoothstep(30, 55, vEffDist) * (1 - smoothstep(55, 130, vEffDist));
     macro *= mix(1, 0.04, vFloor);
     macro += vWallZone * hs * 3.5;
     const spectral = Math.pow(T.energy, this.field.uHeightGamma.value + 0.5) * hs * mass * 0.12 * mix(1, 0.15, vFloor);

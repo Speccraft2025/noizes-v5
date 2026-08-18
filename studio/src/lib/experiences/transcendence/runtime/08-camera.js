@@ -121,28 +121,18 @@ class CameraDirector {
     this.target.applyTo(this._tgt);
 
     if (this.world) {
+      const px = this._pos.x, pz = this._pos.z;
+      let ground = this.world.heightAt(px, pz);
+
       const vx = this.position.x.velocity;
       const vz = this.position.z.velocity;
       const hSpeed = Math.sqrt(vx * vx + vz * vz);
-      const minClear = 1.6 + clamp01(hSpeed / 60) * 2.4;
-
-      const px = this._pos.x, pz = this._pos.z;
-      let maxGround = this.world.heightAt(px, pz);
-
-      if (hSpeed > 0.5) {
+      if (hSpeed > 1) {
         const nx = vx / hSpeed, nz = vz / hSpeed;
-        maxGround = Math.max(maxGround,
-          this.world.heightAt(px + nx * 5, pz + nz * 5),
-          this.world.heightAt(px + nx * 12, pz + nz * 12)
-        );
+        ground = Math.max(ground, this.world.heightAt(px + nx * 4, pz + nz * 4));
       }
 
-      maxGround = Math.max(maxGround,
-        this.world.heightAt(px + 5, pz),
-        this.world.heightAt(px - 5, pz)
-      );
-
-      const floor = maxGround + minClear;
+      const floor = ground + 1.2;
       if (this._pos.y < floor) {
         this._pos.y = floor;
         this.position.y.value = floor;

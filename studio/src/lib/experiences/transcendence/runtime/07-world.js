@@ -854,3 +854,279 @@ class WorldRenderer {
     this.renderer = null;
   }
 }
+
+class TerrainLandmarks {
+  constructor() {
+    this.landmarks = [];
+  }
+
+  scan(world, durationSeconds) {
+    this.landmarks = [];
+    const stepX = 15;
+    const stepZ = 25;
+    const xMin = -140, xMax = 140;
+    const zMax = 0, zMin = -durationSeconds * TIME_SCALE;
+
+    const grid = [];
+    const cols = Math.ceil((xMax - xMin) / stepX) + 1;
+    const rows = Math.ceil((zMax - zMin) / stepZ) + 1;
+
+    for (let r = 0; r < rows; r++) {
+      const row = [];
+      const z = zMax - r * stepZ;
+      for (let c = 0; c < cols; c++) {
+        const x = xMin + c * stepX;
+        row.push({ x, z, h: world.heightAt(x, z) });
+      }
+      grid.push(row);
+    }
+
+    const raw = [];
+    for (let r = 1; r < rows - 1; r++) {
+      for (let c = 1; c < cols - 1; c++) {
+        const cell = grid[r][c];
+        const neighbours = [
+          grid[r - 1][c - 1], grid[r - 1][c], grid[r - 1][c + 1],
+          grid[r][c - 1],                      grid[r][c + 1],
+          grid[r + 1][c - 1], grid[r + 1][c], grid[r + 1][c + 1],
+        ];
+        const isPeak = neighbours.every(n => cell.h > n.h) && cell.h > 15;
+        const isTrough = neighbours.every(n => cell.h < n.h);
+        if (!isPeak && !isTrough) continue;
+
+        let prominence;
+        if (isPeak) {
+          const minNeighbour = Math.min(...neighbours.map(n => n.h));
+          prominence = cell.h - minNeighbour;
+          if (prominence < 3) continue;
+        } else {
+          const maxNeighbour = Math.max(...neighbours.map(n => n.h));
+          prominence = maxNeighbour - cell.h;
+          if (prominence < 1) continue;
+        }
+        raw.push({
+          type: isPeak ? 'peak' : 'trough',
+          x: cell.x, z: cell.z, h: cell.h,
+          prominence,
+          seconds: -cell.z / TIME_SCALE,
+          band: cell.x / (BAND_WIDTH * 0.5),
+        });
+      }
+    }
+
+    const merged = this._merge(raw, stepX * 1.8, stepZ * 1.8);
+
+    const maxProm = { peak: 0, trough: 0 };
+    for (const lm of merged) {
+      if (lm.prominence > maxProm[lm.type]) maxProm[lm.type] = lm.prominence;
+    }
+    for (const lm of merged) {
+      lm.prominence = maxProm[lm.type] > 0 ? lm.prominence / maxProm[lm.type] : 0;
+    }
+
+    merged.sort((a, b) => a.seconds - b.seconds);
+
+    const counts = { peak: 0, trough: 0 };
+    for (const lm of merged) {
+      counts[lm.type]++;
+      const idx = String(counts[lm.type]).padStart(2, '0');
+      lm.id = `${lm.type}-${idx}`;
+      lm.position = [lm.x, lm.h, lm.z];
+      lm.entry = [lm.x, lm.h + (lm.type === 'peak' ? 20 : -5), lm.z + 60];
+      lm.exit = [lm.x, lm.h + (lm.type === 'peak' ? 20 : -5), lm.z - 60];
+      lm.contentSlots = [];
+    }
+
+    this.landmarks = merged;
+    return this;
+  }
+
+  _merge(raw, dx, dz) {
+    const used = new Set();
+    const out = [];
+    for (let i = 0; i < raw.length; i++) {
+      if (used.has(i)) continue;
+      let best = raw[i];
+      for (let j = i + 1; j < raw.length; j++) {
+        if (used.has(j)) continue;
+        if (raw[j].type !== best.type) continue;
+        if (Math.abs(raw[j].x - best.x) > dx || Math.abs(raw[j].z - best.z) > dz) continue;
+        used.add(j);
+        if ((best.type === 'peak' && raw[j].h > best.h) ||
+            (best.type === 'trough' && raw[j].h < best.h)) {
+          best = { ...raw[j], prominence: Math.max(best.prominence, raw[j].prominence) };
+        } else {
+          best.prominence = Math.max(best.prominence, raw[j].prominence);
+        }
+      }
+      out.push(best);
+    }
+    return out;
+  }
+
+  byType(type) { return this.landmarks.filter(l => l.type === type); }
+  byId(id) { return this.landmarks.find(l => l.id === id) || null; }
+  inRange(t0, t1) { return this.landmarks.filter(l => l.seconds >= t0 && l.seconds <= t1); }
+}
+
+class RouteBuilder {
+  constructor(landmarks, world) {
+    this.landmarks = landmarks;
+    this.world = world;
+    this.route = [];
+    this.shots = {};
+    this.sequence = [];
+  }
+
+  plan(t0, t1) {
+    const candidates = this.landmarks.inRange(t0, t1);
+    const all = candidates.slice().sort((a, b) => a.seconds - b.seconds);
+    if (all.length === 0) return this;
+
+    this.route = [];
+    let lastTime = t0;
+    const first = all[0];
+    let wantType = first.type;
+
+    for (const lm of all) {
+      if (lm.seconds < lastTime + 4) continue;
+      if (lm.type !== wantType) continue;
+      this.route.push(lm);
+      lastTime = lm.seconds;
+      wantType = lm.type === 'peak' ? 'trough' : 'peak';
+    }
+
+    if (this.route.length < 3) {
+      this.route = [];
+      lastTime = t0;
+      wantType = first.type;
+      for (const lm of all) {
+        if (lm.seconds < lastTime + 4) continue;
+        if (lm.type !== wantType) continue;
+        this.route.push(lm);
+        lastTime = lm.seconds;
+        wantType = lm.type === 'peak' ? 'trough' : 'peak';
+      }
+      if (this.route.length < 2) {
+        this.route = [];
+        lastTime = t0;
+        for (const lm of all) {
+          if (lm.seconds < lastTime + 4) continue;
+          if (this.route.length > 0 && lm.type === this.route[this.route.length - 1].type) continue;
+          this.route.push(lm);
+          lastTime = lm.seconds;
+        }
+      }
+    }
+
+    return this;
+  }
+
+  generateShots() {
+    this.shots = {};
+    for (let i = 0; i < this.route.length; i++) {
+      const lm = this.route[i];
+      const next = this.route[i + 1] || null;
+      const band = lm.band;
+
+      if (lm.type === 'peak') {
+        this.shots[`route-aerial-${lm.id}`] = {
+          from: { band: band - 0.05, alt: 60, lead: 30, look: 400, lookBand: band, lookAlt: -10, fov: 50, roll: 0.3 },
+          to:   { band: band + 0.05, alt: 40, lead: 20, look: 320, lookBand: band - 0.05, lookAlt: 4, fov: 46, roll: -0.3 },
+          ease: 'inOutCubic', still: 0.5,
+        };
+        if (next && next.type === 'trough') {
+          this.shots[`route-descend-${lm.id}`] = {
+            from: { band: band, alt: 40, lead: 20, look: 300, lookBand: next.band, lookAlt: 4, fov: 46, roll: -0.2 },
+            to:   { band: next.band, alt: 6, lead: 10, look: 160, lookBand: next.band, lookAlt: 3, fov: 50, roll: 0.1 },
+            ease: 'inOutQuint', still: 0.6,
+          };
+        }
+      } else {
+        this.shots[`route-trough-${lm.id}`] = {
+          from: { band: band - 0.01, alt: 4, lead: 8, look: 120, lookBand: band, lookAlt: 3, fov: 52, roll: 0 },
+          to:   { band: band + 0.01, alt: 3, lead: 5, look: 90, lookBand: band, lookAlt: 2, fov: 56, roll: 0.1 },
+          ease: 'inOutSine', still: 0.5,
+        };
+        if (next && next.type === 'peak') {
+          this.shots[`route-climb-${lm.id}`] = {
+            from: { band: band, alt: 4, lead: 8, look: 140, lookBand: next.band, lookAlt: 6, fov: 48, roll: 0.15 },
+            to:   { band: next.band, alt: 50, lead: 28, look: 380, lookBand: next.band, lookAlt: -8, fov: 50, roll: -0.3 },
+            ease: 'inOutQuint', still: 0.65,
+          };
+        }
+      }
+    }
+
+    if (this.route.length > 0) {
+      const last = this.route[this.route.length - 1];
+      this.shots['route-reveal'] = {
+        from: { band: last.band, alt: 50, lead: 30, look: 400, lookBand: 0, lookAlt: -20, fov: 52, roll: 0.2 },
+        to:   { band: 0, alt: 120, lead: 60, look: 600, lookBand: 0, lookAlt: -50, fov: 54, roll: -0.15 },
+        ease: 'outCubic', still: 0.55,
+      };
+    }
+
+    return this;
+  }
+
+  generateSequence() {
+    this.sequence = [];
+    if (this.route.length === 0) return this;
+
+    for (let i = 0; i < this.route.length; i++) {
+      const lm = this.route[i];
+      const next = this.route[i + 1] || null;
+
+      if (lm.type === 'peak') {
+        this.sequence.push({
+          time: lm.seconds,
+          id: `route-aerial-${lm.id}`,
+          shot: `route-aerial-${lm.id}`,
+          phase: 'route',
+          world: { air: 0.4, relief: 0.5, atmosphere: 0.3, ahead: 0.6 },
+        });
+        if (next && next.type === 'trough') {
+          const midTime = (lm.seconds + next.seconds) * 0.5;
+          this.sequence.push({
+            time: midTime,
+            id: `route-descend-${lm.id}`,
+            shot: `route-descend-${lm.id}`,
+            phase: 'route',
+            world: { air: 0.3, relief: 0.6, atmosphere: 0.4, ahead: 0.5 },
+          });
+        }
+      } else {
+        this.sequence.push({
+          time: lm.seconds,
+          id: `route-trough-${lm.id}`,
+          shot: `route-trough-${lm.id}`,
+          phase: 'route',
+          world: { air: 0.2, relief: 0.7, atmosphere: 0.5, ahead: 0.4 },
+        });
+        if (next && next.type === 'peak') {
+          const midTime = (lm.seconds + next.seconds) * 0.5;
+          this.sequence.push({
+            time: midTime,
+            id: `route-climb-${lm.id}`,
+            shot: `route-climb-${lm.id}`,
+            phase: 'route',
+            world: { air: 0.35, relief: 0.55, atmosphere: 0.35, ahead: 0.55 },
+          });
+        }
+      }
+    }
+
+    const last = this.route[this.route.length - 1];
+    this.sequence.push({
+      time: last.seconds + 4,
+      id: 'route-reveal',
+      shot: 'route-reveal',
+      phase: 'route',
+      world: { air: 0.5, relief: 0.4, atmosphere: 0.25, ahead: 0.7 },
+    });
+
+    this.sequence.sort((a, b) => a.time - b.time);
+    return this;
+  }
+}

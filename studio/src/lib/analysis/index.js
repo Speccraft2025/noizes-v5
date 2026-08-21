@@ -64,7 +64,7 @@ export async function sha256Hex(buffer) {
  * @param {Function}  [options.decode]   injectable decoder; defaults to OfflineAudioContext
  * @param {boolean}   [options.useWorker] run the DSP off the main thread when possible
  *
- * @returns {Promise<{ terrain: Blob, analysis: object,
+ * @returns {Promise<{ terrain: Blob, analysis: object, terrainData: { rgba: Uint8Array, width: number, height: number },
  *                     meta: { durationSeconds: number, frameRate: number, frames: number,
  *                             bands: number, sourceSha256: string|null, sourceBytes: number|null } }>}
  */
@@ -97,12 +97,13 @@ export async function analyseTrack(file, {
   };
 
   const runner = useWorker && canRunWorker() ? runInWorker : runInline;
-  const { terrainPng, height, analysis } = await runner(decoded.samples, analysisOptions, { report, signal });
+  const { terrainPng, terrainRGBA, width, height, analysis } = await runner(decoded.samples, analysisOptions, { report, signal });
   throwIfAborted(signal);
 
   return {
     terrain: new Blob([terrainPng], { type: 'image/png' }),
     analysis,
+    terrainData: { rgba: terrainRGBA, width, height },
     meta: {
       durationSeconds: analysis.duration_seconds,
       frameRate: analysis.frame_rate,

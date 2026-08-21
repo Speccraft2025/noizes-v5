@@ -183,8 +183,9 @@ class ExperienceDirector {
   _buildRoute() {
     if (!this.world) return;
     const scanner = new TerrainLandmarks().scan(this.world, TX.slice.end);
-    const t0 = 10, t1 = Math.min(TX.slice.end - 5, 50);
-    const builder = new RouteBuilder(scanner, this.world).plan(t0, t1).generateShots().generateSequence();
+    const t0 = 4, t1 = Math.max(TX.slice.end - 8, 30);
+    const builder = new RouteBuilder(scanner, this.world);
+    builder.planTraversal(t0, t1).generateTraversalShots().generateTraversalSequence();
     if (builder.sequence.length === 0) {
       this._note('route: no landmarks found in range');
       return;
@@ -193,7 +194,9 @@ class ExperienceDirector {
     this.cues = new CueEngine(builder.sequence, this.analysis);
     this.terrainLandmarks = scanner;
     this.routeBuilder = builder;
-    this._note(`route: ${builder.route.length} landmarks, ${builder.sequence.length} cues`);
+    const phases = builder.traversal ? builder.traversal.map(p => p.phase).join(' → ') : '';
+    this._note(`route: ${builder.route.length} landmarks, ${builder.sequence.length} cues`
+      + (phases ? ` [${phases}]` : ''));
   }
 
   /* ------------------------------------------------------- instrument layer */

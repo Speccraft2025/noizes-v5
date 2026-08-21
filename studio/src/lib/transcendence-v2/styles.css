@@ -1,0 +1,83 @@
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(199, 166, 90, 0.12), transparent 24%),
+    linear-gradient(180deg, #020705 0%, #07130d 44%, #030403 100%);
+}
+
+body {
+  color: #f2eddc;
+  font-family: "Baskerville", "Palatino Linotype", serif;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#app canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.txv2-ui { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+.txv2-header {
+  position: absolute; inset: 0 0 auto; display: flex; justify-content: space-between;
+  align-items: flex-start; padding: 28px 32px;
+  background: linear-gradient(180deg, rgba(2, 8, 5, 0.62), transparent);
+}
+.txv2-header div { display: grid; gap: 5px; }
+.txv2-kicker, .txv2-entry span {
+  color: #d8c48a; font: 10px/1.2 ui-monospace, "SFMono-Regular", monospace; letter-spacing: 0.28em;
+}
+.txv2-header strong { font-size: 17px; font-weight: 400; letter-spacing: 0.04em; }
+.txv2-control, .txv2-entry button {
+  pointer-events: auto; border: 1px solid rgba(225, 211, 166, 0.42); color: #f5eed7;
+  background: rgba(7, 18, 11, 0.44); backdrop-filter: blur(16px); cursor: pointer;
+}
+.txv2-control {
+  min-width: 72px; padding: 10px 14px; border-radius: 999px;
+  font: 11px/1 ui-monospace, "SFMono-Regular", monospace; text-transform: uppercase; letter-spacing: 0.12em;
+}
+.txv2-chapter {
+  position: absolute; left: 32px; bottom: 38px; color: rgba(242, 237, 220, 0.76);
+  font: 11px/1.2 ui-monospace, "SFMono-Regular", monospace; letter-spacing: 0.24em;
+}
+.txv2-chapter.is-changing { animation: chapter-in 1.4s ease both; }
+.txv2-progress {
+  position: absolute; right: 32px; bottom: 42px; width: min(28vw, 360px); height: 1px;
+  background: rgba(242, 237, 220, 0.2); overflow: hidden;
+}
+.txv2-progress i {
+  display: block; width: 100%; height: 100%; transform: scaleX(0); transform-origin: left; background: #d8c48a;
+}
+.txv2-entry {
+  position: absolute; inset: 0; display: grid; place-items: center; pointer-events: auto;
+  background: radial-gradient(circle at 50% 43%, rgba(106, 123, 60, 0.14), transparent 30%), rgba(2, 8, 5, 0.64);
+  backdrop-filter: blur(4px); transition: opacity 1.6s ease, visibility 1.6s;
+}
+.txv2-entry.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.txv2-entry-copy { text-align: center; animation: entry-rise 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.txv2-entry h1 {
+  margin: 18px 0 4px; font-size: clamp(56px, 9vw, 138px); font-weight: 400; line-height: 0.88;
+  letter-spacing: -0.045em; text-shadow: 0 10px 60px rgba(0, 0, 0, 0.55);
+}
+.txv2-entry p { margin: 14px 0 34px; color: rgba(242, 237, 220, 0.68); font-style: italic; }
+.txv2-entry button {
+  padding: 14px 25px; border-radius: 999px;
+  font: 11px/1 ui-monospace, "SFMono-Regular", monospace; letter-spacing: 0.12em; text-transform: uppercase;
+}
+
+@keyframes entry-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes chapter-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 700px) {
+  .txv2-header { padding: 20px; }
+  .txv2-chapter { left: 20px; bottom: 28px; }
+  .txv2-progress { right: 20px; bottom: 32px; width: 28vw; }
+  .txv2-entry h1 { font-size: clamp(48px, 18vw, 84px); }
+}

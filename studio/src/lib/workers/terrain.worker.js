@@ -33,8 +33,8 @@ self.onmessage = async (event) => {
     });
 
     self.postMessage(
-      { type: 'done', result: { terrainPng, width, height, analysis } },
-      [terrainPng.buffer],
+      { type: 'done', result: { terrainPng, terrainRGBA, width, height, analysis } },
+      [terrainPng.buffer, terrainRGBA.buffer],
     );
   } catch (error) {
     if (error?.name === 'AbortError') self.postMessage({ type: 'cancelled' });

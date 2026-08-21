@@ -53,6 +53,17 @@ export const ITINERARY = [
   { id: 'complete', phase: 'complete', shot: 'specimen', at: 1.000, snap: 0, terminal: true, world: { air: 0.25, relief: 0.9, atmosphere: 1, ahead: 0.4 } },
 ];
 
+const JOURNEY_WORLD = {
+  AERIAL_OVERVIEW: { air: 0.38, relief: 1.15, atmosphere: 1.05, ahead: 0.72 },
+  PEAK_TRAVERSE: { air: 0.62, relief: 1.12, atmosphere: 0.95, ahead: 0.52 },
+  DESCENT: { air: 0.74, relief: 1.1, atmosphere: 0.88, ahead: 0.44 },
+  TROUGH: { air: 0.82, relief: 1.08, atmosphere: 0.84, ahead: 0.34 },
+  ASCENT: { air: 0.76, relief: 1.14, atmosphere: 0.86, ahead: 0.42 },
+  CREST: { air: 0.68, relief: 1.12, atmosphere: 0.9, ahead: 0.46 },
+  REVEAL: { air: 0.58, relief: 1.06, atmosphere: 0.96, ahead: 0.56 },
+  SECOND_TROUGH: { air: 0.78, relief: 1.08, atmosphere: 0.88, ahead: 0.38 },
+};
+
 /** The minimum gap between consecutive cues, in seconds. */
 const MIN_GAP = 0.35;
 // Cue times are rounded to milliseconds, so a gap of exactly MIN_GAP can measure
@@ -141,10 +152,11 @@ const nearest = (values, target, tolerance) => {
  * @param {number}   [arcEndSeconds] defaults to the whole track
  * @returns {{ cues: Array, snapped: number, arcEnd: number }}
  */
-export function generateSequence({ analysis, landmarks = [], arcEndSeconds = null }) {
+export function generateSequence({ analysis, landmarks = [], arcEndSeconds = null, worldData = null }) {
   const duration = Number(analysis?.duration_seconds) || 0;
   if (!(duration > 0)) throw new Error('Cannot build an arc for a track with no measured duration.');
   const arcEnd = Math.min(duration, Number(arcEndSeconds) > 0 ? Number(arcEndSeconds) : duration);
+  if (worldData?.journey?.route?.length) return generateGeographicSequence({ analysis, landmarks, arcEnd, worldData });
 
   const anchors = measuredAnchors(analysis);
   const apex = apexTime(analysis, arcEnd * 0.88);
@@ -239,6 +251,55 @@ export function generateSequence({ analysis, landmarks = [], arcEndSeconds = nul
   snapped = ordered.filter((cue) => cue.anchored_to.startsWith('measured')).length;
   for (const cue of ordered) delete cue.priority;
   return { cues: ordered, snapped, arcEnd };
+}
+
+function generateGeographicSequence({ analysis, landmarks, arcEnd, worldData }) {
+  const cues = [];
+  for (const step of worldData.journey.route) {
+    cues.push({
+      time: Number(Math.min(arcEnd, step.time).toFixed(3)),
+      id: step.phase.toLowerCase(),
+      phase: step.phase.toLowerCase(),
+      shot: step.shot,
+      title: step.phase.replaceAll('_', ' '),
+      scene: geographicScene(step.phase),
+      world: { ...(JOURNEY_WORLD[step.phase] || JOURNEY_WORLD.REVEAL) },
+      anchored_to: step.landmark_id ? 'measured-geography' : 'proportional',
+      landmark_id: step.landmark_id || null,
+    });
+  }
+  attachLandmarks(cues, landmarks, Math.max(0, arcEnd - MIN_GAP));
+  cues.push({
+    time: Number(arcEnd.toFixed(3)),
+    id: 'complete',
+    phase: 'complete',
+    shot: 'REVEAL',
+    title: 'Complete',
+    scene: 'The flight resolves with the measured geography still intact below.',
+    world: { ...JOURNEY_WORLD.REVEAL },
+    anchored_to: 'arc-end',
+    terminal: true,
+  });
+  const ordered = enforceStrictOrder(cues, arcEnd);
+  return {
+    cues: ordered,
+    snapped: ordered.filter((cue) => cue.anchored_to === 'measured-geography').length,
+    arcEnd,
+  };
+}
+
+function geographicScene(phase) {
+  const scenes = {
+    AERIAL_OVERVIEW: 'A high downward-oblique read over connected geography: peaks, ridges, troughs and basins legible at once.',
+    PEAK_TRAVERSE: 'The route commits to a detected summit mass and travels its shoulder rather than abstract texture.',
+    DESCENT: 'The flight falls into actual terrain, surrendering altitude gradually rather than snapping toward the floor.',
+    TROUGH: 'Sustained low traversal in the trough, with enclosing relief on both sides.',
+    ASCENT: 'A climb out of the depression guided by the next viable passage in the measured landform.',
+    CREST: 'The route crests a rise and the local occlusion begins to clear.',
+    REVEAL: 'The adjacent geography opens up beyond the crest, with a new depression readable ahead.',
+    SECOND_TROUGH: 'The camera descends into the second trough without flattening or simplifying the terrain.',
+  };
+  return scenes[phase] || 'Measured geographic traversal.';
 }
 
 /**

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import JSZip from 'jszip';
 import { buildPackage } from './packager.js';
 import { __setTranscendenceSources } from './transcendence.js';
+import { __setTranscendenceV2Sources } from './transcendence-v2.js';
 import { createAudioAsset, createAudioVersion, createReleaseProject } from '../domain/release.js';
 import { analyseSamples, SAMPLE_RATE } from '../analysis/terrain.js';
 import { encodePng } from '../analysis/encodePng.js';
@@ -61,6 +62,12 @@ beforeAll(() => {
     template: fakeTemplate,
     styles: '#stage{background:#000}',
     runtime: 'const TX_RUNTIME_LOADED = true;',
+  });
+  __setTranscendenceV2Sources({
+    template: `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; media-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'"><title>/* TXV2_TITLE */</title><style>/* TXV2_CSS */</style></head><body><main id="app"></main><script>/* THREE_RUNTIME */</script><script>window.__TXV2_CONFIG=/* TXV2_CONFIG */;</script><script>/* TXV2_RUNTIME */</script></body></html>`,
+    styles: 'body{background:#102318}',
+    three: 'window.THREE={};',
+    runtime: 'window.__TXV2_READY__=true;',
   });
 });
 
@@ -127,6 +134,7 @@ async function transcendenceProject({ timedLines = [], landmarks = [], artDirect
         track_id: track.track_id,
         terrain: new Blob([png], { type: 'image/png' }),
         analysis,
+        terrain_data: { rgba: terrainRGBA, width, height },
         landmarks,
         art_direction: artDirection,
       },
@@ -139,6 +147,29 @@ async function transcendenceProject({ timedLines = [], landmarks = [], artDirect
 const unzip = async (result) => JSZip.loadAsync(await result.blob.arrayBuffer());
 
 describe('buildPackage — Transcendence', () => {
+  it('bakes V2 world, hierarchy, journey, and NED tracks for an arbitrary creator track', async () => {
+    const { input, track } = await transcendenceProject();
+    input.template = 'transcendence-v2';
+    input.transcendence.direction_tracks = { ahead: [{ time: 0, value: 0.9 }, { time: 8, value: 1.1 }] };
+    const result = await buildPackage(input);
+    const zip = await unzip(result);
+    const manifest = JSON.parse(await zip.file('manifest.json').async('string'));
+    const world = JSON.parse(await zip.file(`analysis/${track.track_id}.world.json`).async('string'));
+    const geography = JSON.parse(await zip.file(`analysis/${track.track_id}.landmarks.json`).async('string'));
+    const journey = JSON.parse(await zip.file(`timeline/${track.track_id}.journey.json`).async('string'));
+    const html = await zip.file('experience.html').async('string');
+
+    expect(result.filename).toBe('the_standing_wave_transcendence-v2_noizes.nz');
+    expect(manifest.experience).toMatchObject({ template: 'transcendence-v2', schema: '5.0.0' });
+    expect(world.schema).toBe('transcendence-world-v2');
+    expect(geography.counts).toMatchObject({ ranges: 4, troughs: 3 });
+    expect(journey.samples).toHaveLength(901);
+    expect(journey.sequence.at(-1)).toBe('SECOND_TROUGH');
+    expect(html).toContain(`tracks/01-${track.track_id}/audio/primary.mp3`);
+    expect(html).toContain('"directionTracks":{"ahead"');
+    expect(html).not.toContain('Ovacado');
+  });
+
   it('ships audio, terrain and analysis as separate hashed components', async () => {
     const { input, track, terrainSize } = await transcendenceProject();
     const result = await buildPackage(input);
@@ -147,9 +178,12 @@ describe('buildPackage — Transcendence', () => {
 
     const terrainPath = `analysis/${track.track_id}.terrain.png`;
     const analysisPath = `analysis/${track.track_id}.analysis.json`;
+    const worldPath = `analysis/${track.track_id}.world.json`;
+    const landmarksPath = `analysis/${track.track_id}.landmarks.json`;
+    const journeyPath = `timeline/${track.track_id}.journey.json`;
     const audioPath = `tracks/01-${track.track_id}/audio/primary.mp3`;
 
-    for (const path of [terrainPath, analysisPath, audioPath]) {
+    for (const path of [terrainPath, analysisPath, worldPath, landmarksPath, journeyPath, audioPath]) {
       expect(zip.file(path), `${path} missing from the zip`).toBeTruthy();
       const component = manifest.components.find((entry) => entry.path === path);
       expect(component, `${path} not declared in manifest.components`).toBeTruthy();
@@ -221,6 +255,9 @@ describe('buildPackage — Transcendence', () => {
       fallback_mode: 'essential',
       analysis: `analysis/${track.track_id}.analysis.json`,
       terrain: `analysis/${track.track_id}.terrain.png`,
+      world: `analysis/${track.track_id}.world.json`,
+      landmarks: `analysis/${track.track_id}.landmarks.json`,
+      journey: `timeline/${track.track_id}.journey.json`,
     });
     expect(manifest.experience.quality_profiles).toEqual(['cinematic', 'balanced', 'lite', 'essential']);
     expect(manifest.experience.authored_arc.track_id).toBe(track.track_id);
@@ -310,6 +347,7 @@ describe('buildPackage — Transcendence', () => {
     expect(config.artDirection).toMatchObject({ palette: 'oxide', heightScale: 1.6, terracing: false, sunElevation: 20 });
     expect(config.slice.start).toBe(0);
     expect(config.slice.end).toBeGreaterThan(0);
+    expect(config.worldData?.landmarks?.length ?? 0).toBeGreaterThan(0);
   });
 
   it('clamps out-of-range art direction rather than shipping it', async () => {
@@ -362,6 +400,12 @@ describe('buildPackage — Transcendence', () => {
     const { input } = await transcendenceProject();
     delete input.transcendence.analysis;
     await expect(buildPackage(input)).rejects.toThrow(/analysis/i);
+  });
+
+  it('refuses to build without raw terrain samples for world extraction', async () => {
+    const { input } = await transcendenceProject();
+    delete input.transcendence.terrain_data;
+    await expect(buildPackage(input)).rejects.toThrow(/raw terrain samples/i);
   });
 });
 

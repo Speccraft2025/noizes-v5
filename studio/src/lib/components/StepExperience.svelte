@@ -9,7 +9,7 @@
   import { CANONICAL_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE } from '$lib/utils/project.js';
   import { DEFAULT_ART_DIRECTION, PALETTES, QUALITY_PROFILES, normalizeArtDirection, buildTranscendenceHTML } from '$lib/utils/transcendence.js';
   import { VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
-  import { canDecodeAudio } from '$lib/analysis/index.js';
+  import { canDecodeAudio } from '$lib/analysis/decode.js';
   import { buildLyricLines, defaultLandmarks, landmarkProblems } from '$lib/experiences/transcendence/landmarks.js';
   import HelpTip from './HelpTip.svelte';
   import StepGuide from './StepGuide.svelte';
@@ -482,7 +482,8 @@
                 <p class="text-[11px]" style="color: var(--ink-muted);">No keyframes — using default choreography.</p>
               {:else}
                 <!-- Visual timeline bar -->
-                <div class="relative h-6 rounded-lg mb-2 cursor-pointer"
+                <button type="button" class="relative block w-full h-6 rounded-lg mb-2 cursor-pointer"
+                  aria-label={`Add a ${target.label.toLowerCase()} keyframe on the timeline`}
                   style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);"
                   on:click={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
@@ -495,7 +496,7 @@
                         background: rgba(123,92,240,{0.4 + kf.value * 0.3});"
                       title="{timecode(kf.time)} → {kf.value.toFixed(2)}"></div>
                   {/each}
-                </div>
+                </button>
                 <!-- Keyframe list -->
                 <div class="space-y-1.5">
                   {#each keyframes as kf, i}

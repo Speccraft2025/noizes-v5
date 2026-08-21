@@ -2,7 +2,6 @@ import JSZip from 'jszip';
 import { buildExperienceHTML, buildGuide } from './experience.js';
 import { CANONICAL_TEMPLATE, normalizeEdition, normalizeTemplate, TRANSCENDENCE_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE } from './project.js';
 import { buildTranscendenceHTML, TRANSCENDENCE_SCHEMA, QUALITY_PROFILES } from './transcendence.js';
-import { buildTranscendenceV2HTML, TRANSCENDENCE_V2_SCHEMA, TRANSCENDENCE_V2_QUALITY_PROFILES } from './transcendence-v2.js';
 import { describeFailures, validateTranscendence } from './validateTranscendence.js';
 import { buildWorldData } from '../experiences/transcendence/world-data.js';
 import { normalizeReleaseProject, orderedTracks } from '../domain/release.js';
@@ -10,6 +9,8 @@ import { normalizePlaybackSettings } from '../domain/playback.js';
 import { materializeJourney } from '../domain/journey.js';
 import { buildReleaseArchive, buildReleaseHistory } from '../domain/archive.js';
 import { estimatePackageSize } from '../domain/package-size.js';
+
+const TRANSCENDENCE_V2_SCHEMA = '5.0.0';
 
 const safeFilename = (value, fallback = 'asset') => {
   const cleaned = String(value || fallback).replace(/[^a-z0-9._-]/gi, '_').replace(/_+/g, '_');
@@ -311,7 +312,9 @@ export async function buildPackage(input) {
     }, terrainPath, { track_id: terrainTrack.track_id });
 
     const lyricRecord = project.lyrics.find((entry) => entry.track_id === terrainTrack.track_id);
-    const buildExperience = isTranscendenceV2Build ? buildTranscendenceV2HTML : buildTranscendenceHTML;
+    const buildExperience = isTranscendenceV2Build
+      ? (await import('./transcendence-v2.js')).buildTranscendenceV2HTML
+      : buildTranscendenceHTML;
     transcendenceBuild = await buildExperience({
       identity: {
         title: release.title,
@@ -430,7 +433,7 @@ export async function buildPackage(input) {
       reduced_motion_supported: true,
       navigation: 'music-directed',
       clock: 'audio.currentTime',
-      quality_profiles: isTranscendenceV2Build ? TRANSCENDENCE_V2_QUALITY_PROFILES : QUALITY_PROFILES,
+      quality_profiles: QUALITY_PROFILES,
       authored_arc: { track_id: terrainTrack.track_id, start_seconds: 0, end_seconds: transcendenceBuild.arcEnd },
     };
     onProgress({ percent: 66, stage: 'Writing the terrain' });

@@ -94,7 +94,7 @@
     class="scrim"
     role="presentation"
     use:portal
-    on:click={close}
+    on:click={(event) => event.target === event.currentTarget && close()}
   >
     <div
       class="sheet"
@@ -103,7 +103,6 @@
       aria-modal="true"
       aria-labelledby={titleId}
       tabindex="-1"
-      on:click|stopPropagation
     >
       <header class="sheet-head">
         <div>

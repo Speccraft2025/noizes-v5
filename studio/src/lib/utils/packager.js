@@ -1,8 +1,10 @@
 import JSZip from 'jszip';
 import { buildExperienceHTML, buildGuide } from './experience.js';
-import { CANONICAL_TEMPLATE, normalizeEdition, normalizeTemplate, TRANSCENDENCE_TEMPLATE } from './project.js';
+import { CANONICAL_TEMPLATE, normalizeEdition, normalizeTemplate, TRANSCENDENCE_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE } from './project.js';
 import { buildTranscendenceHTML, TRANSCENDENCE_SCHEMA, QUALITY_PROFILES } from './transcendence.js';
+import { buildTranscendenceV2HTML, TRANSCENDENCE_V2_SCHEMA, TRANSCENDENCE_V2_QUALITY_PROFILES } from './transcendence-v2.js';
 import { describeFailures, validateTranscendence } from './validateTranscendence.js';
+import { buildWorldData } from '../experiences/transcendence/world-data.js';
 import { normalizeReleaseProject, orderedTracks } from '../domain/release.js';
 import { normalizePlaybackSettings } from '../domain/playback.js';
 import { materializeJourney } from '../domain/journey.js';
@@ -49,7 +51,8 @@ export async function buildPackage(input) {
   // The creator's chosen experience system. Legacy and absent values still
   // collapse to ULTRA, so this cannot change what an existing draft produces.
   const template = normalizeTemplate(input.template ?? project.template);
-  const isTranscendenceBuild = template === TRANSCENDENCE_TEMPLATE;
+  const isTranscendenceV2Build = template === TRANSCENDENCE_V2_TEMPLATE;
+  const isTranscendenceBuild = template === TRANSCENDENCE_TEMPLATE || isTranscendenceV2Build;
   const transcendence = input.transcendence ?? {};
   const play = input.play ?? {};
   const extras = input.extras ?? project.extras ?? {};
@@ -280,6 +283,7 @@ export async function buildPackage(input) {
     if (!terrainTrack) throw new Error('Transcendence needs a track to analyse.');
     if (!transcendence.terrain) throw new Error('Transcendence needs an analysed terrain. Run the analysis in the Experience step.');
     if (!transcendence.analysis) throw new Error('Transcendence needs an analysis payload. Run the analysis in the Experience step.');
+    if (!transcendence.terrain_data) throw new Error('Transcendence needs raw terrain samples from the current analysis run.');
 
     const audioComponent = components.find((component) =>
       component.track_id === terrainTrack.track_id && component.type !== 'image' && component.path.includes('/audio/'));
@@ -287,6 +291,13 @@ export async function buildPackage(input) {
 
     const terrainPath = `analysis/${terrainTrack.track_id}.terrain.png`;
     const analysisPath = `analysis/${terrainTrack.track_id}.analysis.json`;
+    const worldPath = `analysis/${terrainTrack.track_id}.world.json`;
+    const landmarksPath = `analysis/${terrainTrack.track_id}.landmarks.json`;
+    const journeyPath = `timeline/${terrainTrack.track_id}.journey.json`;
+    const worldData = isTranscendenceV2Build ? null : buildWorldData({
+      terrainData: transcendence.terrain_data,
+      durationSeconds: transcendence.analysis.duration_seconds,
+    });
 
     await writeComponent({
       asset_id: `terrain-${terrainTrack.track_id}`,
@@ -300,7 +311,8 @@ export async function buildPackage(input) {
     }, terrainPath, { track_id: terrainTrack.track_id });
 
     const lyricRecord = project.lyrics.find((entry) => entry.track_id === terrainTrack.track_id);
-    transcendenceBuild = await buildTranscendenceHTML({
+    const buildExperience = isTranscendenceV2Build ? buildTranscendenceV2HTML : buildTranscendenceHTML;
+    transcendenceBuild = await buildExperience({
       identity: {
         title: release.title,
         artist: release.primary_artist,
@@ -318,6 +330,10 @@ export async function buildPackage(input) {
       timedLines: lyricRecord?.timed_lines ?? [],
       landmarks: transcendence.landmarks ?? [],
       artDirection: transcendence.art_direction ?? {},
+      directionTracks: transcendence.direction_tracks ?? {},
+      qualityProfile: transcendence.quality_preview ?? 'balanced',
+      terrainData: transcendence.terrain_data,
+      worldData,
       arcEndSeconds: transcendence.arc_end_seconds ?? null,
       creditLine: [terrainTrack.primary_artist, ...(terrainTrack.featured_artists ?? [])].filter(Boolean).join(' · '),
     });
@@ -335,6 +351,39 @@ export async function buildPackage(input) {
       filename: `${terrainTrack.track_id}.analysis.json`,
     }, analysisPath, { track_id: terrainTrack.track_id });
 
+    await writeComponent({
+      asset_id: `world-${terrainTrack.track_id}`,
+      scope: 'track',
+      type: 'world',
+      role: 'deterministic_world_data',
+      title: 'Deterministic world geography',
+      file: new Blob([JSON.stringify(transcendenceBuild.worldData, null, 2)], { type: 'application/json' }),
+      mime: 'application/json',
+      filename: `${terrainTrack.track_id}.world.json`,
+    }, worldPath, { track_id: terrainTrack.track_id });
+
+    await writeComponent({
+      asset_id: `landmarks-${terrainTrack.track_id}`,
+      scope: 'track',
+      type: 'landmarks',
+      role: 'terrain_landmarks',
+      title: 'Detected terrain landmarks',
+      file: new Blob([JSON.stringify(isTranscendenceV2Build ? transcendenceBuild.geography : (transcendenceBuild.worldData?.landmarks ?? []), null, 2)], { type: 'application/json' }),
+      mime: 'application/json',
+      filename: `${terrainTrack.track_id}.landmarks.json`,
+    }, landmarksPath, { track_id: terrainTrack.track_id });
+
+    await writeComponent({
+      asset_id: `journey-${terrainTrack.track_id}`,
+      scope: 'track',
+      type: 'journey',
+      role: 'geographic_route',
+      title: 'Geographic journey plan',
+      file: new Blob([JSON.stringify(isTranscendenceV2Build ? transcendenceBuild.journey : (transcendenceBuild.worldData?.journey ?? {}), null, 2)], { type: 'application/json' }),
+      mime: 'application/json',
+      filename: `${terrainTrack.track_id}.journey.json`,
+    }, journeyPath, { track_id: terrainTrack.track_id });
+
     const timelinePath = `timeline/${terrainTrack.track_id}.timeline.json`;
     const timeline = {
       schema_version: '2.0.0',
@@ -343,6 +392,9 @@ export async function buildPackage(input) {
       range_seconds: [0, transcendenceBuild.arcEnd],
       reconstruction: 'Reduce the authored sequence from the beginning at every frame: the state at t depends on nothing but t.',
       analysis: analysisPath,
+      world: worldPath,
+      landmarks: landmarksPath,
+      journey: journeyPath,
       determinism: 'Every particle position is f(seed, audioTime) with no integration and no frame history. Seeking, pausing, tab changes and replay reconstruct identical state.',
       authorship: {
         statement: 'The shape of this flight is a Noizes-authored itinerary; when each move happens is measured from this recording. Lyric landmark positions are creator-placed, not measured.',
@@ -364,7 +416,7 @@ export async function buildPackage(input) {
 
     transcendenceBuild.descriptor = {
       entry: 'experience.html',
-      schema: TRANSCENDENCE_SCHEMA,
+      schema: isTranscendenceV2Build ? TRANSCENDENCE_V2_SCHEMA : TRANSCENDENCE_SCHEMA,
       template,
       type: 'sonic-terrain',
       default_mode: 'world',
@@ -372,10 +424,13 @@ export async function buildPackage(input) {
       timeline: timelinePath,
       analysis: analysisPath,
       terrain: terrainPath,
+      world: worldPath,
+      landmarks: landmarksPath,
+      journey: journeyPath,
       reduced_motion_supported: true,
       navigation: 'music-directed',
       clock: 'audio.currentTime',
-      quality_profiles: QUALITY_PROFILES,
+      quality_profiles: isTranscendenceV2Build ? TRANSCENDENCE_V2_QUALITY_PROFILES : QUALITY_PROFILES,
       authored_arc: { track_id: terrainTrack.track_id, start_seconds: 0, end_seconds: transcendenceBuild.arcEnd },
     };
     onProgress({ percent: 66, stage: 'Writing the terrain' });
@@ -463,7 +518,7 @@ export async function buildPackage(input) {
   }
   if (transcendenceBuild) {
     Object.assign(experienceJson, transcendenceBuild.descriptor, {
-      schema_version: TRANSCENDENCE_SCHEMA,
+      schema_version: isTranscendenceV2Build ? TRANSCENDENCE_V2_SCHEMA : TRANSCENDENCE_SCHEMA,
       art_direction: transcendenceBuild.config.artDirection,
       interaction: {
         threshold: 'press and hold to lower the stylus; unlocks media and AudioContext in one gesture',

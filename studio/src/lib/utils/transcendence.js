@@ -17,11 +17,12 @@
 import { audioSourceTags, escapeHtml, escapeJsonPayload, fillMarkers, timecode } from '../experiences/transcendence/markers.js';
 import { buildLyricLines } from '../experiences/transcendence/landmarks.js';
 import { generateSequence } from '../experiences/transcendence/sequence.js';
+import { buildWorldData } from '../experiences/transcendence/world-data.js';
 
 export const TRANSCENDENCE_TEMPLATE = 'transcendence-v1';
 export const TRANSCENDENCE_SCHEMA = '4.0.0';
 export const QUALITY_PROFILES = ['cinematic', 'balanced', 'lite', 'essential'];
-export const PALETTES = ['alabaster', 'oxide', 'frost'];
+export const PALETTES = ['alabaster', 'oxide', 'frost', 'evergreen'];
 
 /** The art direction a creator can set, and its defaults. */
 export const DEFAULT_ART_DIRECTION = {
@@ -118,6 +119,8 @@ export function __setTranscendenceSources(sources) {
  * @param {Array}  input.timedLines       lyric lines from the Lyrics step
  * @param {Array}  input.landmarks        creator placements
  * @param {object} input.artDirection
+ * @param {object} [input.terrainData]    { rgba, width, height } from analysis stage
+ * @param {object} [input.worldData]      prebuilt deterministic geography data
  * @param {number} [input.arcEndSeconds]  defaults to the whole track
  * @param {object} [input.credits]        { line } for the sheet header
  * @param {boolean} [input.debug]         include the cue inspector
@@ -128,7 +131,7 @@ export async function buildTranscendenceHTML(input) {
   const { template, styles, runtime } = await loadTranscendenceSources();
   const {
     identity = {}, edition = {}, analysis, track = {}, timedLines = [], landmarks = [],
-    artDirection = {}, arcEndSeconds = null, creditLine = '', debug = false,
+    artDirection = {}, terrainData = null, worldData = null, arcEndSeconds = null, creditLine = '', debug = false,
   } = input;
 
   if (!analysis) throw new Error('Transcendence needs an analysis payload. Run the analysis first.');
@@ -144,11 +147,13 @@ export async function buildTranscendenceHTML(input) {
   // and authored data meet.
   const lyrics = buildLyricLines({ timedLines, landmarks, bandCentresHz, durationSeconds: duration });
   const shipped = { ...analysis, lyrics };
+  const geography = worldData ?? (terrainData ? buildWorldData({ terrainData, durationSeconds: duration }) : null);
 
   const { cues, snapped, arcEnd } = generateSequence({
     analysis: shipped,
     landmarks: landmarks.length ? landmarks : lyrics.map((line, index) => ({ line: index, time: line.aligned_seconds, band: line.terrain_band })),
     arcEndSeconds,
+    worldData: geography,
   });
 
   const config = {
@@ -163,6 +168,7 @@ export async function buildTranscendenceHTML(input) {
       blueNoise: track.blueNoise || '',
     },
     artDirection: art,
+    worldData: geography,
   };
 
   const title = identity.title || track.title || 'Untitled';
@@ -194,7 +200,7 @@ export async function buildTranscendenceHTML(input) {
     audioSources: audioSourceTags([{ src: track.audio.src, type: track.audio.mime || 'audio/mpeg' }]),
   });
 
-  return { html, sequence: cues, analysis: shipped, config, arcEnd, snapped };
+  return { html, sequence: cues, analysis: shipped, config, arcEnd, snapped, worldData: geography };
 }
 
 /**

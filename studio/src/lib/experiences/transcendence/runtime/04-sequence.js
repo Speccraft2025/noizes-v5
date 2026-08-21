@@ -39,6 +39,46 @@ const SEQUENCE = (() => {
  * composed to work as a photograph.
  */
 const SHOTS = {
+  AERIAL: {
+    from: { band: -0.06, alt: 260, lead: 180, look: 860, lookBand: -0.02, lookAlt: -140, fov: 40, roll: 0.2 },
+    to:   { band: 0.04, alt: 210, lead: 120, look: 720, lookBand: 0.04, lookAlt: -90, fov: 43, roll: 0 },
+    ease: 'inOutSine', still: 0.42,
+  },
+  APPROACH: {
+    from: { band: 0.03, alt: 36, lead: 18, look: 280, lookBand: 0.02, lookAlt: 6, fov: 44, roll: 0.1 },
+    to:   { band: 0.02, alt: 10, lead: 10, look: 170, lookBand: 0.02, lookAlt: 5, fov: 40, roll: 0 },
+    ease: 'inOutQuint', still: 0.65,
+  },
+  PEAK: {
+    from: { band: -0.02, alt: 74, lead: 34, look: 460, lookBand: 0.02, lookAlt: -14, fov: 44, roll: -0.2 },
+    to:   { band: 0.02, alt: 58, lead: 26, look: 360, lookBand: 0.00, lookAlt: -4, fov: 46, roll: 0.1 },
+    ease: 'inOutCubic', still: 0.5,
+  },
+  DESCEND: {
+    from: { band: 0.0, alt: 50, lead: 22, look: 300, lookBand: 0.01, lookAlt: 2, fov: 45, roll: 0.1 },
+    to:   { band: 0.02, alt: 12, lead: 10, look: 180, lookBand: 0.02, lookAlt: 3, fov: 42, roll: 0 },
+    ease: 'inOutQuint', still: 0.6,
+  },
+  TROUGH: {
+    from: { band: 0.02, alt: 4.8, lead: 7, look: 110, lookBand: 0.02, lookAlt: 2.8, fov: 52, roll: 0 },
+    to:   { band: 0.02, alt: 3.4, lead: 5, look: 82, lookBand: 0.02, lookAlt: 1.8, fov: 56, roll: 0.05 },
+    ease: 'inOutSine', still: 0.5,
+  },
+  CLIMB: {
+    from: { band: 0.02, alt: 5, lead: 8, look: 130, lookBand: 0.06, lookAlt: 6, fov: 46, roll: 0.15 },
+    to:   { band: 0.08, alt: 28, lead: 18, look: 280, lookBand: 0.10, lookAlt: -2, fov: 47, roll: -0.15 },
+    ease: 'inOutQuint', still: 0.66,
+  },
+  CREST: {
+    from: { band: 0.08, alt: 16, lead: 12, look: 220, lookBand: 0.10, lookAlt: -8, fov: 47, roll: -0.1 },
+    to:   { band: 0.10, alt: 12, lead: 10, look: 180, lookBand: 0.12, lookAlt: -12, fov: 45, roll: 0.15 },
+    ease: 'inOutCubic', still: 0.55,
+  },
+  REVEAL: {
+    from: { band: 0.10, alt: 18, lead: 16, look: 260, lookBand: 0.12, lookAlt: -12, fov: 48, roll: 0.15 },
+    to:   { band: 0.12, alt: 52, lead: 30, look: 460, lookBand: 0.08, lookAlt: -20, fov: 50, roll: -0.1 },
+    ease: 'outCubic', still: 0.58,
+  },
   atlas: {
     from: { band: -0.05, alt: 210, lead: 120, look: 620, lookBand: 0.0, lookAlt: -60, fov: 52, roll: 0 },
     to:   { band: -0.02, alt: 176, lead: 90, look: 560, lookBand: 0.02, lookAlt: -50, fov: 50, roll: -0.3 },

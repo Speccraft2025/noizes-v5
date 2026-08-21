@@ -6,7 +6,7 @@
   // measures the recording and lets the creator direct the world built from it.
   import { onDestroy } from 'svelte';
   import { releaseProject, template, transcendence } from '$lib/stores/package.js';
-  import { CANONICAL_TEMPLATE, TRANSCENDENCE_TEMPLATE } from '$lib/utils/project.js';
+  import { CANONICAL_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE } from '$lib/utils/project.js';
   import { DEFAULT_ART_DIRECTION, PALETTES, QUALITY_PROFILES, normalizeArtDirection, buildTranscendenceHTML } from '$lib/utils/transcendence.js';
   import { VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
   import { canDecodeAudio } from '$lib/analysis/index.js';
@@ -52,7 +52,7 @@
 
   function chooseSystem(next) {
     template.set(next);
-    if (next === TRANSCENDENCE_TEMPLATE && !$transcendence.track_id && selectedTrackId) {
+    if (next === TRANSCENDENCE_V2_TEMPLATE && !$transcendence.track_id && selectedTrackId) {
       update({ track_id: selectedTrackId });
     }
   }
@@ -92,6 +92,7 @@
       update({
         terrain: result.terrain,
         analysis: result.analysis,
+        terrain_data: result.terrainData,
         track_id: selectedTrackId,
         // Placements from a previous analysis of a different track would be
         // meaningless; a re-analysis of the same track keeps them.
@@ -176,7 +177,10 @@
     try {
       const audioPath = 'preview/audio';
       const terrainPath = 'preview/terrain.png';
-      const result = await buildTranscendenceHTML({
+      const buildPreview = $template === TRANSCENDENCE_V2_TEMPLATE
+        ? (await import('$lib/utils/transcendence-v2.js')).buildTranscendenceV2HTML
+        : buildTranscendenceHTML;
+      const result = await buildPreview({
         identity: { title: selectedTrack?.title || 'Preview', artist: selectedTrack?.primary_artist || '', release_id: 'ned-preview' },
         edition: {},
         analysis,
@@ -190,6 +194,9 @@
         timedLines,
         landmarks,
         artDirection: art,
+        terrainData: $transcendence.terrain_data,
+        directionTracks,
+        qualityProfile: $transcendence.quality_preview,
       });
       const [audioBytes, terrainBytes] = await Promise.all([
         audioAsset.file.arrayBuffer(),
@@ -257,17 +264,17 @@
       </button>
 
       <button type="button" class="text-left rounded-2xl p-4 transition-all duration-200"
-        style={$template === TRANSCENDENCE_TEMPLATE
+        style={$template === TRANSCENDENCE_V2_TEMPLATE
           ? 'background: rgba(123,92,240,0.10); border: 1px solid rgba(123,92,240,0.55);'
           : 'background: rgba(255,255,255,0.02); border: 1px solid var(--border-dim);'}
-        on:click={() => chooseSystem(TRANSCENDENCE_TEMPLATE)}>
+        on:click={() => chooseSystem(TRANSCENDENCE_V2_TEMPLATE)}>
         <div class="flex items-center justify-between mb-2">
-          <span class="text-sm font-black text-white">TRANSCENDENCE</span>
-          {#if $template === TRANSCENDENCE_TEMPLATE}<span class="text-[10px] font-bold" style="color:#7B5CF0;">SELECTED</span>{/if}
+          <span class="text-sm font-black text-white">TRANSCENDENCE V2</span>
+          {#if $template === TRANSCENDENCE_V2_TEMPLATE}<span class="text-[10px] font-bold" style="color:#7B5CF0;">SELECTED</span>{/if}
         </div>
         <p class="text-xs leading-relaxed" style="color: var(--ink-secondary);">
-          A landscape computed from one recording and flown through in sync with it.
-          Elevation is the track's own energy, ridges its harmonics. Nothing is modelled.
+          A continuous mountain world whose surface detail is articulated by one recording,
+          with an automatically detected geographic journey and comfort-directed flight.
         </p>
       </button>
     </div>

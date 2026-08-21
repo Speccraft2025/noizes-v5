@@ -29,7 +29,7 @@ describe('Studio workflow contract', () => {
     const experienceStep = readFileSync(new URL('../../../lib/components/StepExperience.svelte', import.meta.url), 'utf8');
     expect(page).toContain('<StepExperience />');
     expect(experienceStep).toContain('CANONICAL_TEMPLATE');
-    expect(experienceStep).toContain('TRANSCENDENCE_TEMPLATE');
+    expect(experienceStep).toContain('TRANSCENDENCE_V2_TEMPLATE');
     // ULTRA's own authoring is unchanged: the Guide editor still renders under it.
     expect(experienceStep).toContain('<StepGuide />');
   });

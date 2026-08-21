@@ -1,9 +1,11 @@
 export const CANONICAL_TEMPLATE = 'ultra-v2';
 export const TRANSCENDENCE_TEMPLATE = 'transcendence-v1';
+export const TRANSCENDENCE_V2_TEMPLATE = 'transcendence-v2';
+export const TRANSCENDENCE_V2_EXPERIMENTAL = TRANSCENDENCE_V2_TEMPLATE;
 export const STANDARD_EDITION_TYPE = 'fixed';
 
 /** The experience systems a creator may choose between. ULTRA leads: it is the default. */
-export const EXPERIENCE_SYSTEMS = [CANONICAL_TEMPLATE, TRANSCENDENCE_TEMPLATE];
+export const EXPERIENCE_SYSTEMS = [CANONICAL_TEMPLATE, TRANSCENDENCE_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE];
 
 // Values from templates that no longer exist. They collapse to ULTRA rather than
 // erroring, so an old draft still opens.
@@ -16,6 +18,7 @@ export function normalizeTemplate(value) {
 }
 
 export const isTranscendence = (value) => normalizeTemplate(value) === TRANSCENDENCE_TEMPLATE;
+export const isTranscendenceV2Experimental = (value) => value === TRANSCENDENCE_V2_TEMPLATE;
 
 export function normalizeEdition(value = {}) {
   const legacyName = value.edition_name || (value.edition_type && value.edition_type !== 'Open Edition' ? value.edition_type : 'First Edition');

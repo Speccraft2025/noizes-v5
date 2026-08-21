@@ -15,7 +15,7 @@ const now = () => (typeof performance !== 'undefined' ? performance.now() : Date
  * @param {() => boolean} [hooks.shouldAbort]   polled between chunks
  * @param {number} [hooks.yieldEveryMs]         0 disables event-loop yielding
  *
- * @returns {Promise<{ terrainPng: Uint8Array, width: number, height: number, analysis: object }>}
+ * @returns {Promise<{ terrainPng: Uint8Array, terrainRGBA: Uint8Array, width: number, height: number, analysis: object }>}
  */
 export async function runPipeline(samples, options, { onStage, shouldAbort = () => false, yieldEveryMs = 50 } = {}) {
   const run = analyseSamplesChunked(samples, options);
@@ -38,7 +38,7 @@ export async function runPipeline(samples, options, { onStage, shouldAbort = () 
   onStage?.('encode', 1);
   if (shouldAbort()) throw abortError();
 
-  return { terrainPng, width, height, analysis };
+  return { terrainPng, terrainRGBA, width, height, analysis };
 }
 
 function abortError() {

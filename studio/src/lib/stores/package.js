@@ -229,7 +229,7 @@ export const assets = lens(
   }
 );
 
-// Which experience system the package uses: 'ultra-v2' or 'transcendence-v1'.
+// Which experience system the package uses: ULTRA or a Transcendence generation.
 // Legacy draft values are normalized during compilation.
 export const template = writable('ultra-v2');
 
@@ -243,6 +243,7 @@ export const transcendence = writable({
   track_id: '',
   terrain: null,          // Blob, session only
   analysis: null,         // object, session only
+  terrain_data: null,     // { rgba, width, height }, session only
   landmarks: [],
   art_direction: {},
   direction_tracks: {},

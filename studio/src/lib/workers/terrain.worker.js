@@ -10,6 +10,7 @@
 // which is what actually frees the memory.
 
 import { runPipeline } from '../analysis/pipeline.js';
+import { terrainWorkerCompletion } from '../analysis/workerProtocol.js';
 
 let cancelled = false;
 
@@ -25,17 +26,15 @@ self.onmessage = async (event) => {
   cancelled = false;
 
   try {
-    const { terrainPng, width, height, analysis } = await runPipeline(message.samples, message.options, {
+    const result = await runPipeline(message.samples, message.options, {
       onStage: (stage, progress) => self.postMessage({ type: 'progress', stage, progress }),
       shouldAbort: () => cancelled,
       // Nothing else runs in this scope, so there is no event loop to be polite to.
       yieldEveryMs: 0,
     });
 
-    self.postMessage(
-      { type: 'done', result: { terrainPng, terrainRGBA, width, height, analysis } },
-      [terrainPng.buffer, terrainRGBA.buffer],
-    );
+    const completion = terrainWorkerCompletion(result);
+    self.postMessage(completion.message, completion.transfer);
   } catch (error) {
     if (error?.name === 'AbortError') self.postMessage({ type: 'cancelled' });
     else self.postMessage({ type: 'error', message: error?.message || String(error) });

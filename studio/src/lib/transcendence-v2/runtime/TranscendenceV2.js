@@ -15,7 +15,7 @@ export class TranscendenceV2 {
     this.raf = 0;
     this.disposed = false;
     this.started = false;
-    this.lastChapter = '';
+    this.lastLyricIndex = -1;
     this.reviewMode = false;
     this.recordMode = false;
     this.recordingStopped = false;
@@ -96,15 +96,12 @@ export class TranscendenceV2 {
   mountExperienceUi() {
     const title = escapeText(this.config.title || 'Untitled');
     const artist = escapeText(this.config.artist || '');
-    const label = escapeText(this.config.label || 'TRANSCENDENCE V2');
+    this.lyrics = Array.isArray(this.config.timedLyrics) ? this.config.timedLyrics : [];
     this.ui = document.createElement('section');
     this.ui.className = 'txv2-ui';
     this.ui.innerHTML = `
-      <header class="txv2-header">
-        <div><span class="txv2-kicker">${label}</span><strong>${title}</strong></div>
-        <button class="txv2-control" type="button" aria-label="Play or pause">Pause</button>
-      </header>
-      <div class="txv2-chapter" aria-live="polite">AERIAL OVERVIEW</div>
+      <button class="txv2-control" type="button" aria-label="Play or pause">Pause</button>
+      <div class="txv2-lyrics is-empty" aria-live="polite" aria-atomic="true"></div>
       <div class="txv2-progress"><i></i></div>
       <div class="txv2-entry">
         <div class="txv2-entry-copy">
@@ -118,7 +115,7 @@ export class TranscendenceV2 {
     this.entry = this.ui.querySelector('.txv2-entry');
     this.entryButton = this.entry.querySelector('button');
     this.playButton = this.ui.querySelector('.txv2-control');
-    this.chapterLabel = this.ui.querySelector('.txv2-chapter');
+    this.lyricLabel = this.ui.querySelector('.txv2-lyrics');
     this.progressFill = this.ui.querySelector('.txv2-progress i');
     this.entryButton.addEventListener('click', () => this.begin());
     this.playButton.addEventListener('click', () => this.togglePlayback());
@@ -190,17 +187,20 @@ export class TranscendenceV2 {
     this.playButton.setAttribute('aria-label', playing ? 'Pause experience' : 'Play experience');
   }
 
-  updateUi(frame, progress) {
+  updateUi(progress, seconds) {
     if (!this.ui) return;
-    const chapter = frame.chapter.replaceAll('_', ' ');
-    if (chapter !== this.lastChapter) {
-      this.chapterLabel.textContent = chapter;
-      this.chapterLabel.classList.remove('is-changing');
-      void this.chapterLabel.offsetWidth;
-      this.chapterLabel.classList.add('is-changing');
-      this.lastChapter = chapter;
-    }
+    const lyricIndex = activeLyricIndex(this.lyrics, seconds);
+    if (lyricIndex !== this.lastLyricIndex) this.showLyric(lyricIndex);
     this.progressFill.style.transform = `scaleX(${progress})`;
+  }
+
+  showLyric(index) {
+    this.lastLyricIndex = index;
+    this.lyricLabel.textContent = index >= 0 ? this.lyrics[index].text : '';
+    this.lyricLabel.classList.toggle('is-empty', index < 0);
+    this.lyricLabel.classList.remove('is-changing');
+    void this.lyricLabel.offsetWidth;
+    if (index >= 0) this.lyricLabel.classList.add('is-changing');
   }
 
   directionAt(name, seconds, fallback = 1) {
@@ -291,7 +291,7 @@ export class TranscendenceV2 {
         atmosphere: this.directionAt('atmosphere', seconds, 1),
       });
       this.director.update(frame, delta);
-      this.updateUi(frame, progress);
+      this.updateUi(progress, seconds);
     }
 
     this.renderState.stars.rotation.y += delta * 0.003;
@@ -329,6 +329,15 @@ function escapeText(value) {
   const node = document.createElement('span');
   node.textContent = String(value);
   return node.innerHTML;
+}
+
+function activeLyricIndex(lyrics, seconds) {
+  let active = -1;
+  for (let index = 0; index < lyrics.length; index += 1) {
+    if (Number(lyrics[index].at) > seconds) break;
+    active = index;
+  }
+  return active;
 }
 
 function recordingName(value) {

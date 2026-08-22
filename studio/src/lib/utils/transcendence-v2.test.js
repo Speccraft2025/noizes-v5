@@ -60,12 +60,14 @@ describe('Transcendence V2 creator bake', () => {
       track: { track_id: 'track-77', audio: { src: 'tracks/01-track-77/audio/master.wav', mime: 'audio/wav' } },
       analysis: { duration_seconds: 210 },
       terrainData: terrain(44),
+      timedLines: [{ t: 1250, text: 'First light' }, { t: 4200, text: 'Across the ridge' }],
       directionTracks: { exposure: [{ time: 0, value: 0.9 }, { time: 210, value: 1.1 }] },
     });
 
     expect(result.html).toContain('Creator World · Transcendence V2');
     expect(result.html).toContain('tracks/01-track-77/audio/master.wav');
     expect(result.html).toContain('"directionTracks":{"exposure"');
+    expect(result.config.timedLyrics).toEqual([{ at: 1.25, text: 'First light' }, { at: 4.2, text: 'Across the ridge' }]);
     expect(result.html).not.toContain('Ovacado');
     expect(result.arcEnd).toBe(210);
     expect(result.worldData.journey.samples).toHaveLength(901);

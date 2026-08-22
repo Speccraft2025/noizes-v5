@@ -83,10 +83,12 @@ describe('Transcendence V3 spectral geography', () => {
       track: { track_id: 'track-v3', audio: { src: 'tracks/track-v3/primary.wav', mime: 'audio/wav' } },
       analysis,
       terrainData: spectrogram(),
+      timedLines: [{ t: 2600, text: 'Measured words' }],
     });
 
     expect(result.html).toContain('Measured World · Transcendence V3');
     expect(result.html).toContain('"version":"transcendence-v3"');
+    expect(result.html).toContain('"timedLyrics":[{"at":2.6,"text":"Measured words"}]');
     expect(result.analysis.transcendence_v3.fidelity.classification).toBe('spectrogram-derived geography');
     expect(result.html).not.toContain('Ovacado');
   });

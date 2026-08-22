@@ -25,29 +25,26 @@ body {
 }
 
 .txv2-ui { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
-.txv2-header {
-  position: absolute; inset: 0 0 auto; display: flex; justify-content: space-between;
-  align-items: flex-start; padding: 28px 32px;
-  background: linear-gradient(180deg, rgba(2, 8, 5, 0.62), transparent);
-}
-.txv2-header div { display: grid; gap: 5px; }
-.txv2-kicker, .txv2-entry span {
+.txv2-entry span {
   color: #d8c48a; font: 10px/1.2 ui-monospace, "SFMono-Regular", monospace; letter-spacing: 0.28em;
 }
-.txv2-header strong { font-size: 17px; font-weight: 400; letter-spacing: 0.04em; }
 .txv2-control, .txv2-entry button {
   pointer-events: auto; border: 1px solid rgba(225, 211, 166, 0.42); color: #f5eed7;
   background: rgba(7, 18, 11, 0.44); backdrop-filter: blur(16px); cursor: pointer;
 }
 .txv2-control {
+  position: absolute; right: clamp(18px, 2.4vw, 36px); top: 50%; transform: translateY(-50%);
   min-width: 72px; padding: 10px 14px; border-radius: 999px;
   font: 11px/1 ui-monospace, "SFMono-Regular", monospace; text-transform: uppercase; letter-spacing: 0.12em;
 }
-.txv2-chapter {
-  position: absolute; left: 32px; bottom: 38px; color: rgba(242, 237, 220, 0.76);
-  font: 11px/1.2 ui-monospace, "SFMono-Regular", monospace; letter-spacing: 0.24em;
+.txv2-lyrics {
+  position: absolute; left: clamp(28px, 6vw, 88px); bottom: clamp(34px, 7vh, 70px);
+  width: min(48vw, 620px); color: rgba(248, 241, 216, 0.92);
+  font-size: clamp(18px, 2vw, 29px); line-height: 1.2; letter-spacing: 0.015em;
+  text-wrap: balance; text-shadow: 0 2px 24px rgba(0, 0, 0, 0.9);
 }
-.txv2-chapter.is-changing { animation: chapter-in 1.4s ease both; }
+.txv2-lyrics.is-empty { display: none; }
+.txv2-lyrics.is-changing { animation: lyric-in 1.4s ease both; }
 .txv2-progress {
   position: absolute; right: 32px; bottom: 42px; width: min(28vw, 360px); height: 1px;
   background: rgba(242, 237, 220, 0.2); overflow: hidden;
@@ -73,11 +70,11 @@ body {
 }
 
 @keyframes entry-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes chapter-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes lyric-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 700px) {
-  .txv2-header { padding: 20px; }
-  .txv2-chapter { left: 20px; bottom: 28px; }
+  .txv2-control { right: 16px; }
+  .txv2-lyrics { left: 20px; bottom: 28px; width: 58vw; }
   .txv2-progress { right: 20px; bottom: 32px; width: 28vw; }
   .txv2-entry h1 { font-size: clamp(48px, 18vw, 84px); }
 }

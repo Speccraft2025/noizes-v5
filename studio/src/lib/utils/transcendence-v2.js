@@ -68,6 +68,7 @@ export async function assembleTranscendenceHTML(input, built, experience) {
     qualityProfile: input.qualityProfile || 'balanced',
     artDirection: { ...APPROVED_V17_ART_DIRECTION, ...(input.artDirection || {}), cameraShake: false },
     directionTracks: input.directionTracks || {},
+    timedLyrics: normalizeTimedLyrics(input.timedLines),
     worldData: world,
     geography: built.geography,
     journey: built.journey,
@@ -190,6 +191,18 @@ function escapeJson(value) {
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+}
+
+function normalizeTimedLyrics(lines = []) {
+  return (Array.isArray(lines) ? lines : [])
+    .map((line, index) => ({
+      index,
+      at: Math.max(0, (Number(line?.t) || 0) / 1000),
+      text: String(line?.text || '').trim(),
+    }))
+    .filter((line) => line.text)
+    .sort((first, second) => first.at - second.at || first.index - second.index)
+    .map(({ at, text }) => ({ at: round(at), text }));
 }
 
 function round(value) {

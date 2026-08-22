@@ -171,7 +171,7 @@ describe('buildPackage — Transcendence', () => {
   });
 
   it('bakes V3 spectrogram-derived geography as a self-contained nz', async () => {
-    const { input, track } = await transcendenceProject();
+    const { input, track } = await transcendenceProject({ timedLines: [{ t: 1500, text: 'Inside the valley' }] });
     input.template = 'transcendence-v3';
     const result = await buildPackage(input);
     const zip = await unzip(result);
@@ -189,6 +189,7 @@ describe('buildPackage — Transcendence', () => {
     expect(journey.schema).toBe('transcendence-journey-v3-spectral');
     expect(journey.samples).toHaveLength(901);
     expect(html).toContain('"version":"transcendence-v3"');
+    expect(html).toContain('"timedLyrics":[{"at":1.5,"text":"Inside the valley"}]');
     expect(html).not.toContain('Ovacado');
   });
 

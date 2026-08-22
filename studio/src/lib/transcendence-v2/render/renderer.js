@@ -34,8 +34,8 @@ export function createRenderer(canvasHost, options = {}) {
   const geography = options.geography || extractGeographicHierarchy(macro);
   const terrainWorld = quality.segmentScale === 1 ? macro : {
     ...macro,
-    segmentsX: Math.round(macro.segmentsX * quality.segmentScale),
-    segmentsZ: Math.round(macro.segmentsZ * quality.segmentScale),
+    segmentsX: Math.max(240, Math.round(macro.segmentsX * quality.segmentScale)),
+    segmentsZ: Math.max(210, Math.round(macro.segmentsZ * quality.segmentScale)),
   };
   const terrain = buildContinuousTerrain(terrainWorld);
   world.add(terrain.mesh);

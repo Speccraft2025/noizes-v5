@@ -1,7 +1,13 @@
 import * as THREE from 'three';
 
 export function buildContinuousTerrain(world) {
-  const geometry = new THREE.PlaneGeometry(world.width, world.depth, world.segmentsX, world.segmentsZ);
+  const renderScale = Math.max(1.8, Number(world.renderScale) || 1);
+  const geometry = new THREE.PlaneGeometry(
+    world.width * renderScale,
+    world.depth * renderScale,
+    Math.round(world.segmentsX * renderScale),
+    Math.round(world.segmentsZ * renderScale),
+  );
   geometry.rotateX(-Math.PI / 2);
 
   const position = geometry.attributes.position;

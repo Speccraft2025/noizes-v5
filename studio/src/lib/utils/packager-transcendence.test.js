@@ -64,7 +64,7 @@ beforeAll(() => {
     runtime: 'const TX_RUNTIME_LOADED = true;',
   });
   __setTranscendenceV2Sources({
-    template: `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; media-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'"><title>/* TXV2_TITLE */</title><style>/* TXV2_CSS */</style></head><body><main id="app"></main><script>/* THREE_RUNTIME */</script><script>window.__TXV2_CONFIG=/* TXV2_CONFIG */;</script><script>/* TXV2_RUNTIME */</script></body></html>`,
+    template: `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; media-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'"><title>/* TXV2_TITLE */</title><style>/* TXV2_CSS */</style></head><body><main id="app"></main><script>/* THREE_RUNTIME */</script><script>window.__TXV2_CONFIG=/* TXV2_CONFIG */;window.__TXV2_ARCHIVE="__TXV2_ARCHIVE_DATA__";</script><script>/* TXV2_RUNTIME */</script></body></html>`,
     styles: 'body{background:#102318}',
     three: 'window.THREE={};',
     runtime: 'window.__TXV2_READY__=true;',
@@ -194,6 +194,9 @@ describe('buildPackage — Transcendence', () => {
     expect(html).toContain('"lyricFont":"humanist"');
     expect(html).toContain('"lyricSize":36');
     expect(html).toContain('"lyricColor":"#f2c66d"');
+    expect(html).toContain('window.__TXV2_ARCHIVE={"schema_version":1');
+    expect(html).toContain('"title":"The Standing Wave"');
+    expect(html).not.toContain('__TXV2_ARCHIVE_DATA__');
     expect(html).not.toContain('Ovacado');
   });
 

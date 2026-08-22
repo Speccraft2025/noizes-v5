@@ -108,7 +108,13 @@ export function sampleSpectralDisplacement(world, x, z) {
   const shaped = energy * 0.58 + ridge * 0.26 + energy * harmonic * 0.16;
   const edgeTaper = smoothstep(clamp01(u * 7)) * smoothstep(clamp01((1 - u) * 7))
     * smoothstep(clamp01(v * 7)) * smoothstep(clamp01((1 - v) * 7));
-  return ((shaped - 0.32) * (world.spectralAmplitude || 0) + transient * 16) * edgeTaper;
+  const activity = clamp01(energy * 0.52 + ridge * 0.3 + transient * 0.18);
+  const detailScale = world.spectralDetailScale || 0;
+  const spectralDetail = detailScale > 0
+    ? ridgeNoise(x * detailScale + (world.noiseOffsetX || 0) * 1.7, z * detailScale + (world.noiseOffsetZ || 0) * 1.9)
+      * (world.spectralDetailAmplitude || 0) * (0.32 + activity * 0.88)
+    : 0;
+  return ((shaped - 0.32) * (world.spectralAmplitude || 0) + transient * 16 + spectralDetail) * edgeTaper;
 }
 
 function bilinearChannel(field, u, v, channel) {

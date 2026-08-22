@@ -173,6 +173,7 @@ describe('buildPackage — Transcendence', () => {
   it('bakes V3 spectrogram-derived geography as a self-contained nz', async () => {
     const { input, track } = await transcendenceProject({ timedLines: [{ t: 1500, text: 'Inside the valley' }] });
     input.template = 'transcendence-v3';
+    input.transcendence.art_direction = { lyricFont: 'humanist', lyricSize: 36, lyricColor: '#f2c66d', lyricWeight: 600, lyricAlign: 'right', lyricWidth: 55 };
     const result = await buildPackage(input);
     const zip = await unzip(result);
     const manifest = JSON.parse(await zip.file('manifest.json').async('string'));
@@ -190,6 +191,9 @@ describe('buildPackage — Transcendence', () => {
     expect(journey.samples).toHaveLength(901);
     expect(html).toContain('"version":"transcendence-v3"');
     expect(html).toContain('"timedLyrics":[{"at":1.5,"text":"Inside the valley"}]');
+    expect(html).toContain('"lyricFont":"humanist"');
+    expect(html).toContain('"lyricSize":36');
+    expect(html).toContain('"lyricColor":"#f2c66d"');
     expect(html).not.toContain('Ovacado');
   });
 

@@ -30,6 +30,8 @@ describe('Studio workflow contract', () => {
     expect(page).toContain('<StepExperience />');
     expect(experienceStep).toContain('CANONICAL_TEMPLATE');
     expect(experienceStep).toContain('TRANSCENDENCE_V2_TEMPLATE');
+    expect(experienceStep).toContain('Lyric typography');
+    expect(experienceStep).toContain('LYRIC_FONT_PRESETS');
     // ULTRA's own authoring is unchanged: the Guide editor still renders under it.
     expect(experienceStep).toContain('<StepGuide />');
   });

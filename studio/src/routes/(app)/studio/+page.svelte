@@ -366,8 +366,8 @@
         <div class="flex justify-between">
           <span style="color: var(--ink-muted);">Experience</span>
           <span class="truncate ml-4" style="color: #7B5CF0;">
-            {#if $template === 'transcendence-v1' || $template === 'transcendence-v2'}
-              TRANSCENDENCE {$template === 'transcendence-v2' ? 'V2' : 'V1'} · {$transcendence.analysis ? 'terrain measured' : 'not analysed'}
+            {#if $template === 'transcendence-v1' || $template === 'transcendence-v2' || $template === 'transcendence-v3'}
+              TRANSCENDENCE {$template === 'transcendence-v3' ? 'V3' : $template === 'transcendence-v2' ? 'V2' : 'V1'} · {$transcendence.analysis ? 'terrain measured' : 'not analysed'}
             {:else}
               ULTRA V2 · {$assets.guide?.nodes?.length ?? 0} moments
             {/if}
@@ -406,14 +406,14 @@
           </div>
         </div>
         <p class="text-xs text-center" style="color: var(--ink-muted);">ULTRA V2 · canonical immersive experience</p>
-      {:else if $template === 'transcendence-v1' || $template === 'transcendence-v2'}
+      {:else if $template === 'transcendence-v1' || $template === 'transcendence-v2' || $template === 'transcendence-v3'}
         <div class="w-full rounded-2xl overflow-hidden" style="background: #030303; border: 1px solid rgba(123,92,240,0.3); aspect-ratio: 9/16; max-height: 300px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding: 20px; gap: 3px;">
           <!-- A landscape read from the record: ranges running to a horizon. -->
           {#each [0.18, 0.42, 0.3, 0.66, 0.52, 0.88, 0.6, 0.34] as ridge}
             <div class="w-full rounded-sm" style="height: {4 + ridge * 16}px; background: linear-gradient(90deg, rgba(123,92,240,{0.15 + ridge * 0.5}), rgba(240,75,216,{0.08 + ridge * 0.3}));"></div>
           {/each}
         </div>
-        <p class="text-xs text-center" style="color: var(--ink-muted);">TRANSCENDENCE {$template === 'transcendence-v2' ? 'V2' : 'V1'} · the recording as terrain</p>
+        <p class="text-xs text-center" style="color: var(--ink-muted);">TRANSCENDENCE {$template === 'transcendence-v3' ? 'V3' : $template === 'transcendence-v2' ? 'V2' : 'V1'} · the recording as terrain</p>
       {/if}
     </div>
   </div>

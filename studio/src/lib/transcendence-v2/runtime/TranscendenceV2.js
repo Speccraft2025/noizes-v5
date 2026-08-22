@@ -96,11 +96,12 @@ export class TranscendenceV2 {
   mountExperienceUi() {
     const title = escapeText(this.config.title || 'Untitled');
     const artist = escapeText(this.config.artist || '');
+    const label = escapeText(this.config.label || 'TRANSCENDENCE V2');
     this.ui = document.createElement('section');
     this.ui.className = 'txv2-ui';
     this.ui.innerHTML = `
       <header class="txv2-header">
-        <div><span class="txv2-kicker">TRANSCENDENCE V2</span><strong>${title}</strong></div>
+        <div><span class="txv2-kicker">${label}</span><strong>${title}</strong></div>
         <button class="txv2-control" type="button" aria-label="Play or pause">Pause</button>
       </header>
       <div class="txv2-chapter" aria-live="polite">AERIAL OVERVIEW</div>

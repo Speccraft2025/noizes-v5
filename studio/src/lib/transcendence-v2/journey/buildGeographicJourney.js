@@ -27,18 +27,26 @@ export function buildGeographicJourney(world, geography, sampleHeightAt) {
     frame(1.00, 'TROUGH', troughB.id, 720, 150, 180, 48, 155, 'SECOND_TROUGH'),
   ];
 
-  for (const keyframe of keyframes) {
-    keyframe.position.y += sampleHeightAt(keyframe.position.x, keyframe.position.z);
-  }
-
-  const journey = {
+  return finalizeGeographicJourney({
     schema: 'transcendence-journey-v2-camera-correction',
-    deterministic: true,
     landmarkIds: [rangeA.id, peakA.id, troughA.id, dividingRange.id, troughB.id],
     sequence: ['AERIAL_OVERVIEW', 'APPROACH', 'PEAK_TRAVERSE', 'DESCENT', 'TROUGH', 'ASCENT', 'CREST', 'REVEAL', 'SECOND_TROUGH'],
     keyframes,
-  };
-  journey.samples = buildDenseSamples(journey, sampleHeightAt);
+    terminalHeading: { x: -0.99, z: -0.06 },
+  }, sampleHeightAt);
+}
+
+export function finalizeGeographicJourney(definition, sampleHeightAt) {
+  const { terminalHeading, ...journeyDefinition } = definition;
+  const keyframes = definition.keyframes.map((keyframe) => ({
+    ...keyframe,
+    position: {
+      ...keyframe.position,
+      y: keyframe.position.y + sampleHeightAt(keyframe.position.x, keyframe.position.z),
+    },
+  }));
+  const journey = { ...journeyDefinition, deterministic: true, keyframes };
+  journey.samples = buildDenseSamples(journey, sampleHeightAt, terminalHeading);
   return journey;
 }
 
@@ -61,7 +69,7 @@ export function sampleGeographicJourney(journey, progress) {
   };
 }
 
-function buildDenseSamples(journey, sampleHeightAt) {
+function buildDenseSamples(journey, sampleHeightAt, terminalHeading) {
   const anchors = journey.keyframes;
   const route = new THREE.CatmullRomCurve3(anchors.map((anchor) => pointVector(anchor.position)), false, 'centripetal', 0.35);
   const rawPosition = (progress) => {
@@ -93,8 +101,8 @@ function buildDenseSamples(journey, sampleHeightAt) {
     if (direction.lengthSq() < 0.001) direction.copy(after).sub(before).setY(0);
     direction.normalize();
     const stage = semanticAt(anchors, progress);
-    if (progress > 0.80) {
-      const troughHeading = new THREE.Vector3(-0.99, 0, -0.06).normalize();
+    if (terminalHeading && progress > 0.80) {
+      const troughHeading = new THREE.Vector3(terminalHeading.x, 0, terminalHeading.z).normalize();
       direction.lerp(troughHeading, smootherstep(THREE.MathUtils.clamp((progress - 0.80) / 0.17, 0, 1))).normalize();
     }
     const lookDistance = lookDistanceFor(stage.state, speedFactor);

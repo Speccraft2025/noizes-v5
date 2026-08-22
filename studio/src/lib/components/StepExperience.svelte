@@ -7,7 +7,7 @@
   import { onDestroy } from 'svelte';
   import { releaseProject, template, transcendence } from '$lib/stores/package.js';
   import { CANONICAL_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE, TRANSCENDENCE_V3_TEMPLATE } from '$lib/utils/project.js';
-  import { DEFAULT_ART_DIRECTION, PALETTES, QUALITY_PROFILES, normalizeArtDirection, buildTranscendenceHTML } from '$lib/utils/transcendence.js';
+  import { DEFAULT_ART_DIRECTION, LYRIC_FONT_PRESETS, PALETTES, QUALITY_PROFILES, normalizeArtDirection, buildTranscendenceHTML } from '$lib/utils/transcendence.js';
   import { VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
   import { canDecodeAudio } from '$lib/analysis/decode.js';
   import { buildLyricLines, defaultLandmarks, landmarkProblems } from '$lib/experiences/transcendence/landmarks.js';
@@ -423,6 +423,59 @@
                 <span class="font-mono" style="color:var(--ink-muted);">{art.terraceStep.toFixed(1)}</span>
               </label>
             {/if}
+          </div>
+
+          <div class="mt-6 pt-5" style="border-top: 1px solid var(--border-dim);">
+            <span class="text-xs font-bold text-white block mb-1">Lyric typography</span>
+            <p class="text-[11px] mb-4" style="color: var(--ink-muted);">
+              These settings apply to synced lyrics in Studio preview and the offline package.
+            </p>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="block">
+                <span class="text-xs font-bold text-white block mb-1">Typeface</span>
+                <select class="input-field w-full" value={art.lyricFont} on:change={(e) => setArt({ lyricFont: e.currentTarget.value })}>
+                  {#each LYRIC_FONT_PRESETS as preset}
+                    <option value={preset.id}>{preset.label}</option>
+                  {/each}
+                </select>
+              </label>
+              <label class="block">
+                <span class="text-xs font-bold text-white block mb-1">Color</span>
+                <div class="flex items-center gap-2">
+                  <input type="color" value={art.lyricColor} on:input={(e) => setArt({ lyricColor: e.currentTarget.value })}
+                    class="h-10 w-14 rounded-lg p-1" style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-dim);">
+                  <input type="text" value={art.lyricColor} maxlength="7" class="input-field flex-1 font-mono"
+                    on:change={(e) => setArt({ lyricColor: e.currentTarget.value })}>
+                </div>
+              </label>
+              <label class="block">
+                <span class="text-xs font-bold text-white">Size <span class="font-mono font-normal" style="color:var(--ink-muted);">{art.lyricSize.toFixed(0)}px</span></span>
+                <input type="range" min="14" max="64" step="1" class="w-full mt-1"
+                  value={art.lyricSize} on:input={(e) => setArt({ lyricSize: Number(e.currentTarget.value) })}>
+              </label>
+              <label class="block">
+                <span class="text-xs font-bold text-white">Line width <span class="font-mono font-normal" style="color:var(--ink-muted);">{art.lyricWidth.toFixed(0)}%</span></span>
+                <input type="range" min="24" max="76" step="1" class="w-full mt-1"
+                  value={art.lyricWidth} on:input={(e) => setArt({ lyricWidth: Number(e.currentTarget.value) })}>
+              </label>
+              <label class="block">
+                <span class="text-xs font-bold text-white block mb-1">Weight</span>
+                <select class="input-field w-full" value={art.lyricWeight} on:change={(e) => setArt({ lyricWeight: Number(e.currentTarget.value) })}>
+                  <option value="300">Light</option>
+                  <option value="400">Regular</option>
+                  <option value="600">Semibold</option>
+                  <option value="700">Bold</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="text-xs font-bold text-white block mb-1">Alignment</span>
+                <select class="input-field w-full" value={art.lyricAlign} on:change={(e) => setArt({ lyricAlign: e.currentTarget.value })}>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </label>
+            </div>
           </div>
         </section>
 

@@ -76,6 +76,10 @@ export class TranscendenceV2 {
     window.addEventListener('keydown', this.onKeyDown);
     this.onMessage = (event) => {
       if (event.data?.type === 'ned:direction-tracks') this.directionTracks = event.data.tracks || {};
+      if (event.data?.type === 'ned:visual-update') {
+        this.config.artDirection = { ...(this.config.artDirection || {}), ...(event.data.artDirection || {}) };
+        this.applyLyricStyle();
+      }
     };
     window.addEventListener('message', this.onMessage);
     this.animate();
@@ -112,6 +116,7 @@ export class TranscendenceV2 {
         </div>
       </div>`;
     this.container.appendChild(this.ui);
+    this.applyLyricStyle();
     this.entry = this.ui.querySelector('.txv2-entry');
     this.entryButton = this.entry.querySelector('button');
     this.playButton = this.ui.querySelector('.txv2-control');
@@ -201,6 +206,17 @@ export class TranscendenceV2 {
     this.lyricLabel.classList.remove('is-changing');
     void this.lyricLabel.offsetWidth;
     if (index >= 0) this.lyricLabel.classList.add('is-changing');
+  }
+
+  applyLyricStyle() {
+    if (!this.ui) return;
+    const art = this.config.artDirection || {};
+    this.ui.style.setProperty('--tx-lyric-font', lyricFontStack(art.lyricFont));
+    this.ui.style.setProperty('--tx-lyric-size', `${clampNumber(art.lyricSize, 14, 64, 28)}px`);
+    this.ui.style.setProperty('--tx-lyric-color', validColor(art.lyricColor) ? art.lyricColor : '#f8f1d8');
+    this.ui.style.setProperty('--tx-lyric-weight', String(clampNumber(art.lyricWeight, 300, 700, 400)));
+    this.ui.style.setProperty('--tx-lyric-align', ['left', 'center', 'right'].includes(art.lyricAlign) ? art.lyricAlign : 'left');
+    this.ui.style.setProperty('--tx-lyric-width', `${clampNumber(art.lyricWidth, 24, 76, 48)}vw`);
   }
 
   directionAt(name, seconds, fallback = 1) {
@@ -338,6 +354,24 @@ function activeLyricIndex(lyrics, seconds) {
     active = index;
   }
   return active;
+}
+
+function lyricFontStack(preset) {
+  return ({
+    editorial: 'Baskerville, "Palatino Linotype", serif',
+    humanist: 'Avenir, "Gill Sans", "Trebuchet MS", sans-serif',
+    mono: 'ui-monospace, "SFMono-Regular", Menlo, monospace',
+    display: 'Georgia, "Times New Roman", serif',
+  })[preset] || 'Baskerville, "Palatino Linotype", serif';
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+}
+
+function validColor(value) {
+  return /^#[0-9a-f]{6}$/i.test(String(value || ''));
 }
 
 function recordingName(value) {

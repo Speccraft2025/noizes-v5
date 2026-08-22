@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { sampleSpectralDisplacement } from '../transcendence-v2/world/buildTerrainMesh.js';
+import { sampleHeight, sampleSpectralDisplacement } from '../transcendence-v2/world/buildTerrainMesh.js';
+import { extractGeographicHierarchy } from '../transcendence-v2/world/extractGeographicHierarchy.js';
+import { buildSpectralJourney } from '../transcendence-v3/journey/buildSpectralJourney.js';
 import { __setTranscendenceV2Sources } from './transcendence-v2.js';
 import { buildTrackSpectralGeography, buildTranscendenceV3HTML } from './transcendence-v3.js';
 
@@ -77,6 +79,31 @@ describe('Transcendence V3 spectral geography', () => {
       .toBeGreaterThan(sampleSpectralDisplacement(built.worldData, quietX, quietZ) + 50);
   });
 
+  it('restores detail relief without changing macro landmarks or route anchors', () => {
+    const built = buildTrackSpectralGeography({ trackId: 'relief', analysis, terrainData: spectrogram({ time: 0.42, band: 0.58 }) });
+    const smoothWorld = {
+      ...built.worldData,
+      mesoAmplitude: 0,
+      microAmplitude: 0,
+      spectralAmplitude: 0,
+      spectralDetailAmplitude: 0,
+    };
+    const smoothGeography = extractGeographicHierarchy(smoothWorld);
+    const smoothJourney = buildSpectralJourney(smoothWorld, smoothGeography, (x, z) => sampleHeight(smoothWorld, x, z));
+    const routeIdentity = (journey) => journey.keyframes.map((frame) => ({
+      at: frame.at,
+      landmarkId: frame.landmarkId,
+      x: frame.position.x,
+      z: frame.position.z,
+    }));
+
+    expect(built.worldData.mesoAmplitude).toBe(36);
+    expect(built.worldData.microAmplitude).toBe(16);
+    expect(built.worldData.spectralDetailAmplitude).toBe(34);
+    expect(smoothGeography).toEqual(built.geography);
+    expect(routeIdentity(smoothJourney)).toEqual(routeIdentity(built.journey));
+  });
+
   it('assembles a labeled offline V3 experience with provenance', async () => {
     const result = await buildTranscendenceV3HTML({
       identity: { title: 'Measured World', artist: 'Creator' },
@@ -84,12 +111,14 @@ describe('Transcendence V3 spectral geography', () => {
       analysis,
       terrainData: spectrogram(),
       timedLines: [{ t: 2600, text: 'Measured words' }],
+      artDirection: { lyricFont: 'mono', lyricSize: 42, lyricColor: '#e0aa42', lyricWeight: 700, lyricAlign: 'center', lyricWidth: 62 },
     });
 
     expect(result.html).toContain('Measured World · Transcendence V3');
     expect(result.html).toContain('"version":"transcendence-v3"');
     expect(result.html).toContain('"timedLyrics":[{"at":2.6,"text":"Measured words"}]');
     expect(result.analysis.transcendence_v3.fidelity.classification).toBe('spectrogram-derived geography');
+    expect(result.config.artDirection).toMatchObject({ lyricFont: 'mono', lyricSize: 42, lyricColor: '#e0aa42', lyricWeight: 700, lyricAlign: 'center', lyricWidth: 62 });
     expect(result.html).not.toContain('Ovacado');
   });
 });

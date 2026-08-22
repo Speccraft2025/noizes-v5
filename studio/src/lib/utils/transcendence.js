@@ -23,6 +23,12 @@ export const TRANSCENDENCE_TEMPLATE = 'transcendence-v1';
 export const TRANSCENDENCE_SCHEMA = '4.0.0';
 export const QUALITY_PROFILES = ['cinematic', 'balanced', 'lite', 'essential'];
 export const PALETTES = ['alabaster', 'oxide', 'frost', 'evergreen'];
+export const LYRIC_FONT_PRESETS = [
+  { id: 'editorial', label: 'Editorial serif' },
+  { id: 'humanist', label: 'Humanist sans' },
+  { id: 'mono', label: 'Monospace' },
+  { id: 'display', label: 'Classic display' },
+];
 
 /** The art direction a creator can set, and its defaults. */
 export const DEFAULT_ART_DIRECTION = {
@@ -37,6 +43,12 @@ export const DEFAULT_ART_DIRECTION = {
   flightAltitude: 1,
   worldStability: 0.7,
   musicResponse: 0.3,
+  lyricFont: 'editorial',
+  lyricSize: 28,
+  lyricColor: '#f8f1d8',
+  lyricWeight: 400,
+  lyricAlign: 'left',
+  lyricWidth: 48,
 };
 
 /** Clamp art direction to ranges the world actually looks good in. */
@@ -46,6 +58,10 @@ export function normalizeArtDirection(input = {}) {
     if (!Number.isFinite(parsed)) return fallback;
     return Math.min(max, Math.max(min, parsed));
   };
+  const lyricFont = LYRIC_FONT_PRESETS.some((preset) => preset.id === input.lyricFont) ? input.lyricFont : DEFAULT_ART_DIRECTION.lyricFont;
+  const lyricColor = /^#[0-9a-f]{6}$/i.test(String(input.lyricColor || '')) ? String(input.lyricColor) : DEFAULT_ART_DIRECTION.lyricColor;
+  const lyricWeight = [300, 400, 600, 700].includes(Number(input.lyricWeight)) ? Number(input.lyricWeight) : DEFAULT_ART_DIRECTION.lyricWeight;
+  const lyricAlign = ['left', 'center', 'right'].includes(input.lyricAlign) ? input.lyricAlign : DEFAULT_ART_DIRECTION.lyricAlign;
   return {
     heightScale: number(input.heightScale, 1, 0.4, 2.2),
     ridgeEmphasis: number(input.ridgeEmphasis, 1, 0, 2.5),
@@ -58,6 +74,12 @@ export function normalizeArtDirection(input = {}) {
     flightAltitude: number(input.flightAltitude, 1, 0.5, 2.5),
     worldStability: number(input.worldStability, 0.7, 0, 1),
     musicResponse: number(input.musicResponse, 0.3, 0, 1),
+    lyricFont,
+    lyricSize: number(input.lyricSize, DEFAULT_ART_DIRECTION.lyricSize, 14, 64),
+    lyricColor,
+    lyricWeight,
+    lyricAlign,
+    lyricWidth: number(input.lyricWidth, DEFAULT_ART_DIRECTION.lyricWidth, 24, 76),
   };
 }
 

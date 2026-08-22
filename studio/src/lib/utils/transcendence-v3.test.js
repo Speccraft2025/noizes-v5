@@ -97,9 +97,10 @@ describe('Transcendence V3 spectral geography', () => {
       z: frame.position.z,
     }));
 
-    expect(built.worldData.mesoAmplitude).toBe(36);
-    expect(built.worldData.microAmplitude).toBe(16);
-    expect(built.worldData.spectralDetailAmplitude).toBe(34);
+    expect(built.worldData.mesoAmplitude).toBe(54);
+    expect(built.worldData.microAmplitude).toBe(30);
+    expect(built.worldData.spectralDetailAmplitude).toBe(64);
+    expect(built.worldData.renderScale).toBe(1.8);
     expect(smoothGeography).toEqual(built.geography);
     expect(routeIdentity(smoothJourney)).toEqual(routeIdentity(built.journey));
   });

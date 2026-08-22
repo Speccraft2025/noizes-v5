@@ -100,6 +100,12 @@ export async function assembleTranscendenceHTML(input, built, experience) {
   };
 }
 
+export function injectTranscendenceArchive(html, archive) {
+  const marker = '"__TXV2_ARCHIVE_DATA__"';
+  if (!html.includes(marker)) throw new Error('Transcendence archive marker is missing from experience.html.');
+  return html.replace(marker, escapeJson(archive));
+}
+
 export function __setTranscendenceV2Sources(sources) {
   cachedSources = sources;
 }

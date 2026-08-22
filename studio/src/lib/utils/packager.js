@@ -755,7 +755,9 @@ export async function buildPackage(input) {
   // Transcendence assembles its own document, and references audio and terrain by
   // relative path — no base64 anywhere, which is why its packages are the size of
   // their media rather than 1.4x that.
-  const experienceHTML = transcendenceBuild ? transcendenceBuild.html : buildExperienceHTML({
+  const experienceHTML = isGeographicBuild
+    ? (await import('./transcendence-v2.js')).injectTranscendenceArchive(transcendenceBuild.html, archiveData)
+    : transcendenceBuild ? transcendenceBuild.html : buildExperienceHTML({
     identity: legacyIdentity,
     edition: fixedEdition,
     rights: releaseRights,

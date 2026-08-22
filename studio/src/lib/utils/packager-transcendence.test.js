@@ -170,6 +170,28 @@ describe('buildPackage — Transcendence', () => {
     expect(html).not.toContain('Ovacado');
   });
 
+  it('bakes V3 spectrogram-derived geography as a self-contained nz', async () => {
+    const { input, track } = await transcendenceProject();
+    input.template = 'transcendence-v3';
+    const result = await buildPackage(input);
+    const zip = await unzip(result);
+    const manifest = JSON.parse(await zip.file('manifest.json').async('string'));
+    const world = JSON.parse(await zip.file(`analysis/${track.track_id}.world.json`).async('string'));
+    const geography = JSON.parse(await zip.file(`analysis/${track.track_id}.landmarks.json`).async('string'));
+    const journey = JSON.parse(await zip.file(`timeline/${track.track_id}.journey.json`).async('string'));
+    const html = await zip.file('experience.html').async('string');
+
+    expect(result.filename).toBe('the_standing_wave_transcendence-v3_noizes.nz');
+    expect(manifest.experience).toMatchObject({ template: 'transcendence-v3', schema: '6.0.0' });
+    expect(world.schema).toBe('transcendence-world-v3');
+    expect(world.spectralField.data).toHaveLength(96 * 48 * 4);
+    expect(geography.counts).toMatchObject({ ranges: 4, troughs: 3 });
+    expect(journey.schema).toBe('transcendence-journey-v3-spectral');
+    expect(journey.samples).toHaveLength(901);
+    expect(html).toContain('"version":"transcendence-v3"');
+    expect(html).not.toContain('Ovacado');
+  });
+
   it('ships audio, terrain and analysis as separate hashed components', async () => {
     const { input, track, terrainSize } = await transcendenceProject();
     const result = await buildPackage(input);

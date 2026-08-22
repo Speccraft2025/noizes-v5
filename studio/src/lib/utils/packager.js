@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { buildExperienceHTML, buildGuide } from './experience.js';
-import { CANONICAL_TEMPLATE, normalizeEdition, normalizeTemplate, TRANSCENDENCE_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE } from './project.js';
+import { CANONICAL_TEMPLATE, normalizeEdition, normalizeTemplate, TRANSCENDENCE_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE, TRANSCENDENCE_V3_TEMPLATE } from './project.js';
 import { buildTranscendenceHTML, TRANSCENDENCE_SCHEMA, QUALITY_PROFILES } from './transcendence.js';
 import { describeFailures, validateTranscendence } from './validateTranscendence.js';
 import { buildWorldData } from '../experiences/transcendence/world-data.js';
@@ -11,6 +11,7 @@ import { buildReleaseArchive, buildReleaseHistory } from '../domain/archive.js';
 import { estimatePackageSize } from '../domain/package-size.js';
 
 const TRANSCENDENCE_V2_SCHEMA = '5.0.0';
+const TRANSCENDENCE_V3_SCHEMA = '6.0.0';
 
 const safeFilename = (value, fallback = 'asset') => {
   const cleaned = String(value || fallback).replace(/[^a-z0-9._-]/gi, '_').replace(/_+/g, '_');
@@ -53,7 +54,11 @@ export async function buildPackage(input) {
   // collapse to ULTRA, so this cannot change what an existing draft produces.
   const template = normalizeTemplate(input.template ?? project.template);
   const isTranscendenceV2Build = template === TRANSCENDENCE_V2_TEMPLATE;
-  const isTranscendenceBuild = template === TRANSCENDENCE_TEMPLATE || isTranscendenceV2Build;
+  const isTranscendenceV3Build = template === TRANSCENDENCE_V3_TEMPLATE;
+  const isGeographicBuild = isTranscendenceV2Build || isTranscendenceV3Build;
+  const isTranscendenceBuild = template === TRANSCENDENCE_TEMPLATE || isGeographicBuild;
+  const transcendenceSchema = isTranscendenceV3Build ? TRANSCENDENCE_V3_SCHEMA
+    : isTranscendenceV2Build ? TRANSCENDENCE_V2_SCHEMA : TRANSCENDENCE_SCHEMA;
   const transcendence = input.transcendence ?? {};
   const play = input.play ?? {};
   const extras = input.extras ?? project.extras ?? {};
@@ -295,7 +300,7 @@ export async function buildPackage(input) {
     const worldPath = `analysis/${terrainTrack.track_id}.world.json`;
     const landmarksPath = `analysis/${terrainTrack.track_id}.landmarks.json`;
     const journeyPath = `timeline/${terrainTrack.track_id}.journey.json`;
-    const worldData = isTranscendenceV2Build ? null : buildWorldData({
+    const worldData = isGeographicBuild ? null : buildWorldData({
       terrainData: transcendence.terrain_data,
       durationSeconds: transcendence.analysis.duration_seconds,
     });
@@ -312,9 +317,11 @@ export async function buildPackage(input) {
     }, terrainPath, { track_id: terrainTrack.track_id });
 
     const lyricRecord = project.lyrics.find((entry) => entry.track_id === terrainTrack.track_id);
-    const buildExperience = isTranscendenceV2Build
-      ? (await import('./transcendence-v2.js')).buildTranscendenceV2HTML
-      : buildTranscendenceHTML;
+    const buildExperience = isTranscendenceV3Build
+      ? (await import('./transcendence-v3.js')).buildTranscendenceV3HTML
+      : isTranscendenceV2Build
+        ? (await import('./transcendence-v2.js')).buildTranscendenceV2HTML
+        : buildTranscendenceHTML;
     transcendenceBuild = await buildExperience({
       identity: {
         title: release.title,
@@ -371,7 +378,7 @@ export async function buildPackage(input) {
       type: 'landmarks',
       role: 'terrain_landmarks',
       title: 'Detected terrain landmarks',
-      file: new Blob([JSON.stringify(isTranscendenceV2Build ? transcendenceBuild.geography : (transcendenceBuild.worldData?.landmarks ?? []), null, 2)], { type: 'application/json' }),
+      file: new Blob([JSON.stringify(isGeographicBuild ? transcendenceBuild.geography : (transcendenceBuild.worldData?.landmarks ?? []), null, 2)], { type: 'application/json' }),
       mime: 'application/json',
       filename: `${terrainTrack.track_id}.landmarks.json`,
     }, landmarksPath, { track_id: terrainTrack.track_id });
@@ -382,7 +389,7 @@ export async function buildPackage(input) {
       type: 'journey',
       role: 'geographic_route',
       title: 'Geographic journey plan',
-      file: new Blob([JSON.stringify(isTranscendenceV2Build ? transcendenceBuild.journey : (transcendenceBuild.worldData?.journey ?? {}), null, 2)], { type: 'application/json' }),
+      file: new Blob([JSON.stringify(isGeographicBuild ? transcendenceBuild.journey : (transcendenceBuild.worldData?.journey ?? {}), null, 2)], { type: 'application/json' }),
       mime: 'application/json',
       filename: `${terrainTrack.track_id}.journey.json`,
     }, journeyPath, { track_id: terrainTrack.track_id });
@@ -400,7 +407,9 @@ export async function buildPackage(input) {
       journey: journeyPath,
       determinism: 'Every particle position is f(seed, audioTime) with no integration and no frame history. Seeking, pausing, tab changes and replay reconstruct identical state.',
       authorship: {
-        statement: 'The shape of this flight is a Noizes-authored itinerary; when each move happens is measured from this recording. Lyric landmark positions are creator-placed, not measured.',
+        statement: isTranscendenceV3Build
+          ? 'The recording\'s measured time-frequency structures determine the geography, landmarks, and journey timing; Noizes supplies geological regularization and cinematic camera direction.'
+          : 'The shape of this flight is a Noizes-authored itinerary; when each move happens is measured from this recording. Lyric landmark positions are creator-placed, not measured.',
         cues_anchored_to_measurement: transcendenceBuild.snapped,
         cues_total: transcendenceBuild.sequence.length,
       },
@@ -419,7 +428,7 @@ export async function buildPackage(input) {
 
     transcendenceBuild.descriptor = {
       entry: 'experience.html',
-      schema: isTranscendenceV2Build ? TRANSCENDENCE_V2_SCHEMA : TRANSCENDENCE_SCHEMA,
+      schema: transcendenceSchema,
       template,
       type: 'sonic-terrain',
       default_mode: 'world',
@@ -521,7 +530,7 @@ export async function buildPackage(input) {
   }
   if (transcendenceBuild) {
     Object.assign(experienceJson, transcendenceBuild.descriptor, {
-      schema_version: isTranscendenceV2Build ? TRANSCENDENCE_V2_SCHEMA : TRANSCENDENCE_SCHEMA,
+      schema_version: transcendenceSchema,
       art_direction: transcendenceBuild.config.artDirection,
       interaction: {
         threshold: 'press and hold to lower the stylus; unlocks media and AudioContext in one gesture',

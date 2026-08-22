@@ -33,7 +33,6 @@ export function buildTrackGeography({ trackId = '', analysis = {}, terrainData }
 }
 
 export async function buildTranscendenceV2HTML(input) {
-  const { template, styles, runtime, three } = await loadTranscendenceV2Sources();
   const built = input.worldData
     ? {
         worldData: input.worldData,
@@ -42,12 +41,23 @@ export async function buildTranscendenceV2HTML(input) {
         analysis: input.analysis,
       }
     : buildTrackGeography(input);
+  return assembleTranscendenceHTML(input, built, {
+    version: 'transcendence-v2',
+    label: 'TRANSCENDENCE V2',
+    titleLabel: 'Transcendence V2',
+    sequencePrefix: 'v2',
+  });
+}
+
+export async function assembleTranscendenceHTML(input, built, experience) {
+  const { template, styles, runtime, three } = await loadTranscendenceV2Sources();
   const duration = Number(input.analysis?.duration_seconds) || 0;
   const world = { ...built.worldData };
   delete world.landmarks;
   delete world.journey;
   const config = {
-    version: 'transcendence-v2',
+    version: experience.version,
+    ...(experience.configLabel ? { label: experience.configLabel } : {}),
     mode: 'geographic-journey',
     title: input.identity?.title || input.track?.title || 'Untitled',
     artist: input.identity?.artist || input.track?.primary_artist || '',
@@ -62,16 +72,16 @@ export async function buildTranscendenceV2HTML(input) {
     geography: built.geography,
     journey: built.journey,
   };
-  if (!config.audioPath) throw new Error('Transcendence V2 needs a packaged audio component to reference.');
+  if (!config.audioPath) throw new Error(`${experience.label} needs a packaged audio component to reference.`);
   const html = template
     .split('/* TXV2_CSS */').join(styles)
     .split('/* THREE_RUNTIME */').join(three)
     .split('/* TXV2_CONFIG */').join(escapeJson(config))
     .split('/* TXV2_RUNTIME */').join(runtime)
-    .split('/* TXV2_TITLE */').join(escapeHtml(`${config.title} · Transcendence V2`));
+    .split('/* TXV2_TITLE */').join(escapeHtml(`${config.title} · ${experience.titleLabel || experience.label}`));
   const sequence = built.journey.keyframes.map((frame, index) => ({
     time: Number((frame.at * duration).toFixed(3)),
-    id: `v2-${String(index + 1).padStart(2, '0')}`,
+    id: `${experience.sequencePrefix}-${String(index + 1).padStart(2, '0')}`,
     phase: frame.chapter,
     shot: frame.state,
     anchored_to: frame.landmarkId,

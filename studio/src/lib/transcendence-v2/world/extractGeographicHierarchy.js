@@ -18,7 +18,7 @@ export function extractGeographicHierarchy(world) {
   const passes = detectPasses(world, summits);
 
   return {
-    schema: 'transcendence-geography-v2',
+    schema: world.generation >= 3 ? 'transcendence-geography-v3' : 'transcendence-geography-v2',
     scale: 'macro',
     surfaceFeatures: {
       mesoArticulation: true,
@@ -63,6 +63,7 @@ function detectSummits(world) {
     prominence: round(candidate.prominence),
     extent: round(candidate.extent),
     persistence: round(candidate.persistence, 3),
+    ...(spectralSourceAt(world, candidate.x, candidate.z, 'detected-summit') ? { spectralSource: spectralSourceAt(world, candidate.x, candidate.z, 'detected-summit') } : {}),
     navigation: radialNavigation(point(candidate.x, candidate.elevation, candidate.z), 180),
   }));
 }
@@ -102,6 +103,7 @@ function rangeLandmark(world, range, index) {
     extent: round(range.width * 2.3),
     prominence: round(elevation - Math.max(left, right)),
     persistence: 1,
+    ...(range.spectralSource ? { spectralSource: range.spectralSource } : {}),
     navigation: axisNavigation(range, elevation, 0.42),
   };
 }
@@ -119,6 +121,7 @@ function troughLandmark(world, trough, index) {
     extent: round(trough.width * 2.2),
     prominence: round(Math.min(left, right) - elevation),
     persistence: 1,
+    ...(trough.spectralSource ? { spectralSource: trough.spectralSource } : {}),
     navigation: axisNavigation(trough, elevation, 0.42),
   };
 }
@@ -133,6 +136,7 @@ function basinLandmark(world, basin, index) {
     extent: round(Math.sqrt(basin.radiusX * basin.radiusZ)),
     prominence: round(median(rim) - elevation),
     persistence: 1,
+    ...(basin.spectralSource ? { spectralSource: basin.spectralSource } : {}),
     navigation: radialNavigation(point(basin.x, elevation, basin.z), basin.radiusX * 0.55),
   };
 }
@@ -233,6 +237,22 @@ function radialNavigation(position, radius) {
     safeEntry: point(position.x - radius, position.y, position.z),
     safeExit: point(position.x + radius, position.y, position.z),
     minimumClearance: 140,
+  };
+}
+
+function spectralSourceAt(world, x, z, kind) {
+  const mapping = world.spectralField?.worldMapping;
+  if (!mapping) return null;
+  const progress = (x - mapping.timeStartX) / Math.max(mapping.timeEndX - mapping.timeStartX, 0.001);
+  const bandFraction = (z - mapping.lowBandZ) / Math.max(mapping.highBandZ - mapping.lowBandZ, 0.001);
+  const centres = world.spectralField.source?.bandCentresHz ?? [];
+  const bandIndex = Math.max(0, Math.min(centres.length - 1, Math.round(bandFraction * Math.max(centres.length - 1, 0))));
+  return {
+    kind,
+    seconds: round(Math.max(0, Math.min(1, progress)) * mapping.durationSeconds, 3),
+    bandFraction: round(Math.max(0, Math.min(1, bandFraction)), 4),
+    bandIndex,
+    hz: centres[bandIndex] ?? null,
   };
 }
 

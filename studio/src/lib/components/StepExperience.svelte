@@ -6,7 +6,7 @@
   // measures the recording and lets the creator direct the world built from it.
   import { onDestroy } from 'svelte';
   import { releaseProject, template, transcendence } from '$lib/stores/package.js';
-  import { CANONICAL_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE } from '$lib/utils/project.js';
+  import { CANONICAL_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE, TRANSCENDENCE_V3_TEMPLATE } from '$lib/utils/project.js';
   import { DEFAULT_ART_DIRECTION, PALETTES, QUALITY_PROFILES, normalizeArtDirection, buildTranscendenceHTML } from '$lib/utils/transcendence.js';
   import { VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
   import { canDecodeAudio } from '$lib/analysis/decode.js';
@@ -52,7 +52,7 @@
 
   function chooseSystem(next) {
     template.set(next);
-    if (next === TRANSCENDENCE_V2_TEMPLATE && !$transcendence.track_id && selectedTrackId) {
+    if ((next === TRANSCENDENCE_V2_TEMPLATE || next === TRANSCENDENCE_V3_TEMPLATE) && !$transcendence.track_id && selectedTrackId) {
       update({ track_id: selectedTrackId });
     }
   }
@@ -177,9 +177,11 @@
     try {
       const audioPath = 'preview/audio';
       const terrainPath = 'preview/terrain.png';
-      const buildPreview = $template === TRANSCENDENCE_V2_TEMPLATE
-        ? (await import('$lib/utils/transcendence-v2.js')).buildTranscendenceV2HTML
-        : buildTranscendenceHTML;
+      const buildPreview = $template === TRANSCENDENCE_V3_TEMPLATE
+        ? (await import('$lib/utils/transcendence-v3.js')).buildTranscendenceV3HTML
+        : $template === TRANSCENDENCE_V2_TEMPLATE
+          ? (await import('$lib/utils/transcendence-v2.js')).buildTranscendenceV2HTML
+          : buildTranscendenceHTML;
       const result = await buildPreview({
         identity: { title: selectedTrack?.title || 'Preview', artist: selectedTrack?.primary_artist || '', release_id: 'ned-preview' },
         edition: {},
@@ -264,17 +266,17 @@
       </button>
 
       <button type="button" class="text-left rounded-2xl p-4 transition-all duration-200"
-        style={$template === TRANSCENDENCE_V2_TEMPLATE
+        style={$template === TRANSCENDENCE_V3_TEMPLATE
           ? 'background: rgba(123,92,240,0.10); border: 1px solid rgba(123,92,240,0.55);'
           : 'background: rgba(255,255,255,0.02); border: 1px solid var(--border-dim);'}
-        on:click={() => chooseSystem(TRANSCENDENCE_V2_TEMPLATE)}>
+        on:click={() => chooseSystem(TRANSCENDENCE_V3_TEMPLATE)}>
         <div class="flex items-center justify-between mb-2">
-          <span class="text-sm font-black text-white">TRANSCENDENCE V2</span>
-          {#if $template === TRANSCENDENCE_V2_TEMPLATE}<span class="text-[10px] font-bold" style="color:#7B5CF0;">SELECTED</span>{/if}
+          <span class="text-sm font-black text-white">TRANSCENDENCE V3</span>
+          {#if $template === TRANSCENDENCE_V3_TEMPLATE}<span class="text-[10px] font-bold" style="color:#7B5CF0;">SELECTED</span>{/if}
         </div>
         <p class="text-xs leading-relaxed" style="color: var(--ink-secondary);">
-          A continuous mountain world whose surface detail is articulated by one recording,
-          with an automatically detected geographic journey and comfort-directed flight.
+          A continuous landscape whose ranges, peaks, troughs and surface are derived from
+          the recording's real time-frequency structure, with a comfort-directed flight.
         </p>
       </button>
     </div>

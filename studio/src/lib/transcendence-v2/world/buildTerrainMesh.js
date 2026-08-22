@@ -84,6 +84,7 @@ export function sampleHeight(world, x, z) {
   const offsetZ = world.noiseOffsetZ || 0;
   height += ridgeNoise(x * world.mesoScale + offsetX, z * world.mesoScale + offsetZ) * world.mesoAmplitude;
   height += (fbm(x * world.microScale + offsetX * 2.3, z * world.microScale + offsetZ * 2.3, 3, 0.55, 2.18) - 0.5) * world.microAmplitude;
+  height += sampleSpectralDisplacement(world, x, z);
 
   const edgeX = Math.abs(u) * 2;
   const edgeZ = Math.abs(v) * 2;
@@ -91,6 +92,47 @@ export function sampleHeight(world, x, z) {
   height += edgeFalloff * world.edgeLift;
 
   return height;
+}
+
+export function sampleSpectralDisplacement(world, x, z) {
+  const field = world.spectralField;
+  if (!field?.data?.length || !field.worldMapping) return 0;
+  const mapping = field.worldMapping;
+  const u = (x - mapping.timeStartX) / Math.max(mapping.timeEndX - mapping.timeStartX, 1);
+  const v = (z - mapping.lowBandZ) / Math.max(mapping.highBandZ - mapping.lowBandZ, 1);
+  if (u < 0 || u > 1 || v < 0 || v > 1) return 0;
+  const energy = bilinearChannel(field, u, v, 0);
+  const harmonic = bilinearChannel(field, u, v, 1);
+  const transient = bilinearChannel(field, u, v, 2);
+  const ridge = bilinearChannel(field, u, v, 3);
+  const shaped = energy * 0.58 + ridge * 0.26 + energy * harmonic * 0.16;
+  const edgeTaper = smoothstep(clamp01(u * 7)) * smoothstep(clamp01((1 - u) * 7))
+    * smoothstep(clamp01(v * 7)) * smoothstep(clamp01((1 - v) * 7));
+  return ((shaped - 0.32) * (world.spectralAmplitude || 0) + transient * 16) * edgeTaper;
+}
+
+function bilinearChannel(field, u, v, channel) {
+  const x = u * (field.width - 1);
+  const z = v * (field.height - 1);
+  const x0 = Math.floor(x);
+  const z0 = Math.floor(z);
+  const x1 = Math.min(x0 + 1, field.width - 1);
+  const z1 = Math.min(z0 + 1, field.height - 1);
+  const tx = x - x0;
+  const tz = z - z0;
+  const a = field.data[(z0 * field.width + x0) * 4 + channel] / 255;
+  const b = field.data[(z0 * field.width + x1) * 4 + channel] / 255;
+  const c = field.data[(z1 * field.width + x0) * 4 + channel] / 255;
+  const d = field.data[(z1 * field.width + x1) * 4 + channel] / 255;
+  return THREE.MathUtils.lerp(THREE.MathUtils.lerp(a, b, tx), THREE.MathUtils.lerp(c, d, tx), tz);
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function smoothstep(value) {
+  return value * value * (3 - 2 * value);
 }
 
 export function sampleMacroHeight(world, x, z) {

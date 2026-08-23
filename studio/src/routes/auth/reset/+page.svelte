@@ -6,7 +6,7 @@
   let loading = false;
 </script>
 
-<svelte:head><title>{data?.invite ? 'Create your password' : 'Set a new password'} — Noizes</title></svelte:head>
+<svelte:head><title>{data?.invite || data?.setup ? 'Create your password' : 'Set a new password'} — Noizes</title></svelte:head>
 
 <div class="min-h-screen flex items-center justify-center px-4 relative" style="background: var(--bg-deep);">
   <WaveCanvas />
@@ -17,9 +17,15 @@
     </a>
 
     <div class="glass rounded-2xl p-8">
-      <h1 class="text-xl font-black text-white mb-1">{data?.invite ? 'Create your password' : 'Set a new password'}</h1>
+      <h1 class="text-xl font-black text-white mb-1">{data?.invite || data?.setup ? 'Create your password' : 'Set a new password'}</h1>
       <p class="text-sm mb-6" style="color: var(--ink-muted);">
-        {data?.invite ? 'Your creator invitation is confirmed. Create a password to enter Studio.' : 'Choose something long and unique. 10+ characters.'}
+        {#if data?.invite}
+          Your creator invitation is confirmed. Create a password to enter Studio.
+        {:else if data?.setup}
+          Set a password so you can sign in directly next time. 10+ characters.
+        {:else}
+          Choose something long and unique. 10+ characters.
+        {/if}
       </p>
 
       {#if form?.error}
@@ -44,7 +50,7 @@
             required minlength="10" autocomplete="new-password" />
         </div>
         <button type="submit" class="btn-spectral w-full justify-center py-3 rounded-xl mt-1" disabled={loading}>
-          {loading ? 'Saving…' : data?.invite ? 'Create password & enter Studio' : 'Save new password'}
+          {loading ? 'Saving…' : data?.invite ? 'Create password & enter Studio' : data?.setup ? 'Set password & continue' : 'Save new password'}
         </button>
       </form>
     </div>

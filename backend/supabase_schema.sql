@@ -15,10 +15,12 @@ create table if not exists public.profiles (
   bio text,
   location text,
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  password_set boolean not null default false
 );
 
 alter table public.profiles add column if not exists is_admin boolean default false;
+alter table public.profiles add column if not exists password_set boolean not null default false;
 alter table public.profiles enable row level security;
 drop policy if exists "Profiles are publicly readable" on public.profiles;
 
@@ -165,6 +167,7 @@ begin
     new.kyc_reviewer_id := old.kyc_reviewer_id;
     new.kyc_reject_reason := old.kyc_reject_reason;
     new.signing_public_key := old.signing_public_key;
+    new.password_set := old.password_set;
   end if;
   return new;
 end;

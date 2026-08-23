@@ -2,6 +2,9 @@ import { fail } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+import { buildInviteAcceptanceUrl, isExistingSupabaseUserError } from '$lib/server/collaborator-invites.js';
+import { buildWaitlistInviteEmail, resendInviteConfigured, sendResendEmail } from '$lib/server/resend.js';
 
 export async function load({ locals }) {
   const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -49,25 +52,54 @@ export const actions = {
 
     if (inviteRowError) return fail(500, { inviteError: inviteRowError.message, failedEmail: email });
 
-    const { error } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      data: { role, display_name: email.split('@')[0] },
-      redirectTo: `https://noizes.xyz/auth/callback`
-    });
+    const metadata = { role, display_name: email.split('@')[0] };
+    const useResend = resendInviteConfigured(env);
+    let inviteErr = null;
 
-    if (error) {
-      // "Already registered" isn't a failure of access — the account exists
-      // and the invite row (incl. any role change) stands. No email goes out,
-      // which is fine: they can already sign in.
-      if (/already.{0,30}(registered|exists)/i.test(error.message)) {
+    if (useResend) {
+      const { data, error: genErr } = await adminClient.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: { data: metadata },
+      });
+      inviteErr = genErr;
+
+      if (!inviteErr) {
+        const tokenHash = data?.properties?.hashed_token;
+        try {
+          if (!tokenHash) throw new Error('Supabase did not generate an invitation token.');
+          const actionLink = buildInviteAcceptanceUrl('https://noizes.xyz', tokenHash);
+          const tpl = buildWaitlistInviteEmail({ role, actionLink });
+          await sendResendEmail({
+            apiKey: env.RESEND_API_KEY,
+            from: env.RESEND_FROM_EMAIL,
+            replyTo: env.RESEND_REPLY_TO,
+            to: email,
+            ...tpl,
+            idempotencySeed: `waitlist:${email}:${tokenHash}`,
+          });
+        } catch (resendErr) {
+          if (!existingInvite && data?.user?.id) await adminClient.auth.admin.deleteUser(data.user.id);
+          if (!existingInvite) await adminClient.from('invites').delete().eq('email', email);
+          return fail(500, { inviteError: resendErr.message, failedEmail: email });
+        }
+      }
+    } else {
+      const { error: sbErr } = await adminClient.auth.admin.inviteUserByEmail(email, {
+        data: metadata,
+        redirectTo: `https://noizes.xyz/auth/callback`,
+      });
+      inviteErr = sbErr;
+    }
+
+    if (inviteErr) {
+      if (isExistingSupabaseUserError(inviteErr.message)) {
         return { invited: email, alreadyRegistered: true };
       }
-      // Genuine send failure: don't leave a brand-new invite granting access
-      // to an email that never got a mail — but never delete one that
-      // pre-existed this action.
       if (!existingInvite) {
         await adminClient.from('invites').delete().eq('email', email);
       }
-      return fail(500, { inviteError: error.message, failedEmail: email });
+      return fail(500, { inviteError: inviteErr.message, failedEmail: email });
     }
 
     return { invited: email };

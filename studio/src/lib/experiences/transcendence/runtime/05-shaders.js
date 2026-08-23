@@ -98,8 +98,11 @@ vec4 terrainSample(vec2 worldXZ){
   float v = worldXZ.x / uBandWidth + 0.5;
   // Row 0 of the image is the highest band, so flip v back.
   vec4 T = texture2D(uTerrain, vec2(clamp(u, 0.0, 1.0), clamp(1.0 - v, 0.0, 1.0)));
-  // Outside the recording there is no land at all — the world simply stops.
-  float inside = step(0.0, u) * step(u, 1.0) * step(0.0, v) * step(v, 1.0);
+  // Outside the recording the spectral data fades out, but macro terrain
+  // continues so there is no visible cliff at the edge of the world.
+  float margin = 0.10;
+  float inside = smoothstep(-margin, margin, u) * smoothstep(-margin, margin, 1.0 - u)
+               * smoothstep(-margin, margin, v) * smoothstep(-margin, margin, 1.0 - v);
   return T * inside;
 }
 
@@ -166,7 +169,7 @@ float terrainHeight(vec2 worldXZ, float lod){
 
   float macro = max(max(peakHeight, shoulderHeight), foothills);
   macro += rangeEnvelope * uHeightScale * 2.0;
-  macro *= mix(0.3, 1.0, energy);
+  macro *= mix(0.65, 1.0, energy);
 
   // ── DELIBERATE VALLEY CORRIDOR ──────────────────────────────────
   // One exaggerated test valley at band ~-0.15 (x ≈ -31).  Broad
@@ -182,7 +185,7 @@ float terrainHeight(vec2 worldXZ, float lod){
 
   // ── SPECTRAL SURFACE LAYER ───────────────────────────────────────
   float hasMacro = smoothstep(2.0, 25.0, macro);
-  float spectral = pow(T.r, uHeightGamma + 0.5) * uHeightScale * mass * 0.12;
+  float spectral = pow(T.r, uHeightGamma + 0.5) * uHeightScale * mass * 0.22;
   spectral *= mix(0.1, 1.0, hasMacro) * mix(1.0, 0.15, vFloor);
 
   float sRidge = T.a * T.r * uRidgeScale * mix(0.6, 1.9, band) * 0.08;
@@ -206,13 +209,10 @@ float terrainHeight(vec2 worldXZ, float lod){
   carve *= 1.0 - smoothstep(0.08, 0.42, lod);
   h = mix(h, terraced, carve);
 
-  // Edge margins.
-  float u = secondsAt(worldXZ.y) / uDuration;
-  float v = worldXZ.x / uBandWidth + 0.5;
-  float margin = 0.012;
-  float inside = smoothstep(0.0, margin, u) * (1.0 - smoothstep(1.0 - margin, 1.0, u))
-               * smoothstep(0.0, margin, v) * (1.0 - smoothstep(1.0 - margin, 1.0, v));
-  return h * inside;
+  // Edge margins: the macro procedural terrain extends everywhere, so only
+  // the spectral contribution has already been faded by terrainSample. No
+  // additional cliff at the edge of the recording.
+  return h;
 }
 
 vec3 terrainNormal(vec2 worldXZ, float eps, float lod){

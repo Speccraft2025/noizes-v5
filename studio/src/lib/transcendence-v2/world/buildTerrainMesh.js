@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildContinuousTerrain(world) {
-  const renderScale = Math.max(1.8, Number(world.renderScale) || 1);
+  const renderScale = Number(world.renderScale) || 1;
   const geometry = new THREE.PlaneGeometry(
     world.width * renderScale,
     world.depth * renderScale,

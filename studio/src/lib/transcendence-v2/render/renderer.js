@@ -39,6 +39,14 @@ export function createRenderer(canvasHost, options = {}) {
   };
   const terrain = buildContinuousTerrain(terrainWorld);
   world.add(terrain.mesh);
+  for (let tx = -1; tx <= 1; tx++) {
+    for (let tz = -1; tz <= 1; tz++) {
+      if (tx === 0 && tz === 0) continue;
+      const tile = terrain.mesh.clone();
+      tile.position.set(tx * macro.width, 0, tz * macro.depth);
+      world.add(tile);
+    }
+  }
 
   const sky = buildSky();
   const stars = buildStars();

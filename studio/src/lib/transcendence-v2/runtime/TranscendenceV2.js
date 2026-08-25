@@ -244,8 +244,8 @@ export class TranscendenceV2 {
       const dy = event.clientY - this.explorePointer.y;
       this.explorePointer.x = event.clientX;
       this.explorePointer.y = event.clientY;
-      this.exploreYaw -= dx * 0.0024;
-      this.explorePitch = THREE.MathUtils.clamp(this.explorePitch - dy * 0.0019, -0.72, 0.35);
+      this.exploreYaw -= dx * 0.003;
+      this.explorePitch = THREE.MathUtils.clamp(this.explorePitch - dy * 0.0024, -0.85, 0.42);
     };
     this.onPointerUp = (event) => {
       if (this.explorePointer?.id === event.pointerId) this.explorePointer = null;
@@ -275,7 +275,8 @@ export class TranscendenceV2 {
 
   updateExplore(delta) {
     const camera = this.renderState.camera;
-    const speed = (this.exploreKeys.has('ShiftLeft') || this.exploreKeys.has('ShiftRight')) ? 720 : 330;
+    const sprinting = this.exploreKeys.has('ShiftLeft') || this.exploreKeys.has('ShiftRight');
+    const speed = sprinting ? 900 : 420;
     const forwardInput = axis(this.exploreKeys, ['KeyS', 'ArrowDown'], ['KeyW', 'ArrowUp']);
     const sideInput = axis(this.exploreKeys, ['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']);
     const verticalInput = axis(this.exploreKeys, ['KeyQ'], ['KeyE']);
@@ -284,8 +285,11 @@ export class TranscendenceV2 {
     const desired = forward.multiplyScalar(forwardInput).addScaledVector(right, sideInput);
     if (desired.lengthSq() > 1) desired.normalize();
     desired.multiplyScalar(speed);
-    desired.y = verticalInput * speed * 0.65;
-    this.exploreVelocity.lerp(desired, 1 - Math.exp(-delta * 3.2));
+    desired.y = verticalInput * speed * 0.7;
+    const hasInput = forwardInput !== 0 || sideInput !== 0 || verticalInput !== 0;
+    const responsiveness = hasInput ? 5.5 : 2.8;
+    this.exploreVelocity.lerp(desired, 1 - Math.exp(-delta * responsiveness));
+    if (!hasInput && this.exploreVelocity.lengthSq() < 4) this.exploreVelocity.set(0, 0, 0);
     camera.position.addScaledVector(this.exploreVelocity, delta);
 
     const world = this.renderState.worldData;

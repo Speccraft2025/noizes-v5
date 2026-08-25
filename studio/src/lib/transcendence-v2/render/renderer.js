@@ -12,9 +12,9 @@ export function createRenderer(canvasHost, options = {}) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x14271a);
-  scene.fog = new THREE.FogExp2(0x102318, 0.00022);
+  scene.fog = new THREE.FogExp2(0x102318, 0.0014);
 
-  const camera = new THREE.PerspectiveCamera(30, 1, 1, 16000);
+  const camera = new THREE.PerspectiveCamera(42, 1, 1, 24000);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(pixelRatio);
   renderer.setSize(canvasHost.clientWidth, canvasHost.clientHeight);
@@ -69,7 +69,7 @@ export function createRenderer(canvasHost, options = {}) {
     },
     setDirection({ exposure = 1, atmosphere = 1 } = {}) {
       renderer.toneMappingExposure = 1.5 * exposure;
-      scene.fog.density = 0.00022 * atmosphere;
+      scene.fog.density = 0.0014 * atmosphere;
     },
     dispose() {
       renderer.dispose();

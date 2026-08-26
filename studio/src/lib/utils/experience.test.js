@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildExperienceHTML, buildGuide } from './experience.js';
-import { GAME_CATALOG } from '../stores/package.js';
+import { buildExperienceHTML, buildGuide, buildGifts } from './experience.js';
+import { GAME_CATALOG, EASTER_EGG_TRIGGERS } from '../stores/package.js';
 import ULTRA_HTML from '../templates/ULTRA.html?raw';
 
 const base = {
@@ -35,6 +35,146 @@ describe('buildGuide — Studio authoring', () => {
     expect(guide.allowFreeExplore).toBe(false);
     expect(guide.nodes.map((node) => node.id)).toEqual(['play', 'listen']);
     expect(guide.nodes[0].label).toBe('Enter the rhythm');
+  });
+});
+
+describe('buildGuide — collector note (gift node)', () => {
+  it('adds a gift node before end when collector note is present', () => {
+    const guide = buildGuide({ collectorNote: 'Thank you for listening.' });
+    const ids = guide.nodes.map((n) => n.id);
+    expect(ids).toContain('gift');
+    expect(ids.indexOf('gift')).toBe(ids.indexOf('end') - 1);
+    expect(guide.nodes.find((n) => n.id === 'gift').body).toBe('Thank you for listening.');
+  });
+
+  it('omits the gift node when collector note is empty', () => {
+    const guide = buildGuide({ collectorNote: '' });
+    expect(guide.nodes.map((n) => n.id)).not.toContain('gift');
+  });
+
+  it('omits the gift node when collector note is undefined', () => {
+    const guide = buildGuide({});
+    expect(guide.nodes.map((n) => n.id)).not.toContain('gift');
+  });
+
+  it('drops gift node from authored guide when collector note is absent', () => {
+    const guide = buildGuide({
+      collectorNote: '',
+      authored: {
+        nodes: [
+          { id: 'listen', type: 'listen', label: 'Listen', view: 'view-player' },
+          { id: 'gift', type: 'gift', label: 'Secret Note', view: 'intro' },
+        ],
+      },
+    });
+    expect(guide.nodes.map((n) => n.id)).toEqual(['listen']);
+  });
+
+  it('preserves gift node in authored guide when collector note is present', () => {
+    const guide = buildGuide({
+      collectorNote: 'You found it.',
+      authored: {
+        nodes: [
+          { id: 'listen', type: 'listen', label: 'Listen', view: 'view-player' },
+          { id: 'gift', type: 'gift', label: 'Secret Note', view: 'intro' },
+        ],
+      },
+    });
+    expect(guide.nodes.map((n) => n.id)).toEqual(['listen', 'gift']);
+    expect(guide.nodes[1].body).toBe('You found it.');
+  });
+});
+
+describe('buildGifts', () => {
+  it('returns null when all gift fields are empty', () => {
+    expect(buildGifts({})).toBeNull();
+    expect(buildGifts({ collector_note: '', dedication: '', easter_eggs: [] })).toBeNull();
+  });
+
+  it('includes only non-empty fields', () => {
+    const gifts = buildGifts({ collector_note: 'Hello', dedication: '', easter_eggs: [] });
+    expect(gifts).toEqual({ collector_note: 'Hello' });
+  });
+
+  it('includes dedication when present', () => {
+    const gifts = buildGifts({ dedication: 'For my mother' });
+    expect(gifts).toEqual({ dedication: 'For my mother' });
+  });
+
+  it('filters easter eggs with empty messages', () => {
+    const gifts = buildGifts({
+      easter_eggs: [
+        { id: 'e1', message: 'Secret!', trigger: 'after_full_listen' },
+        { id: 'e2', message: '', trigger: 'cover_tap', taps: 5 },
+      ],
+    });
+    expect(gifts.easter_eggs).toHaveLength(1);
+    expect(gifts.easter_eggs[0].message).toBe('Secret!');
+  });
+
+  it('normalizes easter egg trigger values', () => {
+    const gifts = buildGifts({
+      easter_eggs: [
+        { id: 'e1', message: 'Time egg', trigger: 'at_timestamp', track_index: 2, seconds: 90 },
+        { id: 'e2', message: 'Tap egg', trigger: 'cover_tap', taps: 5 },
+        { id: 'e3', message: 'Listen egg', trigger: 'after_full_listen' },
+      ],
+    });
+    expect(gifts.easter_eggs[0]).toEqual({ id: 'e1', message: 'Time egg', trigger: 'at_timestamp', track_index: 2, seconds: 90 });
+    expect(gifts.easter_eggs[1]).toEqual({ id: 'e2', message: 'Tap egg', trigger: 'cover_tap', taps: 5 });
+    expect(gifts.easter_eggs[2]).toEqual({ id: 'e3', message: 'Listen egg', trigger: 'after_full_listen' });
+  });
+
+  it('clamps cover_tap taps to 3–20', () => {
+    const gifts = buildGifts({ easter_eggs: [{ id: 'e1', message: 'x', trigger: 'cover_tap', taps: 1 }] });
+    expect(gifts.easter_eggs[0].taps).toBe(3);
+    const gifts2 = buildGifts({ easter_eggs: [{ id: 'e2', message: 'x', trigger: 'cover_tap', taps: 50 }] });
+    expect(gifts2.easter_eggs[0].taps).toBe(20);
+  });
+
+  it('trims whitespace from all text fields', () => {
+    const gifts = buildGifts({ collector_note: '  hello  ', dedication: '  for you  ', easter_eggs: [{ id: 'e1', message: '  secret  ', trigger: 'after_full_listen' }] });
+    expect(gifts.collector_note).toBe('hello');
+    expect(gifts.dedication).toBe('for you');
+    expect(gifts.easter_eggs[0].message).toBe('secret');
+  });
+});
+
+describe('EASTER_EGG_TRIGGERS catalog', () => {
+  it('has unique ids', () => {
+    const ids = EASTER_EGG_TRIGGERS.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('every trigger has a name and hint', () => {
+    for (const t of EASTER_EGG_TRIGGERS) {
+      expect(t.name.length).toBeGreaterThan(0);
+      expect(t.hint.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('buildExperienceHTML — gifts block', () => {
+  it('bakes gifts into NZ_CONFIG when extras have gift content', () => {
+    const cfg = configOf(buildExperienceHTML({
+      ...base,
+      extras: { collector_note: 'Thank you', dedication: 'For you', easter_eggs: [] },
+    }));
+    expect(cfg.gifts).toEqual({ collector_note: 'Thank you', dedication: 'For you' });
+  });
+
+  it('omits gifts from NZ_CONFIG when extras are empty', () => {
+    const cfg = configOf(buildExperienceHTML({ ...base, extras: {} }));
+    expect(cfg.gifts).toBeNull();
+  });
+
+  it('bakes easter eggs into the gifts block', () => {
+    const cfg = configOf(buildExperienceHTML({
+      ...base,
+      extras: { easter_eggs: [{ id: 'e1', message: 'Hidden', trigger: 'cover_tap', taps: 10 }] },
+    }));
+    expect(cfg.gifts.easter_eggs).toHaveLength(1);
+    expect(cfg.gifts.easter_eggs[0].trigger).toBe('cover_tap');
   });
 });
 

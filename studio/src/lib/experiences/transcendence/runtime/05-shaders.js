@@ -125,73 +125,57 @@ vec4 terrainSampleLod(vec2 worldXZ, float lod){
  * all evaluate this, so a landmark can never float above the ridge it is cut
  * into and the camera can never sink through the rock.
  *
- * MACRO FORM vs SPECTRAL SURFACE — the two layers are architecturally
- * separate. Procedural noise fields generate the geological vocabulary:
- * broad mountains, connected ridges, deep navigable valleys. The
- * recording's spectral data articulates their surfaces — it does not
- * determine the silhouette. */
+ * SPECTRAL LANDSCAPE — the recording's spectrogram is the primary
+ * terrain driver. Spectral energy in each mel band directly controls
+ * elevation, so harmonics become ridges and quiet bands become
+ * valleys. Gentle procedural noise adds geological texture (weathering,
+ * micro-relief) proportionally to existing spectral mass. */
 float terrainHeight(vec2 worldXZ, float lod){
   vec4 T = terrainSampleLod(worldXZ, lod);
   float band = clamp(worldXZ.x / uBandWidth + 0.5, 0.0, 1.0);
   float mass = mix(1.45, 0.48, pow(band, 0.70));
   float energy = T.r * mass;
 
-  // ── MACRO FORM LAYER ─────────────────────────────────────────────
-  // Continental envelope: broad mountain ranges and basins.
-  float continent = ridged2(worldXZ * vec2(0.00035, 0.00012) + 3.7);
-  continent = pow(continent, 1.2);
-  float basinMod = fbm2(worldXZ * vec2(0.0003, 0.00018) + 11.0);
-  float rangeEnvelope = smoothstep(0.10, 0.55, continent) * mix(0.55, 1.0, basinMod);
+  // ── SPECTRAL LANDSCAPE ───────────────────────────────────────────
+  // The recording's spectrogram IS the terrain. Each mel band with
+  // energy becomes a ridge; gaps between harmonics become valleys.
+  // The landscape is literally shaped by the sound.
 
-  // Broad shoulders and massifs connecting peaks.
-  float shoulder = fbm2(worldXZ * vec2(0.0012, 0.0004) + 7.5);
-  shoulder = pow(max(shoulder, 0.0), 1.3);
+  // Primary elevation: spectral energy drives height directly.
+  float spectralHeight = pow(energy, uHeightGamma) * uHeightScale * 2.8;
 
-  // Meso-scale peaks riding on the ranges.
-  float range1 = ridged2(worldXZ * vec2(0.0020, 0.0005) + 5.3);
-  range1 = pow(range1, 1.6);
+  // Harmonic ridges: sustained tonal content (H/(H+P) mask) lifts
+  // tonal frequencies into long connected ranges the camera flies
+  // between. Percussive bands stay lower, creating traversable gaps.
+  float harmonicLift = T.g * pow(energy, 0.7) * uHeightScale * 1.0;
 
-  float range2 = ridged2(worldXZ * vec2(0.0008, 0.0012) + 19.1);
-  range2 = pow(range2, 1.8) * 0.65;
+  // Ridge salience: measured spectral peaks stand proud as crests.
+  float ridgeStand = T.a * pow(energy, 0.5) * uRidgeScale * mix(0.8, 2.2, band);
 
-  float peakMod = fbm2(worldXZ * vec2(0.0007, 0.0005) + 2.7);
+  // Transient relief: percussive energy adds cross-grain texture,
+  // drum hits and attacks as lateral features across the ridges.
+  float transientGrain = T.b * energy * uHeightScale * 0.35;
 
-  float mountain = max(range1 * mix(0.4, 1.0, peakMod), range2);
-  mountain = pow(max(mountain, 0.0), 1.5);
-  float peakHeight = mountain * uHeightScale * 8.0 * mix(0.25, 1.0, rangeEnvelope);
-  float shoulderHeight = shoulder * uHeightScale * 3.5 * rangeEnvelope;
+  float spectral = spectralHeight + harmonicLift + ridgeStand + transientGrain;
 
-  float foothills = fbm2(worldXZ * vec2(0.0030, 0.0015) + 41.0);
-  foothills = foothills * foothills * uHeightScale * 0.5;
+  // ── GEOLOGICAL TEXTURE ───────────────────────────────────────────
+  // Gentle procedural variation gives the spectrogram geological
+  // character — weathering on the ridges, not new geography. Only
+  // modulates where spectral energy already exists so it never fills
+  // valleys or invents phantom peaks.
+  float geoWarp = fbm2(worldXZ * vec2(0.0015, 0.0005) + 7.5);
+  float geoRidge = ridged2(worldXZ * vec2(0.004, 0.0012) + 5.3);
+  float geological = (geoWarp * 0.22 + geoRidge * 0.10) * uHeightScale;
+  geological *= smoothstep(0.04, 0.35, energy);
 
-  float macro = max(max(peakHeight, shoulderHeight), foothills);
-  macro += rangeEnvelope * uHeightScale * 2.0;
-  macro *= mix(0.3, 1.0, energy);
+  // Broad continental undulation so the landscape breathes.
+  float continent = fbm2(worldXZ * vec2(0.0003, 0.00015) + 11.0);
+  float broadLift = continent * uHeightScale * 0.5 * smoothstep(0.02, 0.20, energy);
 
-  // ── DELIBERATE VALLEY CORRIDOR ──────────────────────────────────
-  // One exaggerated test valley at band ~-0.15 (x ≈ -31).  Broad
-  // floor, towering flanks, micro-terrain suppressed on the floor.
-  float vCenterX = -31.0;
-  float vDist = abs(worldXZ.x - vCenterX);
-  float vEdge = fbm2(vec2(worldXZ.y * 0.0012 + 77.0, worldXZ.x * 0.001 + 77.0)) * 10.0;
-  float vEffDist = max(0.0, vDist - abs(vEdge));
-  float vFloor = 1.0 - smoothstep(10.0, 35.0, vEffDist);
-  float vWallZone = smoothstep(30.0, 55.0, vEffDist) * (1.0 - smoothstep(55.0, 130.0, vEffDist));
-  macro *= mix(1.0, 0.04, vFloor);
-  macro += vWallZone * uHeightScale * 3.5;
+  float h = spectral + geological + broadLift;
 
-  // ── SPECTRAL SURFACE LAYER ───────────────────────────────────────
-  float hasMacro = smoothstep(2.0, 25.0, macro);
-  float spectral = pow(T.r, uHeightGamma + 0.5) * uHeightScale * mass * 0.12;
-  spectral *= mix(0.1, 1.0, hasMacro) * mix(1.0, 0.15, vFloor);
-
-  float sRidge = T.a * T.r * uRidgeScale * mix(0.6, 1.9, band) * 0.08;
-  sRidge *= mix(0.1, 1.0, hasMacro) * mix(1.0, 0.1, vFloor);
-
-  float h = macro + spectral + sRidge;
-
-  // Micro-relief: suppressed at distance, in basins, and on the valley floor.
-  float detail = uDetailScale * (1.0 - smoothstep(0.10, 0.55, lod)) * mix(0.1, 1.0, hasMacro) * mix(1.0, 0.05, vFloor);
+  // Micro-relief: fine surface articulation, only on ridges with mass.
+  float detail = uDetailScale * (1.0 - smoothstep(0.10, 0.55, lod)) * smoothstep(0.06, 0.30, energy);
   float strata = fbm2(worldXZ * 0.055 + vec2(0.0, band * 3.0)) - 0.5;
   float broken = ridged2(worldXZ * 0.21) - 0.5;
   h += mix(broken, strata, T.g) * detail * (0.25 + T.r * 1.5);

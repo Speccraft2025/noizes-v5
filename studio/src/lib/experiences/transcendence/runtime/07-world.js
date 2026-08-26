@@ -619,19 +619,32 @@ class WorldRenderer {
     const mass = mix(1.45, 0.48, Math.pow(band, 0.70));
     const energy = T.energy * mass;
     const hs = this.field.uHeightScale.value;
-    const gamma = this.field.uHeightGamma.value;
-    const rs = this.field.uRidgeScale.value;
-    const spectralHeight = Math.pow(energy, gamma) * hs * 2.8;
-    const harmonicLift = T.harmonic * Math.pow(energy, 0.7) * hs * 1.0;
-    const ridgeStand = T.ridge * Math.pow(energy, 0.5) * rs * mix(0.8, 2.2, band);
-    const transientGrain = T.transient * energy * hs * 0.35;
-    const spectral = spectralHeight + harmonicLift + ridgeStand + transientGrain;
-    const geoWarp = _fbm2(x * 0.0015 + 7.5, z * 0.0005 + 7.5);
-    const geoRidge = _ridged2(x * 0.004 + 5.3, z * 0.0012 + 5.3);
-    const geological = (geoWarp * 0.22 + geoRidge * 0.10) * hs * smoothstep(0.04, 0.35, energy);
-    const continent = _fbm2(x * 0.0003 + 11.0, z * 0.00015 + 11.0);
-    const broadLift = continent * hs * 0.5 * smoothstep(0.02, 0.20, energy);
-    return Math.max(spectral + geological + broadLift, this.field.uBaseHeight.value);
+    const continent = Math.pow(_ridged2(x * 0.00035 + 3.7, z * 0.00012 + 3.7), 1.2);
+    const basinMod = _fbm2(x * 0.0003 + 11.0, z * 0.00018 + 11.0);
+    const rangeEnvelope = smoothstep(0.10, 0.55, continent) * mix(0.55, 1.0, basinMod);
+    const shoulder = Math.pow(Math.max(_fbm2(x * 0.0012 + 7.5, z * 0.0004 + 7.5), 0), 1.3);
+    const range1 = Math.pow(_ridged2(x * 0.0020 + 5.3, z * 0.0005 + 5.3), 1.6);
+    const range2 = Math.pow(_ridged2(x * 0.0008 + 19.1, z * 0.0012 + 19.1), 1.8) * 0.65;
+    const peakMod = _fbm2(x * 0.0007 + 2.7, z * 0.0005 + 2.7);
+    let mountain = Math.max(range1 * mix(0.4, 1.0, peakMod), range2);
+    mountain = Math.pow(Math.max(mountain, 0), 1.5);
+    const peakHeight = mountain * hs * 8.0 * mix(0.25, 1.0, rangeEnvelope);
+    const shoulderHeight = shoulder * hs * 3.5 * rangeEnvelope;
+    const foot = Math.pow(_fbm2(x * 0.0030 + 41.0, z * 0.0015 + 41.0), 2) * hs * 0.5;
+    let macro = Math.max(Math.max(peakHeight, shoulderHeight), foot);
+    macro += rangeEnvelope * hs * 2.0;
+    macro *= mix(0.3, 1.0, energy);
+    const vCenterX = -31;
+    const vDist = Math.abs(x - vCenterX);
+    const vEdge = _fbm2(z * 0.0012 + 77, x * 0.001 + 77) * 10;
+    const vEffDist = Math.max(0, vDist - Math.abs(vEdge));
+    const vFloor = 1 - smoothstep(10, 35, vEffDist);
+    const vWallZone = smoothstep(30, 55, vEffDist) * (1 - smoothstep(55, 130, vEffDist));
+    macro *= mix(1, 0.04, vFloor);
+    macro += vWallZone * hs * 3.5;
+    const spectral = Math.pow(T.energy, this.field.uHeightGamma.value + 0.5) * hs * mass * 0.12 * mix(1, 0.15, vFloor);
+    const sRidge = T.ridge * T.energy * this.field.uRidgeScale.value * mix(0.6, 1.9, band) * 0.08 * mix(1, 0.1, vFloor);
+    return Math.max(macro + spectral + sRidge, this.field.uBaseHeight.value);
   }
 
   /* The height the flight should clear: the highest ground in a short window

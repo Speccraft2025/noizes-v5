@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spectrogram Terrain — Experience Prototype</title>
+  <style>
+    :root{--bg:#020403;--fg:#ece8d9;--muted:#9ca48f;--accent:#c9d66f}
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,Arial,sans-serif}
+    body{height:700vh;overflow-x:hidden}
+    #stage{position:fixed;inset:0;overflow:hidden;background:#010201}
+    canvas{display:block;width:100%;height:100%}
+    .grain{position:absolute;inset:0;pointer-events:none;opacity:.12;mix-blend-mode:soft-light;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 140 140' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E")}
+    .ui{position:absolute;inset:0;pointer-events:none}
+    .brand{position:absolute;left:28px;top:22px;font-size:12px;letter-spacing:.35em;font-weight:700}
+    .brand small{display:block;margin-top:8px;font-size:8px;letter-spacing:.28em;color:var(--muted);font-weight:500}
+    .counter{position:absolute;right:28px;top:24px;font-size:10px;letter-spacing:.18em;color:var(--muted)}
+    .chapter{position:absolute;left:6vw;bottom:12vh;max-width:min(650px,80vw);transition:opacity .45s ease,transform .45s ease;text-shadow:0 2px 30px rgba(0,0,0,.7)}
+    .eyebrow{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--accent)}
+    .chapter h1{margin:.45rem 0 0;font-family:Georgia,'Times New Roman',serif;font-size:clamp(42px,7vw,110px);font-weight:400;line-height:.9;letter-spacing:-.035em}
+    .chapter p{margin-top:16px;max-width:44ch;font-size:12px;line-height:1.6;color:#c9c8bb;letter-spacing:.06em}
+    .scrollhint{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;font-size:9px;letter-spacing:.28em;color:var(--muted)}
+    .scrollhint i{width:50px;height:1px;background:linear-gradient(90deg,transparent,var(--muted))}
+    .progress{position:absolute;top:0;left:0;height:2px;background:var(--accent);width:0%}
+    .vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at center,transparent 45%,rgba(0,0,0,.44) 100%)}
+    .fade{position:absolute;inset:0;pointer-events:none;background:#000;opacity:1;transition:opacity 1.6s ease}
+    .ready .fade{opacity:0}
+    @media(max-width:700px){.brand{left:18px}.counter{right:18px}.chapter{left:22px;bottom:14vh}.chapter p{font-size:11px}}
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="three"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+    <div class="ui">
+      <div class="progress" id="progress"></div>
+      <div class="brand">TRANSCENDENCE<small>SPECTRAL LANDSCAPE</small></div>
+      <div class="counter" id="counter">01 / 07</div>
+      <div class="chapter" id="chapter">
+        <div class="eyebrow">01 — AERIAL</div>
+        <h1>The Spectral<br/>Landscape</h1>
+        <p>Each ridge is a frequency. Each valley, a gap between harmonics. Scroll to travel.</p>
+      </div>
+      <div class="scrollhint"><i></i>SCROLL TO TRAVEL<i></i></div>
+      <div class="fade"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.165.0/build/three.module.js';
+
+    /* ─── renderer ─── */
+    const mount = document.getElementById('three');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    mount.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#07100b');
+    scene.fog = new THREE.FogExp2('#0b160f', 0.00078);
+    const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.1, 5000);
+
+    /* ─── math helpers ─── */
+    const fract = n => n - Math.floor(n);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const smoothstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+
+    function hash(x, z) { return fract(Math.sin(x * 127.1 + z * 311.7) * 43758.5453123); }
+    function noise(x, z) {
+      const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+      const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+      const a = hash(xi, zi), b = hash(xi + 1, zi), c = hash(xi, zi + 1), d = hash(xi + 1, zi + 1);
+      return lerp(lerp(a, b, u), lerp(c, d, u), v);
+    }
+    function fbm(x, z) { let v = 0, a = 0.5, f = 1; for (let i = 0; i < 5; i++) { v += noise(x * f, z * f) * a; f *= 2.03; a *= 0.5; } return v; }
+    function ridged(x, z) { let v = 0, a = 0.5, f = 1; for (let i = 0; i < 4; i++) { v += (1 - Math.abs(noise(x * f, z * f) * 2 - 1)) * a; f *= 2.1; a *= 0.45; } return v; }
+
+    /* ─── SYNTHETIC SPECTROGRAM ───
+     * Simulates a track with bass, vocals, synth chords, and drums.
+     * Returns { energy, harmonic, transient, ridge } matching the
+     * RGBA channels of a real mel-spectrogram terrain PNG.
+     *
+     * band: 0 = lowest mel bin, 1 = highest
+     * time: 0 = song start, 1 = song end
+     */
+
+    // Mel-scale harmonic positions for a given fundamental band
+    // In mel space, harmonics compress at higher frequencies
+    function melHarmonics(fund, count) {
+      const positions = [fund];
+      for (let n = 2; n <= count; n++) {
+        // Approximate mel compression: higher harmonics get closer
+        const pos = fund + (fund * 0.85) * Math.log2(n);
+        if (pos > 0.98) break;
+        positions.push(pos);
+      }
+      return positions;
+    }
+
+    function syntheticSpectrum(time, band) {
+      // ── Song dynamics envelope ──
+      let dynamics;
+      if      (time < 0.06) dynamics = smoothstep(0, 0.06, time) * 0.25;
+      else if (time < 0.14) dynamics = lerp(0.25, 0.38, (time - 0.06) / 0.08);
+      else if (time < 0.32) dynamics = 0.50 + 0.08 * Math.sin(time * 48);
+      else if (time < 0.52) dynamics = 0.88 + 0.10 * Math.sin(time * 32);
+      else if (time < 0.65) dynamics = 0.48 + 0.08 * Math.sin(time * 42);
+      else if (time < 0.88) dynamics = 0.95 + 0.05 * Math.sin(time * 26);
+      else                  dynamics = 0.95 * (1 - smoothstep(0.88, 1.0, time));
+
+      let e = 0, h = 0, t = 0, r = 0;
+      const bandW = 0.014;
+
+      // ── BASS (fundamental ~0.06, plays in verse+chorus) ──
+      const bassPresence = time > 0.10 ? dynamics : dynamics * 0.2;
+      const bassFund = 0.06 + 0.008 * Math.sin(time * 65);
+      const bassH = melHarmonics(bassFund, 10);
+      for (let i = 0; i < bassH.length; i++) {
+        const center = bassH[i];
+        const w = bandW + 0.004 * i;
+        const d = (band - center) / w;
+        const amp = bassPresence * (0.85 / Math.sqrt(i + 1));
+        const c = amp * Math.exp(-d * d * 2.5);
+        e += c;
+        h += c * 0.88;
+        if (i < 4) r += c * 0.65;
+      }
+
+      // ── VOCALS (fundamental ~0.16, melody moves over time) ──
+      const vocalPresence = smoothstep(0.12, 0.18, time) * dynamics * 0.75;
+      const vocalFund = 0.16 + 0.02 * Math.sin(time * 110) + 0.01 * Math.sin(time * 73);
+      const vocalH = melHarmonics(vocalFund, 7);
+      for (let i = 0; i < vocalH.length; i++) {
+        const center = vocalH[i];
+        const w = bandW + 0.006 * i;
+        const d = (band - center) / w;
+        const amp = vocalPresence * (0.72 / (i + 1));
+        const c = amp * Math.exp(-d * d * 2.2);
+        e += c;
+        h += c * 0.93;
+        r += c * 0.45;
+      }
+
+      // ── SYNTH PAD (chord: three fundamentals, chorus only) ──
+      const synthPresence = Math.max(0, dynamics - 0.55) * 2.2;
+      const chordRoots = [0.12, 0.19, 0.27];
+      for (const root of chordRoots) {
+        const sH = melHarmonics(root, 5);
+        for (let i = 0; i < sH.length; i++) {
+          const center = sH[i];
+          const w = 0.018 + 0.004 * i;
+          const d = (band - center) / w;
+          const c = synthPresence * (0.45 / (i + 1)) * Math.exp(-d * d * 2);
+          e += c;
+          h += c * 0.90;
+        }
+      }
+
+      // ── HIGH STRINGS / AIR (upper frequencies, subtle) ──
+      const airPresence = Math.max(0, dynamics - 0.4) * 0.6;
+      if (band > 0.55) {
+        const airEnv = smoothstep(0.55, 0.72, band) * (1 - smoothstep(0.88, 0.98, band));
+        const airNoise = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(band * 180 + time * 40));
+        e += airPresence * airEnv * airNoise * 0.25;
+      }
+
+      // ── DRUMS (transient events) ──
+      const drumPresence = smoothstep(0.13, 0.17, time);
+
+      // Kick (every beat)
+      const kickPhase = fract(time * 36);
+      if (kickPhase < 0.035 && drumPresence > 0 && band < 0.18) {
+        const kickAmp = dynamics * 0.65 * Math.exp(-band / 0.06) * (1 - kickPhase / 0.035);
+        e += kickAmp;
+        t += kickAmp * 0.92;
+      }
+
+      // Snare (off-beats)
+      const snarePhase = fract(time * 18 + 0.5);
+      if (snarePhase < 0.028 && drumPresence > 0 && band > 0.06 && band < 0.52) {
+        const snareAmp = dynamics * 0.38 * Math.exp(-Math.pow(band - 0.22, 2) / 0.025);
+        e += snareAmp;
+        t += snareAmp * 0.82;
+      }
+
+      // Hi-hat (faster subdivision)
+      const hatPhase = fract(time * 72);
+      if (hatPhase < 0.018 && drumPresence > 0 && band > 0.52) {
+        const hatAmp = dynamics * 0.22 * smoothstep(0.52, 0.70, band) * (1 - smoothstep(0.92, 1.0, band));
+        e += hatAmp;
+        t += hatAmp * 0.70;
+      }
+
+      // ── Noise floor (subtle, makes silence not perfectly flat) ──
+      const nf = 0.015 * dynamics * (0.4 + 0.6 * hash(Math.floor(time * 300), Math.floor(band * 200)));
+      e += nf;
+
+      // ── Clamp and normalize ──
+      e = clamp(e, 0, 1);
+      const invE = e > 0.005 ? 1 / e : 0;
+      h = clamp(h * invE, 0, 1);
+      t = clamp(t * invE, 0, 1);
+      r = clamp(r, 0, 1);
+
+      return { energy: e, harmonic: h, transient: t, ridge: r };
+    }
+
+    /* ─── TERRAIN ───
+     * Matches the platform approach: spectrogram is primary (2.8x),
+     * procedural geology is texture only (0.22x), gated by energy.
+     */
+    const TERRAIN_W = 1200, TERRAIN_D = 3200;
+    const SEG_X = 280, SEG_Z = 520;
+    const HEIGHT_SCALE = 30, HEIGHT_GAMMA = 1.55, RIDGE_SCALE = 12;
+
+    function terrainHeight(x, z) {
+      const band = clamp((x + TERRAIN_W * 0.5) / TERRAIN_W, 0, 1);
+      const time = clamp(-z / TERRAIN_D, 0, 1);
+      const T = syntheticSpectrum(time, band);
+
+      // Mass scaling: low frequencies taller
+      const mass = lerp(1.45, 0.48, Math.pow(band, 0.70));
+      const energy = T.energy * mass;
+
+      // SPECTRAL LANDSCAPE
+      const spectralHeight = Math.pow(Math.max(energy, 0), HEIGHT_GAMMA) * HEIGHT_SCALE * 2.8;
+      const harmonicLift = T.harmonic * Math.pow(Math.max(energy, 0), 0.7) * HEIGHT_SCALE * 1.0;
+      const ridgeStand = T.ridge * Math.pow(Math.max(energy, 0), 0.5) * RIDGE_SCALE * lerp(0.8, 2.2, band);
+      const transientGrain = T.transient * energy * HEIGHT_SCALE * 0.35;
+      const spectral = spectralHeight + harmonicLift + ridgeStand + transientGrain;
+
+      // GEOLOGICAL TEXTURE (subtle, only where spectral mass exists)
+      const geoWarp = fbm(x * 0.0015 + 7.5, z * 0.0005 + 7.5);
+      const geoRidge = ridged(x * 0.004 + 5.3, z * 0.0012 + 5.3);
+      const geological = (geoWarp * 0.22 + geoRidge * 0.10) * HEIGHT_SCALE * smoothstep(0.04, 0.35, energy);
+
+      const continent = fbm(x * 0.0003 + 11.0, z * 0.00015 + 11.0);
+      const broadLift = continent * HEIGHT_SCALE * 0.5 * smoothstep(0.02, 0.20, energy);
+
+      return Math.max(spectral + geological + broadLift, -4);
+    }
+
+    /* ─── geometry + vertex colors ─── */
+    const geom = new THREE.PlaneGeometry(TERRAIN_W, TERRAIN_D, SEG_X, SEG_Z);
+    geom.rotateX(-Math.PI / 2);
+
+    const pos = geom.attributes.position, colors = [];
+    const cShadow = new THREE.Color('#07130d');
+    const cDeep   = new THREE.Color('#12331b');
+    const cMid    = new THREE.Color('#356629');
+    const cMoss   = new THREE.Color('#6f8735');
+    const cGold   = new THREE.Color('#c7a65a');
+
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const y = terrainHeight(x, z);
+      pos.setY(i, y);
+      const n = fbm(x * 0.015, z * 0.015);
+      const slopeTone = clamp((y + 10) / 200, 0, 1);
+      let col = cShadow.clone().lerp(cDeep, clamp(slopeTone * 1.4, 0, 1));
+      col.lerp(cMid, clamp((slopeTone - 0.25) * 1.4, 0, 1));
+      if (n > 0.63) col.lerp(cMoss, (n - 0.63) * 1.4);
+      if (n > 0.83) col.lerp(cGold, (n - 0.83) * 1.6);
+      colors.push(col.r, col.g, col.b);
+    }
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geom.computeVertexNormals();
+
+    const terrainMat = new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 0.88, metalness: 0.03, flatShading: false
+    });
+    const terrain = new THREE.Mesh(geom, terrainMat);
+    terrain.position.z = 200;
+    scene.add(terrain);
+
+    /* ─── lighting ─── */
+    scene.add(new THREE.HemisphereLight('#57725a', '#030504', 0.75));
+    const sun = new THREE.DirectionalLight('#ffd58a', 5.2);
+    sun.position.set(-420, 520, -780);
+    scene.add(sun);
+    const warm = new THREE.PointLight('#d8aa54', 1600, 700, 2);
+    warm.position.set(20, 70, -240);
+    scene.add(warm);
+
+    /* ─── particles ─── */
+    const pCount = 2200, pGeo = new THREE.BufferGeometry(), pPos = new Float32Array(pCount * 3);
+    for (let i = 0; i < pCount; i++) {
+      pPos[i * 3] = (Math.random() - 0.5) * TERRAIN_W;
+      pPos[i * 3 + 1] = 30 + Math.random() * 320;
+      pPos[i * 3 + 2] = (Math.random() - 0.5) * TERRAIN_D;
+    }
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+    const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({
+      color: '#c7d19a', size: 0.45, transparent: true, opacity: 0.18, depthWrite: false
+    }));
+    scene.add(particles);
+
+    /* ─── CAMERA PATH ───
+     * The path is routed through natural spectral valleys — the gaps
+     * between harmonic series where energy drops to near zero.
+     *
+     * Key valleys (in band-space, approx):
+     *  ~0.03-0.05  — below bass fundamental
+     *  ~0.10-0.14  — between bass and vocal harmonics
+     *  ~0.38-0.44  — above main vocal harmonics
+     *  ~0.50-0.55  — gap before hi-hat energy
+     *
+     * The camera visits multiple valleys, crossing ridges between them.
+     */
+    function bandToX(b) { return (b - 0.5) * TERRAIN_W; }
+    function timeToZ(t) { return -t * TERRAIN_D + 200; }
+
+    const pathPts = [
+      // AERIAL — high survey of the full spectral landscape
+      new THREE.Vector3(bandToX(0.40), 700, timeToZ(0.02)),
+      new THREE.Vector3(bandToX(0.35), 660, timeToZ(0.06)),
+      new THREE.Vector3(bandToX(0.30), 600, timeToZ(0.10)),
+
+      // DESCEND toward the valley between bass and vocal harmonics
+      new THREE.Vector3(bandToX(0.25), 480, timeToZ(0.14)),
+      new THREE.Vector3(bandToX(0.12), 340, timeToZ(0.18)),
+
+      // INTO VALLEY — between bass harmonics (~band 0.10-0.13)
+      new THREE.Vector3(bandToX(0.11), 200, timeToZ(0.22)),
+      new THREE.Vector3(bandToX(0.12), 130, timeToZ(0.27)),
+      new THREE.Vector3(bandToX(0.11), 110, timeToZ(0.32)),
+
+      // DEEP IN VALLEY — trough language, verse section
+      new THREE.Vector3(bandToX(0.12), 95, timeToZ(0.36)),
+      new THREE.Vector3(bandToX(0.11), 100, timeToZ(0.40)),
+
+      // CLIMB over bass harmonic ridge into the vocal gap
+      new THREE.Vector3(bandToX(0.15), 160, timeToZ(0.44)),
+      new THREE.Vector3(bandToX(0.22), 280, timeToZ(0.48)),
+      new THREE.Vector3(bandToX(0.32), 400, timeToZ(0.51)),
+
+      // CREST — reveal the mid-frequency valley
+      new THREE.Vector3(bandToX(0.38), 460, timeToZ(0.54)),
+      new THREE.Vector3(bandToX(0.42), 430, timeToZ(0.57)),
+
+      // DESCEND into mid-frequency valley (~band 0.40-0.44)
+      new THREE.Vector3(bandToX(0.42), 320, timeToZ(0.61)),
+      new THREE.Vector3(bandToX(0.41), 210, timeToZ(0.66)),
+      new THREE.Vector3(bandToX(0.40), 140, timeToZ(0.70)),
+
+      // DEEP IN SECOND VALLEY — chorus energy rising on both sides
+      new THREE.Vector3(bandToX(0.41), 110, timeToZ(0.74)),
+      new THREE.Vector3(bandToX(0.40), 105, timeToZ(0.78)),
+      new THREE.Vector3(bandToX(0.41), 115, timeToZ(0.82)),
+
+      // CLIMB toward high-frequency terrain
+      new THREE.Vector3(bandToX(0.45), 180, timeToZ(0.86)),
+      new THREE.Vector3(bandToX(0.50), 300, timeToZ(0.90)),
+
+      // FINAL AERIAL as outro fades
+      new THREE.Vector3(bandToX(0.48), 450, timeToZ(0.94)),
+      new THREE.Vector3(bandToX(0.45), 550, timeToZ(0.98)),
+    ];
+    const curve = new THREE.CatmullRomCurve3(pathPts, false, 'centripetal', 0.5);
+
+    function cameraLookTarget(progress, cameraPos) {
+      // Smoothly transition aim between phases
+      if (progress < 0.22) {
+        const t = smoothstep(0, 0.22, progress);
+        return new THREE.Vector3(
+          lerp(bandToX(0.30), bandToX(0.12), t),
+          lerp(220, 120, t),
+          lerp(timeToZ(0.08), timeToZ(0.28), t)
+        );
+      }
+      if (progress < 0.42) {
+        const t = smoothstep(0.22, 0.42, progress);
+        return new THREE.Vector3(
+          lerp(bandToX(0.12), bandToX(0.18), t),
+          lerp(120, 200, t),
+          lerp(timeToZ(0.28), timeToZ(0.46), t)
+        );
+      }
+      if (progress < 0.58) {
+        const t = smoothstep(0.42, 0.58, progress);
+        return new THREE.Vector3(
+          lerp(bandToX(0.18), bandToX(0.41), t),
+          lerp(200, 150, t),
+          lerp(timeToZ(0.46), timeToZ(0.62), t)
+        );
+      }
+      if (progress < 0.78) {
+        const t = smoothstep(0.58, 0.78, progress);
+        return new THREE.Vector3(
+          lerp(bandToX(0.41), bandToX(0.41), t),
+          lerp(150, 110, t),
+          lerp(timeToZ(0.62), timeToZ(0.80), t)
+        );
+      }
+      if (progress < 0.90) {
+        const t = smoothstep(0.78, 0.90, progress);
+        return new THREE.Vector3(
+          lerp(bandToX(0.41), bandToX(0.48), t),
+          lerp(110, 280, t),
+          lerp(timeToZ(0.80), timeToZ(0.92), t)
+        );
+      }
+      const t = smoothstep(0.90, 1, progress);
+      return new THREE.Vector3(
+        lerp(bandToX(0.48), bandToX(0.45), t),
+        lerp(280, 350, t),
+        lerp(timeToZ(0.92), timeToZ(1.0), t)
+      );
+    }
+
+    /* ─── scroll / chapters ─── */
+    let targetProgress = 0, smoothProgress = 0, currentChapter = -1;
+    const chapterEl = document.getElementById('chapter');
+    const counterEl = document.getElementById('counter');
+    const progressEl = document.getElementById('progress');
+
+    const chapters = [
+      { p: 0,    eyebrow: '01 — AERIAL',           title: 'The Spectral<br/>Landscape',   body: 'Each ridge below is a frequency band with energy. Gaps between harmonics form natural valleys.' },
+      { p: 0.15, eyebrow: '02 — HARMONIC RANGES',  title: 'Bass<br/>Harmonics',            body: 'The tallest ridges: bass fundamentals and their overtones, running like mountain ranges.' },
+      { p: 0.28, eyebrow: '03 — SPECTRAL VALLEY',  title: 'Between<br/>Frequencies',       body: 'Where harmonics end and silence begins — the terrain drops to a traversable valley floor.' },
+      { p: 0.44, eyebrow: '04 — RIDGE CROSSING',   title: 'Over the<br/>Harmonics',        body: 'Climbing across a ridge of spectral energy, moving from bass into the mid-frequency world.' },
+      { p: 0.58, eyebrow: '05 — MID VALLEY',       title: 'The Vocal<br/>Gap',             body: 'Between vocal harmonics and high-frequency content — the deepest quiet in the spectrum.' },
+      { p: 0.74, eyebrow: '06 — CHORUS WALLS',     title: 'Energy<br/>Rising',             body: 'The chorus pushes energy into every band. The valley walls grow taller around the camera.' },
+      { p: 0.88, eyebrow: '07 — ASCENT',           title: 'Above<br/>the Spectrum',        body: 'As the outro fades, the ridges lower and the landscape dissolves into silence.' },
+    ];
+
+    function updateChapter(p) {
+      let idx = 0;
+      for (let i = 0; i < chapters.length; i++) if (p >= chapters[i].p) idx = i;
+      if (idx === currentChapter) return;
+      currentChapter = idx;
+      chapterEl.style.opacity = '0';
+      chapterEl.style.transform = 'translateY(12px)';
+      setTimeout(() => {
+        const c = chapters[idx];
+        chapterEl.innerHTML = `<div class="eyebrow">${c.eyebrow}</div><h1>${c.title}</h1><p>${c.body}</p>`;
+        chapterEl.style.opacity = '1';
+        chapterEl.style.transform = 'translateY(0)';
+        counterEl.textContent = String(idx + 1).padStart(2, '0') + ' / ' + String(chapters.length).padStart(2, '0');
+      }, 180);
+    }
+
+    function updateScroll() {
+      const max = document.documentElement.scrollHeight - innerHeight;
+      targetProgress = max > 0 ? scrollY / max : 0;
+    }
+    addEventListener('scroll', updateScroll, { passive: true });
+    updateScroll();
+
+    /* ─── animation loop ─── */
+    const clock = new THREE.Clock();
+    const lookTarget = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.05, clock.getDelta());
+
+      smoothProgress += (targetProgress - smoothProgress) * (1 - Math.exp(-dt * 2.35));
+      const p = clamp(smoothProgress, 0, 1);
+
+      // Dynamic FOV
+      let targetFov = 48;
+      if      (p < 0.20) targetFov = lerp(60, 54, p / 0.20);
+      else if (p < 0.42) targetFov = lerp(54, 46, (p - 0.20) / 0.22);
+      else if (p < 0.58) targetFov = lerp(46, 50, (p - 0.42) / 0.16);
+      else if (p < 0.78) targetFov = lerp(50, 44, (p - 0.58) / 0.20);
+      else if (p < 0.88) targetFov = lerp(44, 56, (p - 0.78) / 0.10);
+      else               targetFov = lerp(56, 48, (p - 0.88) / 0.12);
+      camera.fov += (targetFov - camera.fov) * (1 - Math.exp(-dt * 1.15));
+      camera.updateProjectionMatrix();
+
+      // Camera position
+      const cp = curve.getPointAt(p);
+      const floorY = terrainHeight(cp.x, cp.z - 200);
+      const phaseClearance = p < 0.20 ? 200 : (p < 0.42 ? 72 : (p < 0.58 ? 95 : (p < 0.78 ? 65 : 90)));
+      cp.y = Math.max(cp.y, floorY + phaseClearance);
+
+      // Side-wall awareness
+      let sideThreat = 0;
+      for (const dx of [-90, -55, 55, 90]) {
+        const h = terrainHeight(cp.x + dx, cp.z - 200 + 40);
+        sideThreat = Math.max(sideThreat, h - (cp.y - 50));
+      }
+      if (sideThreat > 0) cp.y += Math.min(75, sideThreat * 0.45);
+      camera.position.lerp(cp, 1 - Math.exp(-dt * 3.0));
+
+      // Look target
+      const desiredLook = cameraLookTarget(p, camera.position);
+      lookTarget.lerp(desiredLook, 1 - Math.exp(-dt * 1.35));
+      const targetFloor = terrainHeight(lookTarget.x, lookTarget.z - 200);
+      lookTarget.y = Math.max(lookTarget.y, targetFloor + 12);
+
+      const q = new THREE.Quaternion();
+      const m = new THREE.Matrix4().lookAt(camera.position, lookTarget, new THREE.Vector3(0, 1, 0));
+      q.setFromRotationMatrix(m);
+      camera.quaternion.slerp(q, 1 - Math.exp(-dt * 1.10));
+
+      // Life
+      particles.rotation.y += dt * 0.0012;
+      warm.intensity = 1450 + Math.sin(performance.now() * 0.00018) * 65;
+
+      // UI
+      updateChapter(p);
+      progressEl.style.width = (p * 100) + '%';
+
+      renderer.render(scene, camera);
+    }
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+    });
+
+    document.documentElement.classList.add('ready');
+    animate();
+  </script>
+</body>
+</html>

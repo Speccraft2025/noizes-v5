@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { buildExperienceHTML, buildGuide } from './experience.js';
+import { buildExperienceHTML, buildGuide, buildGifts } from './experience.js';
 import { CANONICAL_TEMPLATE, normalizeEdition, normalizeTemplate, TRANSCENDENCE_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE, TRANSCENDENCE_V3_TEMPLATE } from './project.js';
 import { buildTranscendenceHTML, TRANSCENDENCE_SCHEMA, QUALITY_PROFILES } from './transcendence.js';
 import { describeFailures, validateTranscendence } from './validateTranscendence.js';
@@ -167,6 +167,36 @@ export async function buildPackage(input) {
       path,
       mime: 'application/pdf',
       src: path,
+    });
+  }
+  const linerImages = [];
+  for (const [index, img] of (extras.images || []).entries()) {
+    if (!img.file || !img.file.type?.startsWith('image/')) continue;
+    const buffer = await img.file.arrayBuffer();
+    const ext = extension(img.name || img.file.name, 'image');
+    const name = `${String(index + 1).padStart(2, '0')}-${safeFilename(img.name || `image-${index + 1}.${ext}`)}`;
+    const path = `release/images/${name}`;
+    const componentId = img.id || `liner-image-${index + 1}`;
+    const sha256 = await sha256Hex(buffer);
+    zip.file(path, buffer);
+    components.push({
+      component_id: componentId,
+      scope: 'release',
+      type: 'image',
+      role: 'liner_image',
+      title: img.title?.trim() || img.name || `Image ${index + 1}`,
+      path,
+      filename: img.name || name,
+      mime: img.file.type || 'image/jpeg',
+      size: buffer.byteLength,
+      sha256,
+    });
+    linerImages.push({
+      id: componentId,
+      title: img.title?.trim() || img.name || `Image ${index + 1}`,
+      caption: img.caption?.trim() || '',
+      path,
+      mime: img.file.type || 'image/jpeg',
     });
   }
   onProgress({ percent: 20, stage: 'Packaging release documents' });
@@ -504,6 +534,7 @@ export async function buildPackage(input) {
     hasPlay: Boolean(play.games?.length),
     hasNotes: Boolean(notes.length),
     story: extras.story?.trim(),
+    collectorNote: extras.collector_note?.trim(),
     authored: project.journey.legacy_guide,
   });
   const experienceJson = {
@@ -525,8 +556,16 @@ export async function buildPackage(input) {
       intensity: typeof play.intensity === 'number' ? play.intensity : 1,
     };
   }
-  if (notes.length) {
-    experienceJson.attachments = notes.map(({ id, title, path, mime }) => ({ id, title, path, mime, kind: 'notes' }));
+  const attachments = [
+    ...notes.map(({ id, title, path, mime }) => ({ id, title, path, mime, kind: 'notes' })),
+    ...linerImages.map(({ id, title, caption, path, mime }) => ({ id, title, caption, path, mime, kind: 'image' })),
+  ];
+  if (attachments.length) {
+    experienceJson.attachments = attachments;
+  }
+  const giftsBlock = buildGifts(extras);
+  if (giftsBlock) {
+    experienceJson.gifts = giftsBlock;
   }
   if (transcendenceBuild) {
     Object.assign(experienceJson, transcendenceBuild.descriptor, {

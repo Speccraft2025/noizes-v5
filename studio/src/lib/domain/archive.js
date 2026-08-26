@@ -3,7 +3,7 @@ const clean = (value) => String(value ?? '').trim();
 export const ARCHIVE_SECTIONS = Object.freeze([
   'overview', 'tracklist', 'artwork', 'booklet', 'images', 'video', 'notes',
   'credits', 'rights', 'edition', 'authenticity', 'technical', 'package_contents',
-  'online_resources', 'games',
+  'online_resources', 'games', 'gifts',
 ]);
 
 const AUDIO_ROLE_GROUPS = Object.freeze({
@@ -122,6 +122,7 @@ export function buildReleaseArchive(input = {}) {
     package_contents: components,
     online_resources: input.resources || { groups: [] },
     games: input.games || [],
+    gifts: input.gifts || null,
   };
 }
 

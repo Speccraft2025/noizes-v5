@@ -274,8 +274,18 @@ export const play = writable({
 export const extras = writable({
   story: '',
   links: [],
-  pdfs: []
+  pdfs: [],
+  collector_note: '',
+  dedication: '',
+  images: [],
+  easter_eggs: [],
 });
+
+export const EASTER_EGG_TRIGGERS = [
+  { id: 'after_full_listen', name: 'After full listen', hint: 'revealed when the collector finishes every track' },
+  { id: 'at_timestamp', name: 'At a moment', hint: 'hidden at a specific point in a track — a secret annotation' },
+  { id: 'cover_tap', name: 'Cover tap', hint: 'revealed after tapping the cover art several times' },
+];
 
 // The nine games the ULTRA template ships. Order = display order.
 export const GAME_CATALOG = [

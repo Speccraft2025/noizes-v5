@@ -111,21 +111,34 @@ describe('describeExperienceSections', () => {
   });
 });
 
+describe('describeExperienceSections — gifts', () => {
+  it('shows a gifts section when the summary says gifts exist', () => {
+    const sections = describeExperienceSections(manifest(), { has_gifts: true });
+    expect(sections.map((s) => s.key)).toContain('gifts');
+  });
+
+  it('omits gifts section when no gifts exist', () => {
+    const sections = describeExperienceSections(manifest(), {});
+    expect(sections.map((s) => s.key)).not.toContain('gifts');
+  });
+});
+
 describe('summarizeExperience', () => {
   it('records only what the package actually declares', () => {
     expect(summarizeExperience({}, [])).toEqual({
-      has_opening: false, has_story: false, has_play: false, has_guide: false,
+      has_opening: false, has_story: false, has_play: false, has_gifts: false, has_guide: false,
       lyric_track_count: 0,
     });
   });
 
-  it('reads the journey, story, games and guide out of experience.json', () => {
+  it('reads the journey, story, games, gifts and guide out of experience.json', () => {
     expect(summarizeExperience({
       journey: { release_moments: [{ id: 'm1' }] },
       guide: { story: 'How it was made' },
       play: { games: ['echo'] },
+      gifts: { collector_note: 'Thank you' },
     }, [])).toMatchObject({
-      has_opening: true, has_story: true, has_play: true, has_guide: true,
+      has_opening: true, has_story: true, has_play: true, has_gifts: true, has_guide: true,
     });
   });
 

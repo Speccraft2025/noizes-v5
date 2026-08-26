@@ -8,26 +8,36 @@ export function applyTerrainClearance(frame, sampleHeightAt) {
   const forward = target.clone().sub(position).setY(0).normalize();
   if (forward.lengthSq() < 0.001) forward.set(0, 0, -1);
   const left = new THREE.Vector3().crossVectors(UP, forward).normalize();
-  const MIN_CLEARANCE = 55;
+  const MIN_CLEARANCE = 85;
 
   let maxTerrain = sampleHeightAt(position.x, position.z);
 
-  const probeDistances = [60, 140, 250, 400, 600];
-  const sideOffsets = [0, -80, 80];
+  // Dense close probes + wider far probes, with diagonal coverage
+  const probeDistances = [20, 50, 100, 180, 300, 500];
+  const sideOffsets = [0, -70, 70];
   for (const dist of probeDistances) {
     for (const side of sideOffsets) {
       const px = position.x + forward.x * dist + left.x * side;
       const pz = position.z + forward.z * dist + left.z * side;
-      const h = sampleHeightAt(px, pz);
-      const fadeOff = 1 - dist / 800;
-      if (h + MIN_CLEARANCE * Math.max(0.5, fadeOff) > maxTerrain + MIN_CLEARANCE) {
-        maxTerrain = Math.max(maxTerrain, h);
-      }
+      maxTerrain = Math.max(maxTerrain, sampleHeightAt(px, pz));
     }
   }
 
-  const behindH = sampleHeightAt(position.x - forward.x * 80, position.z - forward.z * 80);
-  maxTerrain = Math.max(maxTerrain, behindH);
+  // Diagonal probes at 45 degrees — catches ridges the forward grid misses
+  const diag = new THREE.Vector3();
+  for (const angle of [-0.7, 0.7]) {
+    diag.copy(forward).applyAxisAngle(UP, angle);
+    for (const dist of [40, 120, 250]) {
+      maxTerrain = Math.max(maxTerrain, sampleHeightAt(
+        position.x + diag.x * dist, position.z + diag.z * dist,
+      ));
+    }
+  }
+
+  // Behind the camera
+  maxTerrain = Math.max(maxTerrain, sampleHeightAt(
+    position.x - forward.x * 80, position.z - forward.z * 80,
+  ));
 
   position.y = Math.max(position.y, maxTerrain + MIN_CLEARANCE);
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export function buildContinuousTerrain(world) {
-  const renderScale = Math.max(1.8, Number(world.renderScale) || 1);
+  const renderScale = Number(world.renderScale) || 1;
   const geometry = new THREE.PlaneGeometry(
     world.width * renderScale,
     world.depth * renderScale,
@@ -80,9 +80,14 @@ export function buildContinuousTerrain(world) {
   };
 }
 
+function wrapCoord(val, size) {
+  const half = size / 2;
+  return ((val + half) % size + size) % size - half;
+}
+
 export function sampleHeight(world, x, z) {
-  const u = x / world.width;
-  const v = z / world.depth;
+  x = wrapCoord(x, world.width);
+  z = wrapCoord(z, world.depth);
 
   let height = sampleMacroHeight(world, x, z);
 
@@ -92,11 +97,6 @@ export function sampleHeight(world, x, z) {
   height += (fbm(x * world.microScale + offsetX * 2.3, z * world.microScale + offsetZ * 2.3, 3, 0.55, 2.18) - 0.5) * world.microAmplitude;
   height += sampleSpectralDisplacement(world, x, z);
 
-  const edgeX = Math.abs(u) * 2;
-  const edgeZ = Math.abs(v) * 2;
-  const edgeFalloff = Math.pow(Math.max(edgeX, edgeZ), 2.6);
-  height += edgeFalloff * world.edgeLift;
-
   return height;
 }
 
@@ -104,9 +104,10 @@ export function sampleSpectralDisplacement(world, x, z) {
   const field = world.spectralField;
   if (!field?.data?.length || !field.worldMapping) return 0;
   const mapping = field.worldMapping;
-  const u = (x - mapping.timeStartX) / Math.max(mapping.timeEndX - mapping.timeStartX, 1);
-  const v = (z - mapping.lowBandZ) / Math.max(mapping.highBandZ - mapping.lowBandZ, 1);
-  if (u < 0 || u > 1 || v < 0 || v > 1) return 0;
+  let u = (x - mapping.timeStartX) / Math.max(mapping.timeEndX - mapping.timeStartX, 1);
+  let v = (z - mapping.lowBandZ) / Math.max(mapping.highBandZ - mapping.lowBandZ, 1);
+  u = ((u % 1) + 1) % 1;
+  v = ((v % 1) + 1) % 1;
   const energy = bilinearChannel(field, u, v, 0);
   const harmonic = bilinearChannel(field, u, v, 1);
   const transient = bilinearChannel(field, u, v, 2);

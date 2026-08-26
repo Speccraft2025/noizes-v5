@@ -33,18 +33,20 @@ body {
   background: rgba(7, 18, 11, 0.44); backdrop-filter: blur(16px); cursor: pointer;
 }
 .txv2-end-actions {
-  position: absolute; right: clamp(18px, 2.4vw, 36px); top: calc(50% + 48px);
-  display: grid; gap: 9px; opacity: 0; visibility: hidden; transform: translateY(12px);
-  transition: opacity 0.8s ease, transform 0.8s ease, visibility 0.8s;
+  position: absolute; right: clamp(18px, 2.4vw, 36px); top: calc(50% + 24px);
+  display: flex; flex-direction: column; gap: 7px; opacity: 0; visibility: hidden; transform: translateY(6px);
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.5s;
 }
 .txv2-end-actions.is-visible { opacity: 1; visibility: visible; transform: translateY(0); }
 .txv2-end-actions button, .txv2-archive-close, .txv2-archive-nav button, .txv2-archive-back {
   pointer-events: auto; border: 1px solid rgba(225, 211, 166, 0.42); color: #f5eed7;
   background: rgba(7, 18, 11, 0.66); backdrop-filter: blur(16px); cursor: pointer;
   font: 11px/1 ui-monospace, "SFMono-Regular", monospace; text-transform: uppercase; letter-spacing: 0.12em;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
 }
-.txv2-end-actions button { min-width: 88px; padding: 11px 15px; border-radius: 999px; }
-.txv2-end-actions button:hover, .txv2-end-actions button:focus-visible { border-color: #d8c48a; background: rgba(18, 42, 25, 0.82); }
+.txv2-end-actions button { min-width: 72px; padding: 10px 14px; border-radius: 999px; }
+.txv2-end-actions button:hover, .txv2-end-actions button:focus-visible { border-color: #d8c48a; background: rgba(18, 42, 25, 0.82); transform: scale(1.04); }
+.txv2-end-actions button:active { transform: scale(0.97); }
 .txv2-end-actions button[hidden] { display: none; }
 .txv2-control {
   position: absolute; right: clamp(18px, 2.4vw, 36px); top: 50%; transform: translateY(-50%);
@@ -162,7 +164,7 @@ body {
   .txv2-lyrics { left: 20px; bottom: 28px; width: 58vw; }
   .txv2-progress { right: 20px; bottom: 32px; width: 28vw; }
   .txv2-entry h1 { font-size: clamp(48px, 18vw, 84px); }
-  .txv2-end-actions { right: 16px; }
+  .txv2-end-actions { right: 16px; top: calc(50% + 20px); }
   .txv2-map { top: 14px; left: 14px; width: min(220px, 58vw); }
   .txv2-roam-pad { right: 14px; bottom: 70px; }
   .txv2-archive-shell { width: calc(100% - 32px); padding-top: 28px; }

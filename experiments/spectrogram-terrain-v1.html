@@ -78,7 +78,7 @@
     function mat4LookAt(ex, ey, ez, cx, cy, cz) {
       let zx = ex - cx, zy = ey - cy, zz = ez - cz;
       let l = 1 / Math.sqrt(zx * zx + zy * zy + zz * zz); zx *= l; zy *= l; zz *= l;
-      let xx = -zz, xy = 0, xz = zx;
+      let xx = zz, xy = 0, xz = -zx;
       l = Math.sqrt(xx * xx + xz * xz); if (l > 1e-6) { l = 1 / l; xx *= l; xz *= l; }
       const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
       const o = new Float32Array(16);

@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   // Fire-and-forget counters for interactions. The page view itself is counted
   // server-side during load, so nothing is sent on mount.
   //
@@ -9,6 +10,15 @@
 
   let queue = [];
   let flushing = false;
+
+  onMount(() => {
+    if (!releaseId) return;
+    const day = new Date().toISOString().slice(0, 10);
+    const key = `noizes:drop-view:${releaseId}:${day}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    track('view');
+  });
 
   export function track(event) {
     if (!releaseId || !event) return;

@@ -8,7 +8,8 @@ For a new project, run these files in the Supabase SQL Editor in this order:
 2. `provenance-resale-2026-07-26.sql`
 3. `multi-track-phase-1-2026-07-31.sql`
 4. `drop-pages-2026-08-03.sql`
-5. Any later dated hardening scripts not already folded into the base schema
+5. `performance-io-hardening-2026-09-11.sql`
+6. Any later dated hardening scripts not already folded into the base schema
 
 `drop-pages-2026-08-03.sql` adds Drop Page routing, package version history,
 the authenticity index, creator links and aggregate analytics. It backfills a

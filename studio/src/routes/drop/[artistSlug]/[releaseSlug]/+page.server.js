@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 
-import { getDropPage, bumpDropAnalytics } from '$lib/server/drop-page.js';
+import { getDropPage } from '$lib/server/drop-page.js';
 import { metaDescription, openGraphTags, shareMessage, shareTargets } from '$lib/domain/drop-share.js';
 import { qrSvg } from '$lib/domain/qr.js';
 
@@ -42,12 +42,6 @@ export async function load({ params, locals, url, setHeaders }) {
     editionSize: release.edition_size,
     trackCount: release.track_count,
   });
-
-  // Counted server-side and in aggregate only — no visitor row is written, so
-  // there is nothing here to correlate later.
-  if (release.status === 'published') {
-    await bumpDropAnalytics(sb, release.id, 'view');
-  }
 
   // Public and shareable, but short-lived: availability and edition counts
   // change, and a stale "3 left" is worse than a slightly slower page.

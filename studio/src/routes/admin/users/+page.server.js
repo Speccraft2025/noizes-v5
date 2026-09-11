@@ -7,8 +7,9 @@ export async function load({ locals }) {
   const adminClient = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: users } = await adminClient
     .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false });
+    .select('id, email, display_name, role, is_admin, kyc_status, created_at')
+    .order('created_at', { ascending: false })
+    .limit(200);
   return { users: users ?? [] };
 }
 

@@ -82,7 +82,7 @@ export async function fulfillAcquisition(sb, intent) {
   // Already fulfilled (duplicate webhook, or the other path won the race).
   const { data: existing } = await sb
     .from('acquisitions')
-    .select('*')
+    .select('id, release_id, owner_id, edition_number, price_paid, currency, previous_owner_id, transferred_from_acquisition_id, acquired_at, payment_reference')
     .eq('payment_reference', intent.reference)
     .maybeSingle();
   if (existing) return { acquisition: existing };
@@ -148,7 +148,7 @@ export async function fulfillAcquisition(sb, intent) {
       // Lost the idempotency race — the other path inserted it. Success.
       const { data: winner } = await sb
         .from('acquisitions')
-        .select('*')
+        .select('id, release_id, owner_id, edition_number, price_paid, currency, previous_owner_id, transferred_from_acquisition_id, acquired_at, payment_reference')
         .eq('payment_reference', intent.reference)
         .maybeSingle();
       if (winner) return { acquisition: winner };

@@ -144,10 +144,10 @@ export async function getDropPage(sb, { artistSlug, slug, viewerId = null, origi
 
   const [packageResult, authenticityResult, linksResult, eventsResult, ownershipResult] = await Promise.all([
     release.package_id
-      ? sb.from('release_packages').select('*').eq('id', release.package_id).maybeSingle()
-      : sb.from('release_packages').select('*').eq('release_id', release.id)
+      ? sb.from('release_packages').select('id, version, file_size, manifest_json, manifest_hash, package_hash, package_version, experience_entry, experience_summary, validation_status, validated_at').eq('id', release.package_id).maybeSingle()
+      : sb.from('release_packages').select('id, version, file_size, manifest_json, manifest_hash, package_hash, package_version, experience_entry, experience_summary, validation_status, validated_at').eq('release_id', release.id)
         .order('version', { ascending: false }).limit(1).maybeSingle(),
-    sb.from('release_authenticity').select('*').eq('release_id', release.id)
+    sb.from('release_authenticity').select('method, signature_type, content_hash, signature, signer_public_key, verification_status, verified_at, certificate').eq('release_id', release.id)
       .order('created_at', { ascending: false }).limit(1).maybeSingle(),
     sb.from('release_links').select('id, label, url, link_type, position')
       .eq('release_id', release.id).eq('enabled', true).order('position', { ascending: true }),

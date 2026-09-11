@@ -10,8 +10,9 @@ export async function load({ locals }) {
   const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: entries } = await sb
     .from('waitlist')
-    .select('*')
-    .order('created_at', { ascending: false });
+    .select('id, email, role, source, created_at')
+    .order('created_at', { ascending: false })
+    .limit(500);
 
   // public.invites is the source of truth for who has been let in — a profile
   // row only appears once the invite is accepted, so it under-reports.

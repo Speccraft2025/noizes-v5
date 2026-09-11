@@ -5,7 +5,7 @@ import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 import { bumpDropAnalytics } from '$lib/server/drop-page.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ALLOWED = new Set(['share', 'qr', 'experience_open', 'download', 'acquire_start', 'acquire_complete']);
+const ALLOWED = new Set(['view', 'share', 'qr', 'experience_open', 'download', 'acquire_start', 'acquire_complete']);
 
 // Aggregate counters only: one row per release, per day, per event kind.
 // Nothing identifies a visitor, so there is nothing here to correlate later,

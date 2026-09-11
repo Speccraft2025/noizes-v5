@@ -1,7 +1,5 @@
 import { createSupabaseServerClient } from '$lib/server/supabase.js';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { getSupabaseServiceRoleClient } from '$lib/server/supabase.js';
 import { redirect } from '@sveltejs/kit';
 
 export function handleError({ error, event }) {
@@ -15,9 +13,7 @@ const ADMIN_ROUTES = ['/admin'];
 
 // Reads public.invites, which is service-role-only. Carries no user session,
 // so it is never used for anything but the membership lookup below.
-const inviteReader = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+const inviteReader = getSupabaseServiceRoleClient();
 
 export async function handle({ event, resolve }) {
   const supabase = createSupabaseServerClient(event);
@@ -31,7 +27,7 @@ export async function handle({ event, resolve }) {
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, email, display_name, avatar_url, role, is_admin, bio, location, kyc_status, signing_public_key')
       .eq('id', user.id)
       .single();
     event.locals.profile = profile;

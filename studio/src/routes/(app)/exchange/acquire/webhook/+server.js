@@ -36,7 +36,7 @@ export async function POST({ request }) {
 
   const { data: intent } = await sb
     .from('payment_intents')
-    .select('*')
+    .select('id, reference, kind, release_id, buyer_id, seller_id, offer_id, acquisition_id, amount_subunits, currency, status, created_at')
     .eq('reference', data.reference || '')
     .maybeSingle();
   if (!intent) {

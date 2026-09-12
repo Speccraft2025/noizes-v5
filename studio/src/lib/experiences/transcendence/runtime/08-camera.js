@@ -154,3 +154,122 @@ class CameraDirector {
     };
   }
 }
+
+class FreeRoamCamera {
+  constructor(camera, options) {
+    this.T = options.THREE;
+    this.camera = camera;
+    this.world = options.world;
+    this.root = options.root;
+    this.active = false;
+    this._disposers = [];
+
+    this.yaw = 0;
+    this.pitch = -0.15;
+    this.altitude = 40;
+    this.speed = 60;
+    this.fov = new Spring(52, 0.5);
+
+    this._pos = new this.T.Vector3();
+    this._vel = new this.T.Vector3();
+    this._keys = new Set();
+    this._dragging = false;
+    this._lastMouse = { x: 0, y: 0 };
+  }
+
+  activate(fromCamera) {
+    this._pos.copy(fromCamera.position);
+    const dir = new this.T.Vector3();
+    fromCamera.getWorldDirection(dir);
+    this.yaw = Math.atan2(dir.x, dir.z);
+    this.pitch = Math.asin(clamp(dir.y, -0.99, 0.99));
+    this.altitude = this._pos.y;
+    this.fov.reset(fromCamera.fov);
+    this._vel.set(0, 0, 0);
+    this.active = true;
+    this._bind();
+  }
+
+  _bind() {
+    const add = (target, type, handler, opts) => {
+      target.addEventListener(type, handler, opts);
+      this._disposers.push(() => target.removeEventListener(type, handler, opts));
+    };
+    add(this.root, 'pointerdown', e => {
+      if (e.target.closest('button, a, input, [role="button"]')) return;
+      this._dragging = true;
+      this._lastMouse = { x: e.clientX, y: e.clientY };
+    });
+    add(window, 'pointermove', e => {
+      if (!this._dragging) return;
+      const dx = e.clientX - this._lastMouse.x;
+      const dy = e.clientY - this._lastMouse.y;
+      this._lastMouse = { x: e.clientX, y: e.clientY };
+      this.yaw -= dx * 0.003;
+      this.pitch = clamp(this.pitch - dy * 0.003, -1.4, 1.4);
+    }, { passive: true });
+    add(window, 'pointerup', () => { this._dragging = false; });
+    add(window, 'keydown', e => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      this._keys.add(e.key.toLowerCase());
+    });
+    add(window, 'keyup', e => { this._keys.delete(e.key.toLowerCase()); });
+    add(window, 'blur', () => { this._keys.clear(); this._dragging = false; });
+    add(this.root, 'wheel', e => {
+      this.altitude = Math.max(4, this.altitude + e.deltaY * 0.08);
+    }, { passive: true });
+  }
+
+  update(dt) {
+    if (!this.active) return null;
+
+    const forward = new this.T.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    const right = new this.T.Vector3(forward.z, 0, -forward.x);
+    const accel = new this.T.Vector3();
+
+    if (this._keys.has('w') || this._keys.has('arrowup')) accel.add(forward);
+    if (this._keys.has('s') || this._keys.has('arrowdown')) accel.sub(forward);
+    if (this._keys.has('d') || this._keys.has('arrowright')) accel.add(right);
+    if (this._keys.has('a') || this._keys.has('arrowleft')) accel.sub(right);
+    if (this._keys.has(' ')) this.altitude += this.speed * dt * 0.5;
+    if (this._keys.has('shift')) this.altitude = Math.max(4, this.altitude - this.speed * dt * 0.5);
+
+    if (accel.lengthSq() > 0) accel.normalize();
+    accel.multiplyScalar(this.speed);
+    this._vel.lerp(accel, Math.min(1, dt * 4));
+    this._pos.addScaledVector(this._vel, dt);
+
+    const ground = this.world ? this.world.heightAt(this._pos.x, this._pos.z) : 0;
+    const floor = ground + 2.5;
+    if (this.altitude < floor) this.altitude = floor;
+    this._pos.y += (this.altitude - this._pos.y) * Math.min(1, dt * 3);
+    if (this._pos.y < floor) this._pos.y = floor;
+
+    const lookDir = new this.T.Vector3(
+      Math.sin(this.yaw) * Math.cos(this.pitch),
+      Math.sin(this.pitch),
+      Math.cos(this.yaw) * Math.cos(this.pitch)
+    );
+    const target = this._pos.clone().add(lookDir.multiplyScalar(100));
+
+    this.fov.step(52, dt);
+    this.camera.position.copy(this._pos);
+    this.camera.up.set(0, 1, 0);
+    this.camera.lookAt(target);
+    this.camera.fov = this.fov.value;
+    this.camera.updateProjectionMatrix();
+
+    const distance = 100;
+    return {
+      focus: distance * 0.55,
+      focusRange: mix(90, 520, clamp01(distance / 700)),
+      altitude: this.altitude,
+    };
+  }
+
+  dispose() {
+    for (const off of this._disposers) off();
+    this._disposers.length = 0;
+    this.active = false;
+  }
+}

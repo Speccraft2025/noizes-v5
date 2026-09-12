@@ -34,6 +34,7 @@ export function estimatePackageSize(project = {}, extras = {}) {
     ...(project.audio_assets || []).map((asset) => assetRecord(asset, asset.scope || (asset.track_id ? 'track' : 'release'), asset.track_id)),
     ...(project.track_assets || []).map((asset) => assetRecord(asset, 'track', asset.track_id)),
     ...((extras.pdfs || []).map((pdf) => assetRecord({ ...pdf, type: 'document', role: 'notes', filename: pdf.name }, 'release'))),
+    ...((extras.images || []).map((img) => assetRecord({ ...img, type: 'image', role: 'liner_image', filename: img.name }, 'release'))),
   ];
   const originalBytes = assets.reduce((total, asset) => total + asset.size, 0);
   const dataUriBytes = assets.reduce((total, asset) => total + asset.data_uri_size, 0);

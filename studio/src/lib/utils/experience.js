@@ -8,14 +8,19 @@ const ULTRA_THEME = { primary: '#7B5CF0', accent: '#F04BD8', bg: '#030303' };
 // from what the package actually contains, not a separate node-graph format.
 // The viewer shows it as a drawer; collectors may still explore freely.
 // `authored` lets a creator override the order and labels in Studio.
-export function buildGuide({ hasLyrics, hasPlay, hasNotes, story, authored }) {
+export function buildGuide({ hasLyrics, hasPlay, hasNotes, story, collectorNote, authored }) {
   if (authored && Array.isArray(authored.nodes) && authored.nodes.length) {
     const nodes = authored.nodes.filter((node) =>
       (node.id !== 'lyrics' || hasLyrics) &&
       (node.id !== 'play' || hasPlay) &&
       (node.id !== 'notes' || hasNotes) &&
-      (node.id !== 'story' || !!story)
-    ).map((node) => node.id === 'story' ? { ...node, introduction: story } : node);
+      (node.id !== 'story' || !!story) &&
+      (node.id !== 'gift' || !!collectorNote)
+    ).map((node) => {
+      if (node.id === 'story') return { ...node, introduction: story };
+      if (node.id === 'gift') return { ...node, body: collectorNote };
+      return node;
+    });
     if (nodes.length) {
       return { version: 1, allowFreeExplore: authored.allowFreeExplore !== false, nodes };
     }
@@ -30,8 +35,28 @@ export function buildGuide({ hasLyrics, hasPlay, hasNotes, story, authored }) {
   if (hasNotes) nodes.push({ id: 'notes', type: 'notes', label: 'Note Wall', view: 'view-notes' });
   if (hasPlay) nodes.push({ id: 'play', type: 'interactive', label: 'Play', view: 'view-games' });
   nodes.push({ id: 'record', type: 'record', label: 'Collector Record', view: 'intro' });
+  if (collectorNote) nodes.push({ id: 'gift', type: 'gift', label: 'A Note for You', view: 'intro', body: collectorNote });
   nodes.push({ id: 'end', type: 'ending', label: 'End', view: 'view-player' });
   return { version: 1, allowFreeExplore: true, nodes };
+}
+
+export function buildGifts(extras) {
+  const note = extras?.collector_note?.trim() || '';
+  const dedication = extras?.dedication?.trim() || '';
+  const eggs = (extras?.easter_eggs || [])
+    .filter((egg) => egg.message?.trim())
+    .map((egg) => {
+      const base = { id: egg.id, message: egg.message.trim(), trigger: egg.trigger || 'after_full_listen' };
+      if (base.trigger === 'at_timestamp') return { ...base, track_index: egg.track_index ?? 0, seconds: Math.max(0, Number(egg.seconds) || 0) };
+      if (base.trigger === 'cover_tap') return { ...base, taps: Math.min(20, Math.max(3, Number(egg.taps) || 7)) };
+      return base;
+    });
+  if (!note && !dedication && !eggs.length) return null;
+  return {
+    ...(note ? { collector_note: note } : {}),
+    ...(dedication ? { dedication } : {}),
+    ...(eggs.length ? { easter_eggs: eggs } : {}),
+  };
 }
 
 export function buildExperienceHTML({ identity, edition, rights, audioBase64, audioMime, coverBase64, coverMime, lyrics, template, play, guide, extras, notes = [], releasePlayback = null, journey = null, archive = null, history = null }) {
@@ -94,7 +119,8 @@ export function buildExperienceHTML({ identity, edition, rights, audioBase64, au
     history:     history || null,
     play:        playCfg,
     notes,
-    guide:       buildGuide({ hasLyrics: !!(lyrics && lyrics.length) || hasReleaseLyrics, hasPlay: !!playCfg, hasNotes: !!notes.length, story: extras?.story?.trim(), authored: guide }),
+    gifts:       buildGifts(extras),
+    guide:       buildGuide({ hasLyrics: !!(lyrics && lyrics.length) || hasReleaseLyrics, hasPlay: !!playCfg, hasNotes: !!notes.length, story: extras?.story?.trim(), collectorNote: extras?.collector_note?.trim(), authored: guide }),
     edition: {
       type:         edition.edition_type || 'Open Edition',
       name:         edition.edition_name || '',

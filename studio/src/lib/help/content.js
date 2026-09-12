@@ -184,10 +184,14 @@ export const FIELD_HELP = {
 
   // ── Step 5 · Extras ────────────────────────────────────────────────────
   story: 'Optional. Your artist statement or liner note — what lives behind this work. This is the longest piece of writing a collector will see.',
+  dedication: 'Optional. A short dedication line — "For…" — printed in the experience the way it would appear on the inner sleeve of a vinyl pressing.',
+  collector_note: 'Optional. A personal message from you to whoever opens this object. It appears after the guided experience ends, like a handwritten note tucked inside an album sleeve.',
   // The three inputs of a link are one card and read as one idea, so they get
   // one explanation on the section rather than three marks per repeated row.
   extras_links: 'Optional. Each link needs a name a collector will recognise, a type, and a full https:// address. Links point outward, so unlike everything else in the object they need a network to work.',
   note_wall: 'Optional. PDFs kept inside the object: lyric booklets, scores, sleeve notes. They travel with the music.',
+  liner_images: 'Optional. Photos and artwork beyond the cover — session shots, process, alternate visuals. They ship inside the package and appear in the gallery.',
+  easter_eggs: 'Optional. Hidden messages a collector discovers through the experience. Each egg needs a trigger condition and a message. They are baked into the package and revealed by the viewer.',
 
   // ── Step 6 · Experience ────────────────────────────────────────────────
   nav_track_skip: 'Lets a listener jump straight to any track. Turn off to hold them to the running order you authored.',

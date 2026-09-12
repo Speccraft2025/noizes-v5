@@ -177,6 +177,7 @@ const SECTION_LIBRARY = Object.freeze([
   { key: 'notes', label: 'Liner notes', anchor: 'notes', blurb: 'Documents kept with the object' },
   { key: 'video', label: 'Video', anchor: 'video', blurb: 'Moving image inside the package' },
   { key: 'play', label: 'Play', anchor: 'play', blurb: 'Interactive pieces built into the release' },
+  { key: 'gifts', label: 'Gifts', anchor: 'gifts', blurb: 'Hidden notes and discoveries from the creator' },
   { key: 'guide', label: 'Guide', anchor: 'guide', blurb: 'How to move through the experience' },
   { key: 'credits', label: 'Credits', anchor: 'credits', blurb: 'Who made it, and what they did' },
 ]);
@@ -197,6 +198,7 @@ export function summarizeExperience(experience = {}, trackRecords = []) {
     has_opening: Boolean(experience?.journey?.release_moments?.length),
     has_story: Boolean(experience?.guide?.story?.trim?.() || experience?.story?.trim?.()),
     has_play: Boolean(experience?.play?.games?.length),
+    has_gifts: Boolean(experience?.gifts),
     has_guide: Boolean(experience?.guide),
     lyric_track_count: (trackRecords ?? []).filter((track) =>
       track?.lyrics?.timed_lines?.length || track?.lyrics?.plain_text?.trim?.()
@@ -223,6 +225,7 @@ export function describeExperienceSections(manifest, summary = {}) {
     notes: parts.some((part) => part.type === 'document'),
     video: parts.some((part) => part.type === 'video'),
     play: Boolean(summary.has_play),
+    gifts: Boolean(summary.has_gifts),
     guide: Boolean(summary.has_guide),
     credits: Boolean(manifest?.rights?.path),
   };

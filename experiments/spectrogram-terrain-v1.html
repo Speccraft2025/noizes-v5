@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spectrogram Terrain — Experience Prototype</title>
+  <style>
+    :root{--bg:#020403;--fg:#ece8d9;--muted:#9ca48f;--accent:#c9d66f}
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,Arial,sans-serif}
+    body{height:700vh;overflow-x:hidden}
+    #stage{position:fixed;inset:0;overflow:hidden;background:#010201}
+    canvas{display:block;width:100%;height:100%}
+    .grain{position:absolute;inset:0;pointer-events:none;opacity:.12;mix-blend-mode:soft-light;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 140 140' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E")}
+    .ui{position:absolute;inset:0;pointer-events:none}
+    .brand{position:absolute;left:28px;top:22px;font-size:12px;letter-spacing:.35em;font-weight:700}
+    .brand small{display:block;margin-top:8px;font-size:8px;letter-spacing:.28em;color:var(--muted);font-weight:500}
+    .counter{position:absolute;right:28px;top:24px;font-size:10px;letter-spacing:.18em;color:var(--muted)}
+    .chapter{position:absolute;left:6vw;bottom:12vh;max-width:min(650px,80vw);transition:opacity .45s ease,transform .45s ease;text-shadow:0 2px 30px rgba(0,0,0,.7)}
+    .eyebrow{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--accent)}
+    .chapter h1{margin:.45rem 0 0;font-family:Georgia,'Times New Roman',serif;font-size:clamp(42px,7vw,110px);font-weight:400;line-height:.9;letter-spacing:-.035em}
+    .chapter p{margin-top:16px;max-width:44ch;font-size:12px;line-height:1.6;color:#c9c8bb;letter-spacing:.06em}
+    .scrollhint{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;font-size:9px;letter-spacing:.28em;color:var(--muted)}
+    .scrollhint i{width:50px;height:1px;background:linear-gradient(90deg,transparent,var(--muted))}
+    .progress{position:absolute;top:0;left:0;height:2px;background:var(--accent);width:0%}
+    .vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at center,transparent 45%,rgba(0,0,0,.44) 100%)}
+    .fade{position:absolute;inset:0;pointer-events:none;background:#000;opacity:1;transition:opacity 1.6s ease}
+    .ready .fade{opacity:0}
+    .loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;letter-spacing:.28em;color:var(--muted)}
+    @media(max-width:700px){.brand{left:18px}.counter{right:18px}.chapter{left:22px;bottom:14vh}.chapter p{font-size:11px}}
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+    <div class="loading" id="loading">GENERATING TERRAIN</div>
+    <div class="ui" id="ui" style="display:none">
+      <div class="progress" id="progress"></div>
+      <div class="brand">TRANSCENDENCE<small>SPECTRAL LANDSCAPE</small></div>
+      <div class="counter" id="counter">01 / 07</div>
+      <div class="chapter" id="chapter">
+        <div class="eyebrow">01 — AERIAL</div>
+        <h1>The Spectral<br/>Landscape</h1>
+        <p>Each ridge is a frequency. Each valley, a gap between harmonics. Scroll to travel.</p>
+      </div>
+      <div class="scrollhint"><i></i>SCROLL TO TRAVEL<i></i></div>
+      <div class="fade"></div>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    /* ═══ MATH HELPERS ═══ */
+    const PI = Math.PI, DEG2RAD = PI / 180;
+    const fract = n => n - Math.floor(n);
+    const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const smoothstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+
+    function hash(x, z) { return fract(Math.sin(x * 127.1 + z * 311.7) * 43758.5453123); }
+    function noise(x, z) {
+      const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+      const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+      return lerp(lerp(hash(xi, zi), hash(xi + 1, zi), u), lerp(hash(xi, zi + 1), hash(xi + 1, zi + 1), u), v);
+    }
+    function fbm(x, z) { let v = 0, a = 0.5, f = 1; for (let i = 0; i < 5; i++) { v += noise(x * f, z * f) * a; f *= 2.03; a *= 0.5; } return v; }
+    function ridged(x, z) { let v = 0, a = 0.5, f = 1; for (let i = 0; i < 4; i++) { v += (1 - Math.abs(noise(x * f, z * f) * 2 - 1)) * a; f *= 2.1; a *= 0.45; } return v; }
+
+    /* ═══ MATRIX (column-major Float32Array[16]) ═══ */
+    function mat4Perspective(fovRad, aspect, near, far) {
+      const f = 1 / Math.tan(fovRad / 2), ri = 1 / (near - far), o = new Float32Array(16);
+      o[0] = f / aspect; o[5] = f; o[10] = (far + near) * ri; o[11] = -1; o[14] = 2 * far * near * ri;
+      return o;
+    }
+    function mat4LookAt(ex, ey, ez, cx, cy, cz) {
+      let zx = ex - cx, zy = ey - cy, zz = ez - cz;
+      let l = 1 / Math.sqrt(zx * zx + zy * zy + zz * zz); zx *= l; zy *= l; zz *= l;
+      let xx = zz, xy = 0, xz = -zx;
+      l = Math.sqrt(xx * xx + xz * xz); if (l > 1e-6) { l = 1 / l; xx *= l; xz *= l; }
+      const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+      const o = new Float32Array(16);
+      o[0] = xx; o[1] = yx; o[2] = zx; o[4] = xy; o[5] = yy; o[6] = zy; o[8] = xz; o[9] = yz; o[10] = zz;
+      o[12] = -(xx * ex + xy * ey + xz * ez); o[13] = -(yx * ex + yy * ey + yz * ez);
+      o[14] = -(zx * ex + zy * ey + zz * ez); o[15] = 1;
+      return o;
+    }
+
+    /* ═══ SPLINE (Catmull-Rom) ═══ */
+    function catmullRom(p0, p1, p2, p3, t) {
+      const t2 = t * t, t3 = t2 * t;
+      return 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+    }
+    function splineAt(pts, t) {
+      const n = pts.length - 1, f = clamp(t, 0, 1) * n, i = Math.min(Math.floor(f), n - 1), s = f - i;
+      const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[Math.min(n, i + 1)], p3 = pts[Math.min(n, i + 2)];
+      return [catmullRom(p0[0], p1[0], p2[0], p3[0], s), catmullRom(p0[1], p1[1], p2[1], p3[1], s), catmullRom(p0[2], p1[2], p2[2], p3[2], s)];
+    }
+
+    /* ═══ SYNTHETIC SPECTROGRAM ═══ */
+    function melHarmonics(fund, count) {
+      const out = [fund];
+      for (let n = 2; n <= count; n++) { const p = fund + fund * 0.85 * Math.log2(n); if (p > 0.98) break; out.push(p); }
+      return out;
+    }
+    function syntheticSpectrum(time, band) {
+      let dynamics;
+      if      (time < 0.06) dynamics = smoothstep(0, 0.06, time) * 0.25;
+      else if (time < 0.14) dynamics = lerp(0.25, 0.38, (time - 0.06) / 0.08);
+      else if (time < 0.32) dynamics = 0.50 + 0.08 * Math.sin(time * 48);
+      else if (time < 0.52) dynamics = 0.88 + 0.10 * Math.sin(time * 32);
+      else if (time < 0.65) dynamics = 0.48 + 0.08 * Math.sin(time * 42);
+      else if (time < 0.88) dynamics = 0.95 + 0.05 * Math.sin(time * 26);
+      else                  dynamics = 0.95 * (1 - smoothstep(0.88, 1.0, time));
+
+      let e = 0, h = 0, t = 0, r = 0;
+      const bw = 0.014;
+
+      const bassPres = time > 0.10 ? dynamics : dynamics * 0.2;
+      const bassFund = 0.06 + 0.008 * Math.sin(time * 65);
+      const bH = melHarmonics(bassFund, 10);
+      for (let i = 0; i < bH.length; i++) {
+        const d = (band - bH[i]) / (bw + 0.004 * i), amp = bassPres * (0.85 / Math.sqrt(i + 1));
+        const c = amp * Math.exp(-d * d * 2.5); e += c; h += c * 0.88; if (i < 4) r += c * 0.65;
+      }
+      const vPres = smoothstep(0.12, 0.18, time) * dynamics * 0.75;
+      const vFund = 0.16 + 0.02 * Math.sin(time * 110) + 0.01 * Math.sin(time * 73);
+      const vH = melHarmonics(vFund, 7);
+      for (let i = 0; i < vH.length; i++) {
+        const d = (band - vH[i]) / (bw + 0.006 * i), c = vPres * (0.72 / (i + 1)) * Math.exp(-d * d * 2.2);
+        e += c; h += c * 0.93; r += c * 0.45;
+      }
+      const sPres = Math.max(0, dynamics - 0.55) * 2.2;
+      for (const root of [0.12, 0.19, 0.27]) {
+        const sH = melHarmonics(root, 5);
+        for (let i = 0; i < sH.length; i++) {
+          const d = (band - sH[i]) / (0.018 + 0.004 * i), c = sPres * (0.45 / (i + 1)) * Math.exp(-d * d * 2);
+          e += c; h += c * 0.90;
+        }
+      }
+      if (band > 0.55) {
+        const airP = Math.max(0, dynamics - 0.4) * 0.6;
+        const airE = smoothstep(0.55, 0.72, band) * (1 - smoothstep(0.88, 0.98, band));
+        e += airP * airE * (0.3 + 0.7 * (0.5 + 0.5 * Math.sin(band * 180 + time * 40))) * 0.25;
+      }
+      const drumP = smoothstep(0.13, 0.17, time);
+      const kP = fract(time * 36); if (kP < 0.035 && drumP > 0 && band < 0.18) { const a = dynamics * 0.65 * Math.exp(-band / 0.06) * (1 - kP / 0.035); e += a; t += a * 0.92; }
+      const sP = fract(time * 18 + 0.5); if (sP < 0.028 && drumP > 0 && band > 0.06 && band < 0.52) { const a = dynamics * 0.38 * Math.exp(-(band - 0.22) * (band - 0.22) / 0.025); e += a; t += a * 0.82; }
+      const hP = fract(time * 72); if (hP < 0.018 && drumP > 0 && band > 0.52) { const a = dynamics * 0.22 * smoothstep(0.52, 0.70, band) * (1 - smoothstep(0.92, 1.0, band)); e += a; t += a * 0.70; }
+      e += 0.015 * dynamics * (0.4 + 0.6 * hash(Math.floor(time * 300), Math.floor(band * 200)));
+      e = clamp(e, 0, 1); const iv = e > 0.005 ? 1 / e : 0;
+      return { energy: e, harmonic: clamp(h * iv, 0, 1), transient: clamp(t * iv, 0, 1), ridge: clamp(r, 0, 1) };
+    }
+
+    /* ═══ TERRAIN HEIGHT ═══ */
+    const TW = 1200, TD = 3200, HS = 30, HG = 1.55, RS = 12;
+    function terrainHeight(x, z) {
+      const band = clamp((x + TW * 0.5) / TW, 0, 1), time = clamp(-z / TD, 0, 1);
+      const T = syntheticSpectrum(time, band);
+      const mass = lerp(1.45, 0.48, Math.pow(band, 0.70)), energy = T.energy * mass;
+      const sH = Math.pow(Math.max(energy, 0), HG) * HS * 2.8;
+      const hL = T.harmonic * Math.pow(Math.max(energy, 0), 0.7) * HS * 1.0;
+      const rS = T.ridge * Math.pow(Math.max(energy, 0), 0.5) * RS * lerp(0.8, 2.2, band);
+      const tG = T.transient * energy * HS * 0.35;
+      const spectral = sH + hL + rS + tG;
+      const geo = (fbm(x * 0.0015 + 7.5, z * 0.0005 + 7.5) * 0.22 + ridged(x * 0.004 + 5.3, z * 0.0012 + 5.3) * 0.10) * HS * smoothstep(0.04, 0.35, energy);
+      const broad = fbm(x * 0.0003 + 11, z * 0.00015 + 11) * HS * 0.5 * smoothstep(0.02, 0.20, energy);
+      return Math.max(spectral + geo + broad, -4);
+    }
+
+    /* ═══ MESH GENERATION ═══ */
+    const SX = 160, SZ = 280, VX = SX + 1, VZ = SZ + 1, VCOUNT = VX * VZ;
+    function buildMesh() {
+      const positions = new Float32Array(VCOUNT * 3);
+      const colors = new Float32Array(VCOUNT * 3);
+      const normals = new Float32Array(VCOUNT * 3);
+      const cShadow = [0.027, 0.075, 0.051], cDeep = [0.071, 0.200, 0.106];
+      const cMid = [0.208, 0.400, 0.161], cMoss = [0.435, 0.529, 0.208], cGold = [0.780, 0.651, 0.353];
+      function lerpC(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+
+      for (let iz = 0; iz < VZ; iz++) {
+        const z = -(iz / SZ) * TD;
+        for (let ix = 0; ix < VX; ix++) {
+          const x = (ix / SX - 0.5) * TW;
+          const y = terrainHeight(x, z);
+          const idx = (iz * VX + ix) * 3;
+          positions[idx] = x; positions[idx + 1] = y; positions[idx + 2] = z;
+          const n = fbm(x * 0.015, z * 0.015), sl = clamp((y + 10) / 200, 0, 1);
+          let col = lerpC(cShadow, cDeep, clamp(sl * 1.4, 0, 1));
+          col = lerpC(col, cMid, clamp((sl - 0.25) * 1.4, 0, 1));
+          if (n > 0.63) col = lerpC(col, cMoss, Math.min((n - 0.63) * 1.4, 1));
+          if (n > 0.83) col = lerpC(col, cGold, Math.min((n - 0.83) * 1.6, 1));
+          colors[idx] = col[0]; colors[idx + 1] = col[1]; colors[idx + 2] = col[2];
+        }
+      }
+      for (let iz = 0; iz < VZ; iz++) {
+        for (let ix = 0; ix < VX; ix++) {
+          const ci = iz * VX + ix;
+          const hL = ix > 0 ? positions[(ci - 1) * 3 + 1] : positions[ci * 3 + 1];
+          const hR = ix < SX ? positions[(ci + 1) * 3 + 1] : positions[ci * 3 + 1];
+          const hD = iz > 0 ? positions[(ci - VX) * 3 + 1] : positions[ci * 3 + 1];
+          const hU = iz < SZ ? positions[(ci + VX) * 3 + 1] : positions[ci * 3 + 1];
+          let nx = hL - hR, ny = 2 * (TW / SX), nz = hD - hU;
+          const l = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+          normals[ci * 3] = nx * l; normals[ci * 3 + 1] = ny * l; normals[ci * 3 + 2] = nz * l;
+        }
+      }
+      const iCount = SX * SZ * 6, indices = new Uint16Array(iCount); let ii = 0;
+      for (let iz = 0; iz < SZ; iz++) for (let ix = 0; ix < SX; ix++) {
+        const a = iz * VX + ix, b = a + 1, c = a + VX, d = c + 1;
+        indices[ii++] = a; indices[ii++] = c; indices[ii++] = b;
+        indices[ii++] = b; indices[ii++] = c; indices[ii++] = d;
+      }
+      return { positions, colors, normals, indices, iCount };
+    }
+
+    /* ═══ WEBGL SETUP ═══ */
+    const canvas = document.getElementById('gl');
+    const gl = canvas.getContext('webgl2', { antialias: true, powerPreference: 'high-performance' });
+
+    const VS = `#version 300 es
+    in vec3 aPos, aCol, aNrm;
+    uniform mat4 uProj, uView;
+    out vec3 vCol, vNrm, vWPos;
+    out float vFog;
+    void main(){
+      vec4 wp = vec4(aPos, 1.0);
+      vec4 vp = uView * wp;
+      gl_Position = uProj * vp;
+      vCol = aCol; vNrm = aNrm; vWPos = aPos.xyz;
+      vFog = 1.0 - exp(-length(vp.xyz) * 0.00078);
+    }`;
+
+    const FS = `#version 300 es
+    precision mediump float;
+    in vec3 vCol, vNrm, vWPos;
+    in float vFog;
+    out vec4 fragColor;
+    void main(){
+      vec3 n = normalize(vNrm);
+      vec3 sunDir = normalize(vec3(-0.35, 0.72, -0.60));
+      float diff = max(dot(n, sunDir), 0.0);
+      vec3 lit = vCol * (0.38 + 0.62 * diff);
+      lit += vCol * 0.08 * max(dot(n, vec3(0.0, 1.0, 0.0)), 0.0);
+      // ACES-ish tonemap
+      lit = (lit * (2.51 * lit + 0.03)) / (lit * (2.43 * lit + 0.59) + 0.14);
+      vec3 fog = vec3(0.043, 0.086, 0.059);
+      vec3 c = mix(lit, fog, clamp(vFog, 0.0, 1.0));
+      fragColor = vec4(c, 1.0);
+    }`;
+
+    function compileShader(src, type) {
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
+      return s;
+    }
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compileShader(VS, gl.VERTEX_SHADER));
+    gl.attachShader(prog, compileShader(FS, gl.FRAGMENT_SHADER));
+    gl.linkProgram(prog); gl.useProgram(prog);
+    const uProj = gl.getUniformLocation(prog, 'uProj'), uView = gl.getUniformLocation(prog, 'uView');
+    const aPos = gl.getAttribLocation(prog, 'aPos'), aCol = gl.getAttribLocation(prog, 'aCol'), aNrm = gl.getAttribLocation(prog, 'aNrm');
+
+    /* ═══ BUILD + UPLOAD MESH ═══ */
+    setTimeout(() => {
+      const mesh = buildMesh();
+      function uploadBuf(attr, data, size) {
+        const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(attr); gl.vertexAttribPointer(attr, size, gl.FLOAT, false, 0, 0);
+      }
+      uploadBuf(aPos, mesh.positions, 3);
+      uploadBuf(aCol, mesh.colors, 3);
+      uploadBuf(aNrm, mesh.normals, 3);
+      const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
+
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+      gl.clearColor(0.027, 0.063, 0.043, 1);
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('ui').style.display = '';
+
+      /* ═══ CAMERA PATH ═══ */
+      function bx(b) { return (b - 0.5) * TW; }
+      function tz(t) { return -t * TD; }
+      const eyePts = [
+        [bx(0.40), 700, tz(0.02)], [bx(0.35), 660, tz(0.06)], [bx(0.30), 600, tz(0.10)],
+        [bx(0.25), 480, tz(0.14)], [bx(0.12), 340, tz(0.18)],
+        [bx(0.11), 200, tz(0.22)], [bx(0.12), 130, tz(0.27)], [bx(0.11), 110, tz(0.32)],
+        [bx(0.12), 95, tz(0.36)], [bx(0.11), 100, tz(0.40)],
+        [bx(0.15), 160, tz(0.44)], [bx(0.22), 280, tz(0.48)], [bx(0.32), 400, tz(0.51)],
+        [bx(0.38), 460, tz(0.54)], [bx(0.42), 430, tz(0.57)],
+        [bx(0.42), 320, tz(0.61)], [bx(0.41), 210, tz(0.66)], [bx(0.40), 140, tz(0.70)],
+        [bx(0.41), 110, tz(0.74)], [bx(0.40), 105, tz(0.78)], [bx(0.41), 115, tz(0.82)],
+        [bx(0.45), 180, tz(0.86)], [bx(0.50), 300, tz(0.90)],
+        [bx(0.48), 450, tz(0.94)], [bx(0.45), 550, tz(0.98)]
+      ];
+
+      function lookTarget(p) {
+        if (p < 0.22) { const t = smoothstep(0, 0.22, p); return [lerp(bx(0.30), bx(0.12), t), lerp(220, 120, t), lerp(tz(0.08), tz(0.28), t)]; }
+        if (p < 0.42) { const t = smoothstep(0.22, 0.42, p); return [lerp(bx(0.12), bx(0.18), t), lerp(120, 200, t), lerp(tz(0.28), tz(0.46), t)]; }
+        if (p < 0.58) { const t = smoothstep(0.42, 0.58, p); return [lerp(bx(0.18), bx(0.41), t), lerp(200, 150, t), lerp(tz(0.46), tz(0.62), t)]; }
+        if (p < 0.78) { const t = smoothstep(0.58, 0.78, p); return [lerp(bx(0.41), bx(0.41), t), lerp(150, 110, t), lerp(tz(0.62), tz(0.80), t)]; }
+        if (p < 0.90) { const t = smoothstep(0.78, 0.90, p); return [lerp(bx(0.41), bx(0.48), t), lerp(110, 280, t), lerp(tz(0.80), tz(0.92), t)]; }
+        const t = smoothstep(0.90, 1, p); return [lerp(bx(0.48), bx(0.45), t), lerp(280, 350, t), lerp(tz(0.92), tz(1.0), t)];
+      }
+
+      /* ═══ CHAPTERS ═══ */
+      let currentChapter = -1;
+      const chapterEl = document.getElementById('chapter'), counterEl = document.getElementById('counter'), progressEl = document.getElementById('progress');
+      const chapters = [
+        { p: 0,    ey: '01 — AERIAL',          ti: 'The Spectral<br/>Landscape',  bo: 'Each ridge below is a frequency band with energy. Gaps between harmonics form natural valleys.' },
+        { p: 0.15, ey: '02 — HARMONIC RANGES', ti: 'Bass<br/>Harmonics',           bo: 'The tallest ridges: bass fundamentals and their overtones, running like mountain ranges.' },
+        { p: 0.28, ey: '03 — SPECTRAL VALLEY', ti: 'Between<br/>Frequencies',      bo: 'Where harmonics end and silence begins — the terrain drops to a traversable valley floor.' },
+        { p: 0.44, ey: '04 — RIDGE CROSSING',  ti: 'Over the<br/>Harmonics',       bo: 'Climbing across a ridge of spectral energy, moving from bass into the mid-frequency world.' },
+        { p: 0.58, ey: '05 — MID VALLEY',      ti: 'The Vocal<br/>Gap',            bo: 'Between vocal harmonics and high-frequency content — the deepest quiet in the spectrum.' },
+        { p: 0.74, ey: '06 — CHORUS WALLS',    ti: 'Energy<br/>Rising',            bo: 'The chorus pushes energy into every band. The valley walls grow taller around the camera.' },
+        { p: 0.88, ey: '07 — ASCENT',          ti: 'Above<br/>the Spectrum',       bo: 'As the outro fades, the ridges lower and the landscape dissolves into silence.' }
+      ];
+      function updateChapter(p) {
+        let idx = 0; for (let i = 0; i < chapters.length; i++) if (p >= chapters[i].p) idx = i;
+        if (idx === currentChapter) return; currentChapter = idx;
+        chapterEl.style.opacity = '0'; chapterEl.style.transform = 'translateY(12px)';
+        setTimeout(() => { const c = chapters[idx];
+          chapterEl.innerHTML = '<div class="eyebrow">' + c.ey + '</div><h1>' + c.ti + '</h1><p>' + c.bo + '</p>';
+          chapterEl.style.opacity = '1'; chapterEl.style.transform = 'translateY(0)';
+          counterEl.textContent = String(idx + 1).padStart(2, '0') + ' / ' + String(chapters.length).padStart(2, '0');
+        }, 180);
+      }
+
+      /* ═══ SCROLL ═══ */
+      let targetP = 0, smoothP = 0;
+      function onScroll() { const mx = document.documentElement.scrollHeight - innerHeight; targetP = mx > 0 ? scrollY / mx : 0; }
+      addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+      /* ═══ RESIZE ═══ */
+      function resize() {
+        canvas.width = innerWidth * Math.min(devicePixelRatio, 1.7);
+        canvas.height = innerHeight * Math.min(devicePixelRatio, 1.7);
+        canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      }
+      addEventListener('resize', resize); resize();
+
+      /* ═══ ANIMATE ═══ */
+      const sEye = [eyePts[0][0], eyePts[0][1], eyePts[0][2]];
+      const sLook = [bx(0.30), 220, tz(0.08)];
+      let prevT = performance.now();
+
+      function frame(now) {
+        requestAnimationFrame(frame);
+        const dt = Math.min(0.05, (now - prevT) / 1000); prevT = now;
+
+        smoothP += (targetP - smoothP) * (1 - Math.exp(-dt * 2.35));
+        const p = clamp(smoothP, 0, 1);
+
+        let fov = 48;
+        if      (p < 0.20) fov = lerp(60, 54, p / 0.20);
+        else if (p < 0.42) fov = lerp(54, 46, (p - 0.20) / 0.22);
+        else if (p < 0.58) fov = lerp(46, 50, (p - 0.42) / 0.16);
+        else if (p < 0.78) fov = lerp(50, 44, (p - 0.58) / 0.20);
+        else if (p < 0.88) fov = lerp(44, 56, (p - 0.78) / 0.10);
+        else               fov = lerp(56, 48, (p - 0.88) / 0.12);
+
+        const dEye = splineAt(eyePts, p);
+        const floorY = terrainHeight(dEye[0], dEye[2]);
+        const clearance = p < 0.20 ? 200 : (p < 0.42 ? 72 : (p < 0.58 ? 95 : (p < 0.78 ? 65 : 90)));
+        dEye[1] = Math.max(dEye[1], floorY + clearance);
+        let sideThreat = 0;
+        for (const dx of [-90, -55, 55, 90]) {
+          const h = terrainHeight(dEye[0] + dx, dEye[2] + 40);
+          sideThreat = Math.max(sideThreat, h - (dEye[1] - 50));
+        }
+        if (sideThreat > 0) dEye[1] += Math.min(75, sideThreat * 0.45);
+
+        const dLook = lookTarget(p);
+        const tFloor = terrainHeight(dLook[0], dLook[2]);
+        dLook[1] = Math.max(dLook[1], tFloor + 12);
+
+        const easeE = 1 - Math.exp(-dt * 3.0), easeL = 1 - Math.exp(-dt * 1.35);
+        for (let i = 0; i < 3; i++) { sEye[i] += (dEye[i] - sEye[i]) * easeE; sLook[i] += (dLook[i] - sLook[i]) * easeL; }
+
+        const aspect = canvas.width / canvas.height;
+        gl.uniformMatrix4fv(uProj, false, mat4Perspective(fov * DEG2RAD, aspect, 0.1, 5000));
+        gl.uniformMatrix4fv(uView, false, mat4LookAt(sEye[0], sEye[1], sEye[2], sLook[0], sLook[1], sLook[2]));
+
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.drawElements(gl.TRIANGLES, mesh.iCount, gl.UNSIGNED_SHORT, 0);
+
+        updateChapter(p);
+        progressEl.style.width = (p * 100) + '%';
+      }
+
+      document.documentElement.classList.add('ready');
+      requestAnimationFrame(frame);
+    }, 50);
+  </script>
+</body>
+</html>

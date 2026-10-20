@@ -30,8 +30,20 @@ export async function POST({ request, locals }) {
   if (offer.acquisitions?.owner_id !== locals.user.id) throw error(403, 'You do not own this edition');
   if (offer.status !== 'active') throw error(409, 'Offer is no longer active');
 
-  const { error: upErr } = await sb.from('offers').update({ status: 'accepted' }).eq('id', offerId).eq('status', 'active');
-  if (upErr) throw error(500, 'Could not accept offer');
+  // The registry migration performs the ownership, active-listing and
+  // competing-offer checks under one row-locking transaction. A conditional
+  // UPDATE here used to leave two offers accepted when requests raced.
+  const { error: acceptErr } = await sb.rpc('accept_copy_offer', {
+    p_offer_id: offerId,
+    p_seller_id: locals.user.id,
+  });
+  if (acceptErr) {
+    if (/not active|no longer owns|not found/i.test(acceptErr.message || '')) {
+      throw error(409, 'This offer or listing is no longer active');
+    }
+    console.error(`[offers] atomic accept failed: ${acceptErr.message}`);
+    throw error(500, 'Could not accept offer');
+  }
 
   return json({ ok: true });
 }

@@ -25,8 +25,8 @@ export async function handle({ event, resolve }) {
   // when available), so public pages do not wait on Auth before they can load.
   // The claims are still cryptographically verified and are safe for the same
   // authorization decisions previously made with `getUser()`.
-  const { data: { claims } } = await supabase.auth.getClaims();
-  const user = authenticatedUserFromClaims(claims);
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = authenticatedUserFromClaims(claimsData?.claims);
   event.locals.user = user;
   event.locals.session = user ? { user } : null;
 

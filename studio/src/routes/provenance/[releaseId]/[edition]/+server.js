@@ -49,6 +49,9 @@ export async function GET({ params }) {
     headers: {
       'content-type': 'application/json',
       'content-disposition': `attachment; filename="${filename}"`,
+      // A provenance export is public for every viewer. Keep the freshness
+      // window short because a transfer can append to the chain at any time.
+      'Netlify-CDN-Cache-Control': 'public, durable, max-age=60, stale-while-revalidate=300',
     },
   });
 }

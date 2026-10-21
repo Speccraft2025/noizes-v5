@@ -72,6 +72,9 @@ export async function GET({ params }) {
       'content-type': 'application/json',
       'content-disposition': `attachment; filename="${filename}"`,
       'cache-control': 'public, max-age=0, s-maxage=300',
+      // Certificates are public, immutable verification material for the
+      // duration of this short cache window; no account data is present.
+      'Netlify-CDN-Cache-Control': 'public, durable, max-age=300, stale-while-revalidate=3600',
     },
   });
 }

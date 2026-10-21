@@ -35,6 +35,10 @@ export async function GET({ params }) {
       'content-type': 'application/json',
       'content-disposition': `attachment; filename="${filename}"`,
       'cache-control': 'public, max-age=0, s-maxage=300',
+      // This endpoint has no viewer-specific fields. Let Netlify serve the
+      // portable public document from its durable cache without caching it in
+      // a collector's browser.
+      'Netlify-CDN-Cache-Control': 'public, durable, max-age=300, stale-while-revalidate=3600',
     },
   });
 }

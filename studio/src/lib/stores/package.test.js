@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { get } from 'svelte/store';
-import { assets, identity, manifest, play, releaseProject, GAME_CATALOG } from './package.js';
+import { assets, identity, manifest, play, extras, releaseProject, GAME_CATALOG, EASTER_EGG_TRIGGERS } from './package.js';
 
 describe('GAME_CATALOG invariants', () => {
   it('has nine games with unique ids and complete display fields', () => {
@@ -21,6 +21,35 @@ describe('GAME_CATALOG invariants', () => {
     // default intensity sits inside the UI slider range (0.4–1.4)
     expect(p.intensity).toBeGreaterThanOrEqual(0.4);
     expect(p.intensity).toBeLessThanOrEqual(1.4);
+  });
+});
+
+describe('extras store defaults', () => {
+  it('starts with empty gift fields alongside the existing extras', () => {
+    const e = get(extras);
+    expect(e.story).toBe('');
+    expect(e.links).toEqual([]);
+    expect(e.pdfs).toEqual([]);
+    expect(e.collector_note).toBe('');
+    expect(e.dedication).toBe('');
+    expect(e.images).toEqual([]);
+    expect(e.easter_eggs).toEqual([]);
+  });
+});
+
+describe('EASTER_EGG_TRIGGERS invariants', () => {
+  it('has three triggers with unique ids', () => {
+    expect(EASTER_EGG_TRIGGERS).toHaveLength(3);
+    const ids = EASTER_EGG_TRIGGERS.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('every trigger has a name and hint', () => {
+    for (const t of EASTER_EGG_TRIGGERS) {
+      expect(t.id).toMatch(/^[a-z_]+$/);
+      expect(t.name.length).toBeGreaterThan(0);
+      expect(t.hint.length).toBeGreaterThan(0);
+    }
   });
 });
 

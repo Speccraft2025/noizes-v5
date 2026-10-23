@@ -244,8 +244,8 @@ export class TranscendenceV2 {
       const dy = event.clientY - this.explorePointer.y;
       this.explorePointer.x = event.clientX;
       this.explorePointer.y = event.clientY;
-      this.exploreYaw -= dx * 0.0024;
-      this.explorePitch = THREE.MathUtils.clamp(this.explorePitch - dy * 0.0019, -0.72, 0.35);
+      this.exploreYaw -= dx * 0.003;
+      this.explorePitch = THREE.MathUtils.clamp(this.explorePitch - dy * 0.0024, -0.85, 0.42);
     };
     this.onPointerUp = (event) => {
       if (this.explorePointer?.id === event.pointerId) this.explorePointer = null;
@@ -275,7 +275,8 @@ export class TranscendenceV2 {
 
   updateExplore(delta) {
     const camera = this.renderState.camera;
-    const speed = (this.exploreKeys.has('ShiftLeft') || this.exploreKeys.has('ShiftRight')) ? 720 : 330;
+    const sprinting = this.exploreKeys.has('ShiftLeft') || this.exploreKeys.has('ShiftRight');
+    const speed = sprinting ? 900 : 420;
     const forwardInput = axis(this.exploreKeys, ['KeyS', 'ArrowDown'], ['KeyW', 'ArrowUp']);
     const sideInput = axis(this.exploreKeys, ['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']);
     const verticalInput = axis(this.exploreKeys, ['KeyQ'], ['KeyE']);
@@ -284,21 +285,44 @@ export class TranscendenceV2 {
     const desired = forward.multiplyScalar(forwardInput).addScaledVector(right, sideInput);
     if (desired.lengthSq() > 1) desired.normalize();
     desired.multiplyScalar(speed);
-    desired.y = verticalInput * speed * 0.65;
-    this.exploreVelocity.lerp(desired, 1 - Math.exp(-delta * 3.2));
+    desired.y = verticalInput * speed * 0.7;
+    const hasInput = forwardInput !== 0 || sideInput !== 0 || verticalInput !== 0;
+    const responsiveness = hasInput ? 5.5 : 2.8;
+    this.exploreVelocity.lerp(desired, 1 - Math.exp(-delta * responsiveness));
+    if (!hasInput && this.exploreVelocity.lengthSq() < 4) this.exploreVelocity.set(0, 0, 0);
     camera.position.addScaledVector(this.exploreVelocity, delta);
 
     const world = this.renderState.worldData;
-    camera.position.x = THREE.MathUtils.clamp(camera.position.x, -world.width * 0.46, world.width * 0.46);
-    camera.position.z = THREE.MathUtils.clamp(camera.position.z, -world.depth * 0.46, world.depth * 0.46);
-    const sampleHeight = this.renderState.terrain.sampleHeightAt;
-    const ground = Math.max(
-      sampleHeight(camera.position.x, camera.position.z),
-      sampleHeight(camera.position.x + forward.x * 120, camera.position.z + forward.z * 120),
-      sampleHeight(camera.position.x + right.x * 80, camera.position.z + right.z * 80),
-      sampleHeight(camera.position.x - right.x * 80, camera.position.z - right.z * 80),
-    );
-    camera.position.y = THREE.MathUtils.clamp(camera.position.y, ground + 105, ground + 1700);
+    const halfW = world.width / 2;
+    const halfD = world.depth / 2;
+    if (camera.position.x > halfW) camera.position.x -= world.width;
+    if (camera.position.x < -halfW) camera.position.x += world.width;
+    if (camera.position.z > halfD) camera.position.z -= world.depth;
+    if (camera.position.z < -halfD) camera.position.z += world.depth;
+
+    const sampleH = this.renderState.terrain.sampleHeightAt;
+    const EX_CLEAR = 55;
+    let maxTerrainH = sampleH(camera.position.x, camera.position.z);
+    const eDists = [50, 120, 220, 380];
+    const eSides = [0, -60, 60];
+    for (const ed of eDists) {
+      for (const es of eSides) {
+        const px = camera.position.x + forward.x * ed + right.x * es;
+        const pz = camera.position.z + forward.z * ed + right.z * es;
+        maxTerrainH = Math.max(maxTerrainH, sampleH(px, pz));
+      }
+    }
+    maxTerrainH = Math.max(maxTerrainH, sampleH(
+      camera.position.x + forward.x * 60, camera.position.z + forward.z * 60,
+    ));
+
+    const requiredY = maxTerrainH + EX_CLEAR;
+    if (camera.position.y < requiredY) {
+      camera.position.y = THREE.MathUtils.lerp(camera.position.y, requiredY, Math.min(1, delta * 8));
+      const hardFloor = sampleH(camera.position.x, camera.position.z) + 40;
+      if (camera.position.y < hardFloor) camera.position.y = hardFloor;
+    }
+    camera.position.y = Math.min(camera.position.y, maxTerrainH + 1700);
     camera.rotation.set(this.explorePitch, this.exploreYaw, 0, 'YXZ');
     this.updateMinimap();
   }

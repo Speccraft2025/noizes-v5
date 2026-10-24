@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
+  import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '#lib/utils/viewer.js';
 
   let dragging = false;
   let loading = false;

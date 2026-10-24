@@ -1,8 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-import { createSupabaseServerClient } from '$lib/server/supabase.js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 
 // GoTrue reports a trigger rejection as a generic "Database error saving new
 // user" — our noizes_invite_required message is not passed through. Since the
@@ -50,7 +50,7 @@ export async function GET(event) {
       // Upsert profile — preserve role if already set
       const { data: existing } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, password_set')
         .eq('id', data.user.id)
         .maybeSingle();
 
@@ -62,6 +62,13 @@ export async function GET(event) {
           avatar_url: data.user.user_metadata?.avatar_url || null,
           role: invite.role
         });
+      }
+
+      // If the user hasn't set a password yet, redirect to the password
+      // setup page before continuing. Recovery links (next=/auth/reset)
+      // are already going there, so skip the redirect for those.
+      if (!existing?.password_set && !next.startsWith('/auth/reset')) {
+        throw redirect(303, `/auth/reset?setup=1&next=${encodeURIComponent(next)}`);
       }
 
       throw redirect(303, next);

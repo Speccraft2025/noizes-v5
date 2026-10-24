@@ -1,7 +1,7 @@
 <script>
-  import HelpTip from '$lib/components/HelpTip.svelte';
-  import { edition, CURRENCIES } from '$lib/stores/package.js';
-  import { editionErrors } from '$lib/utils/project.js';
+  import HelpTip from '#lib/components/HelpTip.svelte';
+  import { edition, CURRENCIES } from '#lib/stores/package.js';
+  import { editionErrors } from '#lib/utils/project.js';
   $: errors = editionErrors($edition);
 </script>
 

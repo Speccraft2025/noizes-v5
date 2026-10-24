@@ -1,10 +1,13 @@
-import { createSupabaseServerClient } from '$lib/server/supabase.js';
-import { getSupabaseServiceRoleClient } from '$lib/server/supabase.js';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
+import { getSupabaseServiceRoleClient } from '#lib/server/supabase.js';
+import { authenticatedUserFromClaims } from '#lib/server/auth-claims.js';
 import { redirect } from '@sveltejs/kit';
 
-export function handleError({ error, event }) {
-  console.error('[handleError]', event.url.pathname, error?.message ?? error);
-  return { message: 'An error occurred.' };
+export function handleError({ error, event, status, message }) {
+  if (status >= 500) {
+    console.error('[handleError]', event.url.pathname, error?.message ?? error);
+  }
+  return { message: status >= 500 ? 'An error occurred.' : message ?? 'An error occurred.' };
 }
 
 const CREATOR_ROUTES = ['/studio'];
@@ -19,8 +22,14 @@ export async function handle({ event, resolve }) {
   const supabase = createSupabaseServerClient(event);
   event.locals.supabase = supabase;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  event.locals.user = user ?? null;
+  // `getUser()` makes a network round-trip to Auth for every request. Claims
+  // validation verifies the signed access token locally (using the cached JWKS
+  // when available), so public pages do not wait on Auth before they can load.
+  // The claims are still cryptographically verified and are safe for the same
+  // authorization decisions previously made with `getUser()`.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = authenticatedUserFromClaims(claimsData?.claims);
+  event.locals.user = user;
   event.locals.session = user ? { user } : null;
 
   // Load profile if authenticated

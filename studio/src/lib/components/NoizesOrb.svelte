@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { introDone } from '$lib/stores/landing';
+  import { introDone } from '#lib/stores/landing.js';
 
   let container;
 

@@ -1,6 +1,6 @@
 <script>
-  import { invalidateAll } from '$app/navigation';
-  import OpenNzModal from '$lib/components/OpenNzModal.svelte';
+  import { refreshAll } from '$app/navigation';
+  import OpenNzModal from '#lib/components/OpenNzModal.svelte';
 
   export let data;
   $: ({ collection, events, myOffers } = data);
@@ -44,7 +44,7 @@
       });
       if (!res.ok) throw new Error((await res.json()).message || 'Could not save note');
       flash = 'Note saved.';
-      await invalidateAll();
+      await refreshAll();
     } catch (e) { flash = e.message; } finally { busy = false; }
   }
 
@@ -60,7 +60,7 @@
       if (!res.ok) throw new Error((await res.json()).message || 'Transfer failed');
       flash = `Transferred to ${transferEmail}.`;
       transferring = null; transferEmail = '';
-      await invalidateAll();
+      await refreshAll();
     } catch (e) { flash = e.message; } finally { busy = false; }
   }
 
@@ -73,7 +73,7 @@
       });
       if (!res.ok) throw new Error((await res.json()).message || 'Could not accept');
       flash = 'Offer accepted. The buyer can now complete payment.';
-      await invalidateAll();
+      await refreshAll();
     } catch (e) { flash = e.message; } finally { busy = false; }
   }
 
@@ -98,7 +98,7 @@
         body: JSON.stringify({ offer_id: offerId }),
       });
       if (!res.ok) throw new Error((await res.json()).message || 'Could not withdraw');
-      await invalidateAll();
+      await refreshAll();
     } catch (e) { flash = e.message; } finally { busy = false; }
   }
 
@@ -111,7 +111,7 @@
         body: JSON.stringify({ acquisition_id: item.id, accepting: !item.accepting_offers }),
       });
       if (!res.ok) throw new Error((await res.json()).message || 'Could not update');
-      await invalidateAll();
+      await refreshAll();
     } catch (e) { flash = e.message; } finally { busy = false; }
   }
 </script>

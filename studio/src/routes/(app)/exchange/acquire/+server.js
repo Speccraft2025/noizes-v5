@@ -1,8 +1,13 @@
-import { json, error } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY, PAYSTACK_SECRET_KEY } from '$env/static/private';
-import { makeReference, toSubunits, initializeTransaction, SUPPORTED_CURRENCIES } from '$lib/server/paystack.js';
+import { error } from '@sveltejs/kit';import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY, PAYSTACK_SECRET_KEY } from '$app/env/private';
+
+import {
+  makeReference,
+  toSubunits,
+  initializeTransaction,
+  SUPPORTED_CURRENCIES
+} from '#lib/server/paystack.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -71,5 +76,5 @@ export async function POST({ request, locals, url }) {
     throw error(502, 'Payment provider unavailable — try again shortly');
   }
 
-  return json({ authorization_url: tx.authorization_url, reference });
+  return Response.json({ authorization_url: tx.authorization_url, reference });
 }

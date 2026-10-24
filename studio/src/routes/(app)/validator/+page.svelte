@@ -1,6 +1,6 @@
 <script>
   import JSZip from 'jszip';
-  import { sha256Hex, validateNzArchive } from '$lib/domain/package-validation.js';
+  import { sha256Hex, validateNzArchive } from '#lib/domain/package-validation.js';
 
   let dragging = false;
   let result = null;

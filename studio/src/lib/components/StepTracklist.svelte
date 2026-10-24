@@ -1,7 +1,7 @@
 <script>
   import HelpTip from './HelpTip.svelte';
-  import { releaseProject } from '$lib/stores/package.js';
-  import { createTrack, duplicateTrack as duplicateReleaseTrack, orderedTracks, removeTrack, reorderTrack } from '$lib/domain/release.js';
+  import { releaseProject } from '#lib/stores/package.js';
+  import { createTrack, duplicateTrack as duplicateReleaseTrack, orderedTracks, removeTrack, reorderTrack } from '#lib/domain/release.js';
 
   let selectedTrackId = '';
   $: tracks = orderedTracks($releaseProject.tracks);

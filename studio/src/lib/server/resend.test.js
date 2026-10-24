@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildCollaboratorInviteEmail, resendInviteConfigured, sendResendEmail } from './resend.js';
+import { buildCollaboratorInviteEmail, buildWaitlistInviteEmail, resendInviteConfigured, sendResendEmail } from './resend.js';
 
 describe('Resend collaborator invitations', () => {
   it('builds a branded invite while escaping dynamic HTML', () => {
@@ -17,6 +17,30 @@ describe('Resend collaborator invitations', () => {
     expect(email.html).toContain('next=&quot;studio&quot;&amp;token=abc');
     expect(email.html).not.toContain('<Guest>');
     expect(email.text).toContain('on 2 tracks');
+  });
+
+  it('builds a branded waitlist invite email', () => {
+    const email = buildWaitlistInviteEmail({
+      role: 'collector',
+      actionLink: 'https://noizes.xyz/auth/confirm?token_hash=abc123',
+    });
+
+    expect(email.subject).toBe("You're in — welcome to Noizes");
+    expect(email.html).toContain('collector');
+    expect(email.html).toContain('token_hash=abc123');
+    expect(email.html).toContain('NOIZES');
+    expect(email.text).toContain('collector');
+    expect(email.text).toContain('https://noizes.xyz/auth/confirm?token_hash=abc123');
+  });
+
+  it('escapes HTML in waitlist invite role', () => {
+    const email = buildWaitlistInviteEmail({
+      role: '<script>alert("xss")</script>',
+      actionLink: 'https://noizes.xyz/auth/confirm?token_hash=abc',
+    });
+
+    expect(email.html).not.toContain('<script>');
+    expect(email.html).toContain('&lt;script&gt;');
   });
 
   it('requires both Resend configuration values', () => {

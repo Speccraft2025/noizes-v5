@@ -1,5 +1,4 @@
-import { json } from '@sveltejs/kit';
-import { getSupabaseServiceRoleClient } from '$lib/server/supabase.js';
+import { getSupabaseServiceRoleClient } from '#lib/server/supabase.js';
 
 const EVENTS = new Set([
   'exchange_viewed', 'rotation_window_viewed', 'release_impression',
@@ -14,23 +13,23 @@ export async function POST({ request }) {
   try {
     body = await request.json();
   } catch {
-    return json({ message: 'This analytics batch could not be read.' }, { status: 400 });
+    return Response.json({ message: 'This analytics batch could not be read.' }, { status: 400 });
   }
   if (!Array.isArray(body?.events) || body.events.length > 40) {
-    return json({ message: 'This analytics batch is invalid.' }, { status: 400 });
+    return Response.json({ message: 'This analytics batch is invalid.' }, { status: 400 });
   }
   const events = body.events.flatMap((item) => {
     if (!EVENTS.has(item?.event)) return [];
     const releaseId = UUID.test(String(item?.release_id ?? '')) ? String(item.release_id) : null;
     return [{ event: item.event, ...(releaseId ? { release_id: releaseId } : {}) }];
   });
-  if (!events.length) return json({ recorded: 0 });
+  if (!events.length) return Response.json({ recorded: 0 });
 
   const admin = getSupabaseServiceRoleClient();
   const { data, error } = await admin.rpc('record_exchange_analytics', { p_events: events });
   if (error) {
     console.error('[exchange] analytics batch failed:', error);
-    return json({ message: 'Analytics could not be recorded.' }, { status: 503 });
+    return Response.json({ message: 'Analytics could not be recorded.' }, { status: 503 });
   }
-  return json({ recorded: Number(data ?? 0) });
+  return Response.json({ recorded: Number(data ?? 0) });
 }

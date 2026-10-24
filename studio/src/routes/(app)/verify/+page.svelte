@@ -1,6 +1,6 @@
 <script>
   import { enhance } from '$app/forms';
-  import { invalidateAll } from '$app/navigation';
+  import { refreshAll } from '$app/navigation';
   export let data;
   export let form;
 
@@ -67,7 +67,7 @@
     <form method="POST" action="?/submit" enctype="multipart/form-data"
       use:enhance={() => {
         submitting = true;
-        return async ({ update }) => { submitting = false; await update(); await invalidateAll(); };
+        return async ({ update }) => { submitting = false; await update(); await refreshAll(); };
       }}
       class="glass rounded-2xl p-6 space-y-5">
 

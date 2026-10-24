@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY, PAYSTACK_SECRET_KEY } from '$env/static/private';
-import { verifyTransaction } from '$lib/server/paystack.js';
-import { fulfillAcquisition } from '$lib/server/acquire.js';
-import { fulfillResale } from '$lib/server/resale.js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY, PAYSTACK_SECRET_KEY } from '$app/env/private';
+import { verifyTransaction } from '#lib/server/paystack.js';
+import { fulfillAcquisition } from '#lib/server/acquire.js';
+import { fulfillResale } from '#lib/server/resale.js';
 
 const REFERENCE_RE = /^nz_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

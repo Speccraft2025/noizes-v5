@@ -1,5 +1,8 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { createSupabaseServerClient } from '$lib/server/supabase.js';
+import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 
 // The recovery link lands here via /auth/callback, which has already exchanged
 // the code for a session. No valid session ⇒ the link was missing/expired, so
@@ -13,6 +16,7 @@ export async function load({ locals, url }) {
   if (!locals.user) throw redirect(303, '/auth/recover');
   return {
     invite: url.searchParams.get('invite') === '1',
+    setup: url.searchParams.get('setup') === '1',
     next: safeNextPath(url.searchParams.get('next')),
   };
 }
@@ -38,9 +42,11 @@ export const actions = {
     const supabase = createSupabaseServerClient(event);
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
-      // Supabase enforces its own strength / leaked-password checks here.
       return fail(400, { error: error.message || 'Could not update password.' });
     }
+
+    const admin = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    await admin.from('profiles').update({ password_set: true }).eq('id', event.locals.user.id);
 
     throw redirect(303, next);
   }

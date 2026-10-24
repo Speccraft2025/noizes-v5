@@ -1,6 +1,6 @@
 <script>
-  import HelpTip from '$lib/components/HelpTip.svelte';
-  import { releaseProject } from '$lib/stores/package.js';
+  import HelpTip from '#lib/components/HelpTip.svelte';
+  import { releaseProject } from '#lib/stores/package.js';
   import {
     AUDIO_VERSION_ROLES,
     createAudioAsset,
@@ -8,7 +8,7 @@
     createReleaseAsset,
     createTrackAsset,
     orderedTracks,
-  } from '$lib/domain/release.js';
+  } from '#lib/domain/release.js';
 
   let selectedTrackId = '';
   let alternateRole = 'instrumental';

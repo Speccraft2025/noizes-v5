@@ -1,21 +1,19 @@
 <script>
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { identity, edition, assets, rights, releaseProject, template, play, extras, transcendence, draftableTranscendence } from '$lib/stores/package.js';
-  import { createReleaseProject } from '$lib/domain/release.js';
-  import { clearStudioDraft, loadStudioDraft, saveStudioDraft } from '$lib/utils/studio-draft.js';
-  import StepIdentity    from '$lib/components/StepIdentity.svelte';
-  import StepTracklist   from '$lib/components/StepTracklist.svelte';
-  import StepAssets      from '$lib/components/StepAssets.svelte';
-  import StepLyrics      from '$lib/components/StepLyrics.svelte';
-  import StepExperience  from '$lib/components/StepExperience.svelte';
-  import StepExtras      from '$lib/components/StepExtras.svelte';
-  import StepEdition     from '$lib/components/StepEdition.svelte';
-  import StepRights      from '$lib/components/StepRights.svelte';
-  import StepExport      from '$lib/components/StepExport.svelte';
-  import StudioCoach     from '$lib/components/StudioCoach.svelte';
-  import { validateReleaseProject } from '$lib/domain/release.js';
-  import { editionErrors } from '$lib/utils/project.js';
+  import { identity, edition, assets, rights, releaseProject, template, play, extras, transcendence, draftableTranscendence } from '#lib/stores/package.js';
+  import { createReleaseProject } from '#lib/domain/release.js';
+  import { clearStudioDraft, loadStudioDraft, saveStudioDraft } from '#lib/utils/studio-draft.js';
+  import StepIdentity    from '#lib/components/StepIdentity.svelte';
+  import StepTracklist   from '#lib/components/StepTracklist.svelte';
+  import StepAssets      from '#lib/components/StepAssets.svelte';
+  import StepLyrics      from '#lib/components/StepLyrics.svelte';
+  import StepExtras      from '#lib/components/StepExtras.svelte';
+  import StepEdition     from '#lib/components/StepEdition.svelte';
+  import StepRights      from '#lib/components/StepRights.svelte';
+  import StudioCoach     from '#lib/components/StudioCoach.svelte';
+  import { validateReleaseProject } from '#lib/domain/release.js';
+  import { editionErrors } from '#lib/utils/project.js';
 
   export let data;
 
@@ -39,6 +37,9 @@
   let saveQueue = Promise.resolve();
   let draftSubscriptions = [];
   let lastFileSignature = '';
+  let StepExperience = null;
+  let StepExport = null;
+  let optionalStepLoadError = '';
 
   // Handoff from beatsunlimited: a countersigned split-sheet deal arrives as
   // ?source=beatsunlimited&deal=<token>&title=&producer=&master=&pub=.
@@ -134,7 +135,25 @@
 
   function goToStep(step) {
     currentStep = Math.max(1, Math.min(steps.length, Number(step) || 1));
+    void loadOptionalStep(currentStep);
     scheduleDraftSave();
+  }
+
+  // The experience editor includes 3D authoring code and the publish step
+  // includes archive generation. They are useful only after a creator asks
+  // for those steps, so keep them out of the Studio's initial download.
+  async function loadOptionalStep(step) {
+    try {
+      if (step === 6 && !StepExperience) {
+        StepExperience = (await import('#lib/components/StepExperience.svelte')).default;
+      }
+      if (step === 8 && !StepExport) {
+        StepExport = (await import('#lib/components/StepExport.svelte')).default;
+      }
+    } catch (error) {
+      console.error('[studio] optional step failed to load:', error);
+      optionalStepLoadError = 'That Studio tool could not load. Please refresh and try again.';
+    }
   }
 
   async function handlePublished() {
@@ -189,6 +208,7 @@
             terrain: null, analysis: null, terrain_data: null,
           });
           currentStep = Math.max(1, Math.min(steps.length, Number(snapshot.currentStep) || 1));
+          void loadOptionalStep(currentStep);
           draftSavedAt = restored.saved_at;
           draftRestored = true;
           if (!restored.durableFiles) draftWarning = 'Draft metadata was restored; uploaded files may need to be selected again.';
@@ -199,6 +219,7 @@
 
       if (disposed) return;
       importBeatsUnlimitedDeal();
+      void loadOptionalStep(currentStep);
       draftStatus = 'saved';
       lastFileSignature = fileSignature();
       draftSubscriptions = [releaseProject, template, play, extras, transcendence].map((store) => store.subscribe(() => scheduleDraftSave()));
@@ -323,11 +344,28 @@
       {:else if currentStep === 5}
         <StepExtras />
       {:else if currentStep === 6}
-        <StepExperience />
+        {#if StepExperience}
+          <svelte:component this={StepExperience} />
+        {:else if optionalStepLoadError}
+          <p class="text-sm" style="color:#F0C98A;">{optionalStepLoadError}</p>
+        {:else}
+          <p class="text-sm" style="color:var(--ink-muted);">Loading experience tools…</p>
+        {/if}
       {:else if currentStep === 7}
         <StepEdition />
       {:else if currentStep === 8}
-        <div class="space-y-8"><StepRights /><div class="border-t pt-8" style="border-color: var(--border-dim);"><StepExport on:published={handlePublished} /></div></div>
+        <div class="space-y-8">
+          <StepRights />
+          <div class="border-t pt-8" style="border-color: var(--border-dim);">
+            {#if StepExport}
+              <svelte:component this={StepExport} on:published={handlePublished} />
+            {:else if optionalStepLoadError}
+              <p class="text-sm" style="color:#F0C98A;">{optionalStepLoadError}</p>
+            {:else}
+              <p class="text-sm" style="color:var(--ink-muted);">Loading publishing tools…</p>
+            {/if}
+          </div>
+        </div>
       {/if}
     </div>
 

@@ -1,7 +1,7 @@
 <script>
   import HelpTip from './HelpTip.svelte';
-  import { assets, play, releaseProject, template } from '$lib/stores/package.js';
-  import { createUuid, orderedTracks } from '$lib/domain/release.js';
+  import { assets, play, releaseProject, template } from '#lib/stores/package.js';
+  import { createUuid, orderedTracks } from '#lib/domain/release.js';
   import {
     MOMENT_EFFECTS,
     RELEASE_MOMENT_TYPES,
@@ -11,7 +11,7 @@
     createTrackMoment,
     materializeJourney,
     releaseTimeline,
-  } from '$lib/domain/journey.js';
+  } from '#lib/domain/journey.js';
 
   const LABELS = {
     opening: 'Opening encounter', release_identity: 'Release identity', release_introduction: 'Release introduction',

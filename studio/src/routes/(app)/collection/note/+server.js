@@ -1,5 +1,4 @@
-import { json, error } from '@sveltejs/kit';
-
+import { error } from '@sveltejs/kit';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Write / update the current custodian's stewardship note (one per stewardship).
@@ -34,5 +33,5 @@ export async function POST({ request, locals }) {
     throw error(403, 'You can only leave a note on an edition you currently hold');
   }
 
-  return json({ ok: true });
+  return Response.json({ ok: true });
 }

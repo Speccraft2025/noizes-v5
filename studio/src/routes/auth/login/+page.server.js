@@ -1,5 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { createSupabaseServerClient } from '$lib/server/supabase.js';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 
 export async function load({ locals, url }) {
   if (locals.session) throw redirect(303, url.searchParams.get('next') || '/exchange');

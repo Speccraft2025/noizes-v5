@@ -9,7 +9,7 @@
    * or an outside click, and is wired to the popover with aria-describedby so
    * assistive tech reads the explanation as part of the field.
    */
-  import { fieldHelp } from '$lib/help/content.js';
+  import { fieldHelp } from '#lib/help/content.js';
 
   /** Field id from FIELD_HELP, or pass `text` directly. */
   export let field = '';

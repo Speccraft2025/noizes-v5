@@ -1,6 +1,6 @@
 <script>
-  import { page } from '$app/stores';
-  import WaveCanvas from '$lib/components/WaveCanvas.svelte';
+  import { page } from '$app/state';
+  import WaveCanvas from '#lib/components/WaveCanvas.svelte';
   const nav = [
     { href: '/admin',          label: 'Overview',  icon: '◎' },
     { href: '/admin/waitlist', label: 'Waitlist',  icon: '◉' },
@@ -29,7 +29,7 @@
         {#each nav as item}
           <a href={item.href}
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200"
-            style={$page.url.pathname === item.href
+            style={page.url.pathname === item.href
               ? 'background: rgba(240,75,216,0.12); color: #fff; border: 1px solid rgba(240,75,216,0.25);'
               : 'color: var(--ink-tertiary); border: 1px solid transparent;'}>
             <span class="text-xs">{item.icon}</span>{item.label}
@@ -43,7 +43,5 @@
     </div>
   </header>
 
-  <main class="flex-1 relative z-10">
-    <slot />
-  </main>
+  <main class="flex-1 relative z-10"><slot></slot></main>
 </div>

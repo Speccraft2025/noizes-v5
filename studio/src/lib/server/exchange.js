@@ -1,6 +1,12 @@
 import { createHmac, randomUUID } from 'node:crypto';
-import { env } from '$env/dynamic/private';
-import { getSupabaseServiceRoleClient } from '$lib/server/supabase.js';
+
+import {
+  EXCHANGE_ROTATION_HOURS,
+  EXCHANGE_ROTATION_SECRET,
+  SUPABASE_SERVICE_ROLE_KEY
+} from '$app/env/private';
+
+import { getSupabaseServiceRoleClient } from '#lib/server/supabase.js';
 import {
   createExchangeRotation,
   exchangeCatalogueVersion,
@@ -8,7 +14,7 @@ import {
   isEligibleExchangeRelease,
   paginateExchangeReleases,
   searchExchangeReleases,
-} from '$lib/domain/exchange-rotation.js';
+} from '#lib/domain/exchange-rotation.js';
 
 const PAGE_SIZE = 20;
 const PAGE_FETCH_SIZE = 1000;
@@ -17,9 +23,9 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const VISITOR_COOKIE = 'noizes_exchange_window';
 
 function rotationSettings(now) {
-  const configuredHours = Number.parseInt(env.EXCHANGE_ROTATION_HOURS ?? '4', 10) || 4;
+  const configuredHours = Number.parseInt(EXCHANGE_ROTATION_HOURS ?? '4', 10) || 4;
   const window = exchangeRotationWindow(now, configuredHours);
-  const secret = env.EXCHANGE_ROTATION_SECRET || env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret = EXCHANGE_ROTATION_SECRET || SUPABASE_SERVICE_ROLE_KEY;
   if (!secret) throw new Error('Exchange Rotation requires a server-side secret.');
   return { window, secret };
 }
@@ -149,7 +155,7 @@ async function readRotationSnapshot(admin, releases, window, secret) {
 function buildSearchMetadata(release) {
   return [
     release.genre,
-    ...(Array.isArray(release.genres) ? release.genres : []),
+    ...Array.isArray(release.genres) ? release.genres : [],
     release.label,
     release.catalogue_number,
     release.release_type,

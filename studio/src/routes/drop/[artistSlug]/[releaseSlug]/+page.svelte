@@ -1,17 +1,15 @@
 <script>
   import { goto } from '$app/navigation';
-  import { page as pageStore } from '$app/stores';
-
-  import DropHero from '$lib/components/drop/DropHero.svelte';
-  import DropContents from '$lib/components/drop/DropContents.svelte';
-  import DropExperiencePreview from '$lib/components/drop/DropExperiencePreview.svelte';
-  import DropEditionInfo from '$lib/components/drop/DropEditionInfo.svelte';
-  import DropAuthenticity from '$lib/components/drop/DropAuthenticity.svelte';
-  import DropProvenance from '$lib/components/drop/DropProvenance.svelte';
-  import DropSharePanel from '$lib/components/drop/DropSharePanel.svelte';
-  import DropCreatorLinks from '$lib/components/drop/DropCreatorLinks.svelte';
-  import DropCreatorControls from '$lib/components/drop/DropCreatorControls.svelte';
-  import DropAnalyticsTracker from '$lib/components/drop/DropAnalyticsTracker.svelte';
+  import DropHero from '#lib/components/drop/DropHero.svelte';
+  import DropContents from '#lib/components/drop/DropContents.svelte';
+  import DropExperiencePreview from '#lib/components/drop/DropExperiencePreview.svelte';
+  import DropEditionInfo from '#lib/components/drop/DropEditionInfo.svelte';
+  import DropAuthenticity from '#lib/components/drop/DropAuthenticity.svelte';
+  import DropProvenance from '#lib/components/drop/DropProvenance.svelte';
+  import DropSharePanel from '#lib/components/drop/DropSharePanel.svelte';
+  import DropCreatorLinks from '#lib/components/drop/DropCreatorLinks.svelte';
+  import DropCreatorControls from '#lib/components/drop/DropCreatorControls.svelte';
+  import DropAnalyticsTracker from '#lib/components/drop/DropAnalyticsTracker.svelte';
 
   export let data;
 
@@ -104,7 +102,11 @@
         body: JSON.stringify({ action: 'update', ...event.detail }),
       });
       const body = await res.json().catch(() => ({}));
-      creatorMessage = res.ok ? 'Saved.' : (body.message || 'Could not save those changes.');
+
+      creatorMessage = res.ok
+        ? 'Saved.'
+        : body.message || 'Could not save those changes.';
+
       if (res.ok) location.reload();
     } catch {
       creatorMessage = 'Could not save those changes.';
@@ -123,7 +125,11 @@
         body: JSON.stringify({ action: 'links', links: event.detail }),
       });
       const body = await res.json().catch(() => ({}));
-      creatorMessage = res.ok ? 'Links saved.' : (body.message || 'Could not save those links.');
+
+      creatorMessage = res.ok
+        ? 'Links saved.'
+        : body.message || 'Could not save those links.';
+
       if (res.ok) location.reload();
     } catch {
       creatorMessage = 'Could not save those links.';
@@ -142,7 +148,11 @@
         body: JSON.stringify({ action }),
       });
       const body = await res.json().catch(() => ({}));
-      creatorMessage = res.ok ? 'Done.' : (body.message || 'Could not change publication state.');
+
+      creatorMessage = res.ok
+        ? 'Done.'
+        : body.message || 'Could not change publication state.';
+
       if (res.ok) location.reload();
     } catch {
       creatorMessage = 'Could not change publication state.';
@@ -194,7 +204,7 @@
   <main class="max-w-6xl mx-auto px-5 md:px-8 py-10 md:py-16 space-y-16 md:space-y-20">
     {#if data.isCreator}
       <DropCreatorControls
-        {release}
+        release={release}
         analytics={data.analytics}
         links={data.links}
         busy={creatorBusy}
@@ -207,11 +217,11 @@
     {/if}
 
     <DropHero
-      {release}
+      release={release}
       availability={data.availability}
       trust={data.trust}
-      {busy}
-      {message}
+      busy={busy}
+      message={message}
       on:action={onAction}
     />
 
@@ -223,12 +233,12 @@
       on:open={(event) => openExperience(event.detail)}
     />
 
-    <DropEditionInfo {release} packageRecord={data.package} />
+    <DropEditionInfo release={release} packageRecord={data.package} />
 
     <DropAuthenticity
       authenticity={data.authenticity}
       packageRecord={data.package}
-      {release}
+      release={release}
       certificateHref={`${base}/certificate`}
       manifestHref={`${base}/manifest`}
     />

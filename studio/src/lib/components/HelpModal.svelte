@@ -9,7 +9,7 @@
    * be stranded tabbing through a form they cannot see.
    */
   import { createEventDispatcher, onDestroy, tick } from 'svelte';
-  import { portal } from '$lib/utils/portal.js';
+  import { portal } from '#lib/utils/portal.js';
 
   export let open = false;
   export let title = '';

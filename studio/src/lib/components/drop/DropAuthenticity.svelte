@@ -1,5 +1,5 @@
 <script>
-  import { describeVerificationStatus } from '$lib/domain/drop-contents.js';
+  import { describeVerificationStatus } from '#lib/domain/drop-contents.js';
 
   // Authenticity here means one specific, checkable thing: the creator signed
   // a hash of the package's component inventory, and the signature verifies.

@@ -1,8 +1,8 @@
 import { error } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-import { resolveDropAddress } from '$lib/server/drop-page.js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
+import { resolveDropAddress } from '#lib/server/drop-page.js';
 
 // The authenticity certificate as a portable JSON document. Public on purpose:
 // a certificate nobody can fetch is a certificate nobody can check.
@@ -11,14 +11,9 @@ import { resolveDropAddress } from '$lib/server/drop-page.js';
 // inside the .nz, and a verifier should check that one — it travels with the
 // object and needs no server.
 export async function GET({ params }) {
-  const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { release } = await resolveDropAddress(sb, { artistSlug: params.artistSlug, slug: params.releaseSlug });
 
-  const { release } = await resolveDropAddress(sb, {
-    artistSlug: params.artistSlug,
-    slug: params.releaseSlug,
-  });
   if (!release || release.status === 'draft') throw error(404, 'No release lives at this address.');
 
   const { data: record } = await sb
@@ -72,6 +67,9 @@ export async function GET({ params }) {
       'content-type': 'application/json',
       'content-disposition': `attachment; filename="${filename}"`,
       'cache-control': 'public, max-age=0, s-maxage=300',
+      // Certificates are public, immutable verification material for the
+      // duration of this short cache window; no account data is present.
+      'Netlify-CDN-Cache-Control': 'public, durable, max-age=300, stale-while-revalidate=3600',
     },
   });
 }

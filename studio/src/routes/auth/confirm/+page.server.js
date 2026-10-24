@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { createSupabaseServerClient } from '$lib/server/supabase.js';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 
 export function load({ url }) {
   const tokenHash = url.searchParams.get('token_hash');

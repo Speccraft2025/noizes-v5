@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-import { loadChain, verifyChain, buildProvenanceDocument } from '$lib/server/provenance.js';
-import { getRegistryPublicKey } from '$lib/server/signing.js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
+import { loadChain, verifyChain, buildProvenanceDocument } from '#lib/server/provenance.js';
+import { getRegistryPublicKey } from '#lib/server/signing.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -49,6 +49,9 @@ export async function GET({ params }) {
     headers: {
       'content-type': 'application/json',
       'content-disposition': `attachment; filename="${filename}"`,
+      // A provenance export is public for every viewer. Keep the freshness
+      // window short because a transfer can append to the chain at any time.
+      'Netlify-CDN-Cache-Control': 'public, durable, max-age=60, stale-while-revalidate=300',
     },
   });
 }

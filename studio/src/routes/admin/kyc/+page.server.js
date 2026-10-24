@@ -1,8 +1,8 @@
 import { fail } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-import { REJECT_REASONS } from '$lib/server/kyc.js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
+import { REJECT_REASONS } from '#lib/server/kyc.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -23,11 +23,11 @@ export async function load() {
   const rows = submissions ?? [];
 
   // Resolve emails + signed URLs (1h) for the private documents.
-  const userIds = [...new Set(rows.map(s => s.user_id))];
+  const userIds = [...new Set(rows.map((s) => s.user_id))];
   const { data: profiles } = userIds.length
     ? await sb.from('profiles').select('id, email, kyc_status').in('id', userIds)
     : { data: [] };
-  const byId = Object.fromEntries((profiles ?? []).map(p => [p.id, p]));
+  const byId = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
 
   const withUrls = await Promise.all(rows.map(async (s) => {
     const sign = async (path) => {
@@ -46,8 +46,8 @@ export async function load() {
 
   return {
     submissions: withUrls,
-    pendingCount: withUrls.filter(s => s.status === 'pending').length,
-    rejectReasons: REJECT_REASONS,
+    pendingCount: withUrls.filter((s) => s.status === 'pending').length,
+    rejectReasons: REJECT_REASONS
   };
 }
 

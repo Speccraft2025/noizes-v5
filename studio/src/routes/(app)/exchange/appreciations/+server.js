@@ -1,22 +1,21 @@
-import { json } from '@sveltejs/kit';
-import { getSupabaseServiceRoleClient } from '$lib/server/supabase.js';
+import { getSupabaseServiceRoleClient } from '#lib/server/supabase.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST({ locals, request }) {
   const user = locals.user;
-  if (!user) return json({ message: 'Sign in to appreciate this release.' }, { status: 401 });
+  if (!user) return Response.json({ message: 'Sign in to appreciate this release.' }, { status: 401 });
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return json({ message: 'This appreciation request could not be read.' }, { status: 400 });
+    return Response.json({ message: 'This appreciation request could not be read.' }, { status: 400 });
   }
   const releaseId = String(body?.release_id ?? '');
   const appreciated = body?.appreciated;
   if (!UUID.test(releaseId) || typeof appreciated !== 'boolean') {
-    return json({ message: 'This appreciation request is invalid.' }, { status: 400 });
+    return Response.json({ message: 'This appreciation request is invalid.' }, { status: 400 });
   }
 
   const admin = getSupabaseServiceRoleClient();
@@ -33,9 +32,9 @@ export async function POST({ locals, request }) {
       .maybeSingle();
     if (releaseError) {
       console.error('[exchange] appreciation eligibility check failed:', releaseError);
-      return json({ message: 'Appreciation is temporarily unavailable.' }, { status: 503 });
+      return Response.json({ message: 'Appreciation is temporarily unavailable.' }, { status: 503 });
     }
-    if (!release) return json({ message: 'This release is no longer available to appreciate.' }, { status: 409 });
+    if (!release) return Response.json({ message: 'This release is no longer available to appreciate.' }, { status: 409 });
   }
 
   // The user ID comes from the server-verified Supabase session, never from
@@ -51,13 +50,13 @@ export async function POST({ locals, request }) {
 
   if (result.error) {
     if (result.error.code === 'P0001') {
-      return json({ message: 'Please wait a moment before changing your appreciation.' }, { status: 429 });
+      return Response.json({ message: 'Please wait a moment before changing your appreciation.' }, { status: 429 });
     }
     if (result.error.code === '42501') {
-      return json({ message: 'This appreciation could not be recorded for your account.' }, { status: 403 });
+      return Response.json({ message: 'This appreciation could not be recorded for your account.' }, { status: 403 });
     }
     console.error('[exchange] appreciation write failed:', result.error);
-    return json({ message: 'Appreciation could not be saved. Please try again.' }, { status: 503 });
+    return Response.json({ message: 'Appreciation could not be saved. Please try again.' }, { status: 503 });
   }
 
   const confirmed = result.data?.appreciated ?? false;
@@ -66,7 +65,7 @@ export async function POST({ locals, request }) {
   });
   if (countError) console.error('[exchange] updated appreciation count failed:', countError);
   const appreciationCount = counts?.[0]?.appreciation_count;
-  return json({
+  return Response.json({
     appreciated: confirmed,
     ...(appreciationCount != null && Number.isFinite(Number(appreciationCount))
       ? { appreciation_count: Number(appreciationCount) }

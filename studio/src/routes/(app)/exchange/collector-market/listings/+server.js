@@ -1,5 +1,4 @@
-import { json } from '@sveltejs/kit';
-import { getSupabaseServiceRoleClient } from '$lib/server/supabase.js';
+import { getSupabaseServiceRoleClient } from '#lib/server/supabase.js';
 
 function publicCover(admin, release) {
   return release?.cover_path
@@ -23,7 +22,7 @@ export async function GET() {
 
   if (error) {
     console.error('[exchange] Collector Market listing failed:', error);
-    return json({ message: 'Collector Market could not be loaded just now.' }, { status: 503 });
+    return Response.json({ message: 'Collector Market could not be loaded just now.' }, { status: 503 });
   }
 
   const listings = (data ?? []).filter((copy) => copy.releases?.slug && copy.releases?.artist_slug).map((copy) => {
@@ -44,5 +43,5 @@ export async function GET() {
     };
   });
 
-  return json({ listings }, { headers: { 'cache-control': 'private, no-store' } });
+  return Response.json({ listings }, { headers: { 'cache-control': 'private, no-store' } });
 }

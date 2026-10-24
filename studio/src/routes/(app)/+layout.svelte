@@ -23,7 +23,9 @@
 </script>
 
 <div class="min-h-screen flex flex-col relative" style="background: var(--bg-deep);">
-  <WaveCanvas />
+  {#if $page.url.pathname !== '/exchange'}
+    <WaveCanvas />
+  {/if}
 
   <header class="sticky top-0 z-50 border-b"
     style="background: rgba(3,3,3,0.92); backdrop-filter: blur(20px); border-color: var(--border-dim);">

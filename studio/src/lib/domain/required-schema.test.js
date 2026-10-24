@@ -68,6 +68,20 @@ describe('the manifest stays honest', () => {
     expect(targets).toContain('audio_versions');
     expect(targets).toContain('audio_assets');
   });
+
+  it('probes the new Exchange appreciation and rotation schema', () => {
+    const targets = schemaProbes().map((probe) => probe.target);
+    for (const target of [
+      'release_appreciations',
+      'release_appreciations.user_id',
+      'release_appreciations.appreciated',
+      'exchange_rotation_snapshots.release_ids',
+      'exchange_rotation_impressions.visitor_hash',
+      'exchange_analytics.event_count',
+    ]) {
+      expect(targets).toContain(target);
+    }
+  });
 });
 
 describe('isDriftError', () => {

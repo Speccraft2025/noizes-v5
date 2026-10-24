@@ -12,6 +12,7 @@
 
 const MULTI_TRACK = 'multi-track-phase-1-2026-07-31.sql';
 const DROP_PAGES = 'drop-pages-2026-08-03.sql';
+const EXCHANGE_ROTATION = 'exchange-rotation-2026-10-24.sql';
 
 /**
  * Tables the app cannot function without, each with the columns that a
@@ -63,6 +64,38 @@ export const REQUIRED_SCHEMA = {
   release_authenticity: { migration: DROP_PAGES, columns: [] },
   release_links: { migration: DROP_PAGES, columns: [] },
   drop_analytics: { migration: DROP_PAGES, columns: [] },
+
+  // Fair Exchange ordering, private appreciation state, and aggregate events.
+  release_appreciations: {
+    migration: EXCHANGE_ROTATION,
+    columns: [
+      ['user_id', EXCHANGE_ROTATION], ['release_id', EXCHANGE_ROTATION],
+      ['appreciated', EXCHANGE_ROTATION], ['created_at', EXCHANGE_ROTATION],
+      ['updated_at', EXCHANGE_ROTATION],
+    ],
+  },
+  exchange_rotation_snapshots: {
+    migration: EXCHANGE_ROTATION,
+    columns: [
+      ['window_id', EXCHANGE_ROTATION], ['catalogue_version', EXCHANGE_ROTATION],
+      ['release_ids', EXCHANGE_ROTATION],
+    ],
+  },
+  exchange_rotation_impressions: {
+    migration: EXCHANGE_ROTATION,
+    columns: [
+      ['window_id', EXCHANGE_ROTATION], ['release_id', EXCHANGE_ROTATION],
+      ['visitor_hash', EXCHANGE_ROTATION], ['created_at', EXCHANGE_ROTATION],
+    ],
+  },
+  exchange_analytics: {
+    migration: EXCHANGE_ROTATION,
+    columns: [
+      ['event_day', EXCHANGE_ROTATION], ['event_key', EXCHANGE_ROTATION],
+      ['event', EXCHANGE_ROTATION], ['release_id', EXCHANGE_ROTATION],
+      ['event_count', EXCHANGE_ROTATION],
+    ],
+  },
 };
 
 /** Postgres / PostgREST codes meaning "the schema is not what we expect". */

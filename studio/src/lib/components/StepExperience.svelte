@@ -5,12 +5,12 @@
   // Guide editor exactly as before. Choosing Transcendence reveals the panel that
   // measures the recording and lets the creator direct the world built from it.
   import { onDestroy } from 'svelte';
-  import { releaseProject, template, transcendence } from '$lib/stores/package.js';
-  import { CANONICAL_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE, TRANSCENDENCE_V3_TEMPLATE } from '$lib/utils/project.js';
-  import { DEFAULT_ART_DIRECTION, LYRIC_FONT_PRESETS, PALETTES, QUALITY_PROFILES, normalizeArtDirection, buildTranscendenceHTML } from '$lib/utils/transcendence.js';
-  import { VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
-  import { canDecodeAudio } from '$lib/analysis/decode.js';
-  import { buildLyricLines, defaultLandmarks, landmarkProblems } from '$lib/experiences/transcendence/landmarks.js';
+  import { releaseProject, template, transcendence } from '#lib/stores/package.js';
+  import { CANONICAL_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE, TRANSCENDENCE_V3_TEMPLATE } from '#lib/utils/project.js';
+  import { DEFAULT_ART_DIRECTION, LYRIC_FONT_PRESETS, PALETTES, QUALITY_PROFILES, normalizeArtDirection, buildTranscendenceHTML } from '#lib/utils/transcendence.js';
+  import { VIEWER_FRAME_BOOTSTRAP } from '#lib/utils/viewer.js';
+  import { canDecodeAudio } from '#lib/analysis/decode.js';
+  import { buildLyricLines, defaultLandmarks, landmarkProblems } from '#lib/experiences/transcendence/landmarks.js';
   import HelpTip from './HelpTip.svelte';
   import StepGuide from './StepGuide.svelte';
   import TerrainPreview from './TerrainPreview.svelte';
@@ -77,7 +77,7 @@
     try {
       // Imported here rather than at module scope so the DSP and the 850 KB of
       // runtime source only load for a creator who actually chose this system.
-      const { analyseTrack } = await import('$lib/analysis/index.js');
+      const { analyseTrack } = await import('#lib/analysis/index.js');
       const result = await analyseTrack(audioAsset.file, {
         signal: controller.signal,
         source: {
@@ -178,9 +178,9 @@
       const audioPath = 'preview/audio';
       const terrainPath = 'preview/terrain.png';
       const buildPreview = $template === TRANSCENDENCE_V3_TEMPLATE
-        ? (await import('$lib/utils/transcendence-v3.js')).buildTranscendenceV3HTML
+        ? (await import('#lib/utils/transcendence-v3.js')).buildTranscendenceV3HTML
         : $template === TRANSCENDENCE_V2_TEMPLATE
-          ? (await import('$lib/utils/transcendence-v2.js')).buildTranscendenceV2HTML
+          ? (await import('#lib/utils/transcendence-v2.js')).buildTranscendenceV2HTML
           : buildTranscendenceHTML;
       const result = await buildPreview({
         identity: { title: selectedTrack?.title || 'Preview', artist: selectedTrack?.primary_artist || '', release_id: 'ned-preview' },

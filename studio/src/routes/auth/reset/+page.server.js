@@ -1,8 +1,8 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-import { createSupabaseServerClient } from '$lib/server/supabase.js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 
 // The recovery link lands here via /auth/callback, which has already exchanged
 // the code for a session. No valid session ⇒ the link was missing/expired, so

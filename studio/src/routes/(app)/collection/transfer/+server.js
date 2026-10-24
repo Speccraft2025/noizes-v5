@@ -1,8 +1,7 @@
-import { json, error } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-import { transferCustody, TransferError } from '$lib/server/transfer.js';
+import { error } from '@sveltejs/kit';import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
+import { transferCustody, TransferError } from '#lib/server/transfer.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -40,7 +39,7 @@ export async function POST({ request, locals }) {
       expectedFromOwnerId: locals.user.id,
       toOwnerId: recipient.id,
     });
-    return json({ ok: true, acquisition_id: acquisition.id, seq: event.seq });
+    return Response.json({ ok: true, acquisition_id: acquisition.id, seq: event.seq });
   } catch (e) {
     if (e instanceof TransferError) {
       const status = e.code === 'not_found' ? 404 : e.code === 'not_owner' ? 409 : 400;

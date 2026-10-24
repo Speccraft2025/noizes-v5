@@ -1,7 +1,7 @@
 <script>
   import HelpTip from './HelpTip.svelte';
-  import { releaseProject } from '$lib/stores/package.js';
-  import { orderedTracks } from '$lib/domain/release.js';
+  import { releaseProject } from '#lib/stores/package.js';
+  import { orderedTracks } from '#lib/domain/release.js';
   import { onDestroy } from 'svelte';
 
   // ── state ──────────────────────────────────────────────────────────────────

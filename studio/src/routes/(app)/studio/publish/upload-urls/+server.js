@@ -1,9 +1,8 @@
-import { json, error } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-import { findPublishSchemaError, publishSchemaMessage } from '$lib/server/publish-schema.js';
-import { PACKAGE_BUCKET, COVER_BUCKET } from '$lib/server/storage.js';
+import { error } from '@sveltejs/kit';import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
+import { findPublishSchemaError, publishSchemaMessage } from '#lib/server/publish-schema.js';
+import { PACKAGE_BUCKET, COVER_BUCKET } from '#lib/server/storage.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -55,5 +54,5 @@ export async function POST({ request, locals }) {
     uploads[key] = { path, signedUrl: data.signedUrl };
   }
 
-  return json({ release_id: releaseId, uploads });
+  return Response.json({ release_id: releaseId, uploads });
 }

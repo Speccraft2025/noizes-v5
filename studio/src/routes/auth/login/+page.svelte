@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { enhance } from '$app/forms';
-  import WaveCanvas from '$lib/components/WaveCanvas.svelte';
+  import WaveCanvas from '#lib/components/WaveCanvas.svelte';
   export let form;
   export let data;
 

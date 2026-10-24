@@ -1,9 +1,9 @@
 <script>
   import HelpTip from './HelpTip.svelte';
   import { onMount } from 'svelte';
-  import { extras, identity, releaseProject, rights, LICENSES } from '$lib/stores/package.js';
-  import { orderedTracks } from '$lib/domain/release.js';
-  import { createCreditRecord, mergeFeaturedCreditRecords } from '$lib/domain/credit-records.js';
+  import { extras, identity, releaseProject, rights, LICENSES } from '#lib/stores/package.js';
+  import { orderedTracks } from '#lib/domain/release.js';
+  import { createCreditRecord, mergeFeaturedCreditRecords } from '#lib/domain/credit-records.js';
 
   const CREDIT_ROLES = [
     'Featured Artist', 'Primary Artist', 'Producer', 'Executive Producer', 'Songwriter',

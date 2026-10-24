@@ -1,10 +1,24 @@
-import { error, json } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-import { env } from '$env/dynamic/private';
-import { buildInviteAcceptanceUrl, isExistingSupabaseUserError, validateCollaboratorInvite } from '$lib/server/collaborator-invites.js';
-import { buildCollaboratorInviteEmail, resendInviteConfigured, sendResendEmail } from '$lib/server/resend.js';
+import { error } from '@sveltejs/kit';import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+
+import {
+  SUPABASE_SERVICE_ROLE_KEY,
+  RESEND_API_KEY,
+  RESEND_FROM_EMAIL,
+  RESEND_REPLY_TO
+} from '$app/env/private';
+
+import {
+  buildInviteAcceptanceUrl,
+  isExistingSupabaseUserError,
+  validateCollaboratorInvite
+} from '#lib/server/collaborator-invites.js';
+
+import {
+  buildCollaboratorInviteEmail,
+  resendInviteConfigured,
+  sendResendEmail
+} from '#lib/server/resend.js';
 
 export async function POST({ request, locals, url }) {
   if (!locals.user || locals.profile?.role !== 'creator') throw error(401, 'A creator account is required.');
@@ -80,9 +94,9 @@ export async function POST({ request, locals, url }) {
           actionLink,
         });
         const sent = await sendResendEmail({
-          apiKey: env.RESEND_API_KEY,
-          from: env.RESEND_FROM_EMAIL,
-          replyTo: env.RESEND_REPLY_TO,
+          apiKey: RESEND_API_KEY,
+          from: RESEND_FROM_EMAIL,
+          replyTo: RESEND_REPLY_TO,
           to: invite.email,
           ...email,
           idempotencySeed: `${invite.credit_id}:${invite.email}:${tokenHash}`,
@@ -130,7 +144,7 @@ export async function POST({ request, locals, url }) {
     delivery = 'existing_account';
   }
 
-  return json({
+  return Response.json({
     invited: invite.email,
     already_registered: alreadyRegistered,
     user_id: collaboratorUserId,

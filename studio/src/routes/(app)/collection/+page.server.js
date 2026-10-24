@@ -1,4 +1,4 @@
-import { describeLoadError } from '$lib/domain/load-errors.js';
+import { describeLoadError } from '#lib/domain/load-errors.js';
 
 export async function load({ locals }) {
   const sb = locals.supabase;

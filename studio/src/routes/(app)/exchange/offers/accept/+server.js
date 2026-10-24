@@ -1,7 +1,6 @@
-import { json, error } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { error } from '@sveltejs/kit';import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,12 +37,12 @@ export async function POST({ request, locals }) {
     p_seller_id: locals.user.id,
   });
   if (acceptErr) {
-    if (/not active|no longer owns|not found/i.test(acceptErr.message || '')) {
+    if ((/not active|no longer owns|not found/i).test(acceptErr.message || '')) {
       throw error(409, 'This offer or listing is no longer active');
     }
     console.error(`[offers] atomic accept failed: ${acceptErr.message}`);
     throw error(500, 'Could not accept offer');
   }
 
-  return json({ ok: true });
+  return Response.json({ ok: true });
 }

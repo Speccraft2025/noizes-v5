@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { env } from '$env/dynamic/private';
+import { SIGNING_KEK } from '$app/env/private';
 import { verifySignature } from './crypto-verify.js';
 
 export { verifySignature };
@@ -7,10 +7,10 @@ export { verifySignature };
 const CIPHER = 'aes-256-gcm';
 
 function getKek() {
-  if (!env.SIGNING_KEK) {
+  if (!SIGNING_KEK) {
     throw new Error('SIGNING_KEK env var is not set — cannot access custodial signing keys. Generate one with `openssl rand -base64 32`.');
   }
-  const key = Buffer.from(env.SIGNING_KEK, 'base64');
+  const key = Buffer.from(SIGNING_KEK, 'base64');
   if (key.length !== 32) {
     throw new Error('SIGNING_KEK must decode to exactly 32 bytes (base64-encoded).');
   }

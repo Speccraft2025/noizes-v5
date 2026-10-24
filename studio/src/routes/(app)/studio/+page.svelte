@@ -1,19 +1,19 @@
 <script>
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { identity, edition, assets, rights, releaseProject, template, play, extras, transcendence, draftableTranscendence } from '$lib/stores/package.js';
-  import { createReleaseProject } from '$lib/domain/release.js';
-  import { clearStudioDraft, loadStudioDraft, saveStudioDraft } from '$lib/utils/studio-draft.js';
-  import StepIdentity    from '$lib/components/StepIdentity.svelte';
-  import StepTracklist   from '$lib/components/StepTracklist.svelte';
-  import StepAssets      from '$lib/components/StepAssets.svelte';
-  import StepLyrics      from '$lib/components/StepLyrics.svelte';
-  import StepExtras      from '$lib/components/StepExtras.svelte';
-  import StepEdition     from '$lib/components/StepEdition.svelte';
-  import StepRights      from '$lib/components/StepRights.svelte';
-  import StudioCoach     from '$lib/components/StudioCoach.svelte';
-  import { validateReleaseProject } from '$lib/domain/release.js';
-  import { editionErrors } from '$lib/utils/project.js';
+  import { identity, edition, assets, rights, releaseProject, template, play, extras, transcendence, draftableTranscendence } from '#lib/stores/package.js';
+  import { createReleaseProject } from '#lib/domain/release.js';
+  import { clearStudioDraft, loadStudioDraft, saveStudioDraft } from '#lib/utils/studio-draft.js';
+  import StepIdentity    from '#lib/components/StepIdentity.svelte';
+  import StepTracklist   from '#lib/components/StepTracklist.svelte';
+  import StepAssets      from '#lib/components/StepAssets.svelte';
+  import StepLyrics      from '#lib/components/StepLyrics.svelte';
+  import StepExtras      from '#lib/components/StepExtras.svelte';
+  import StepEdition     from '#lib/components/StepEdition.svelte';
+  import StepRights      from '#lib/components/StepRights.svelte';
+  import StudioCoach     from '#lib/components/StudioCoach.svelte';
+  import { validateReleaseProject } from '#lib/domain/release.js';
+  import { editionErrors } from '#lib/utils/project.js';
 
   export let data;
 
@@ -145,10 +145,10 @@
   async function loadOptionalStep(step) {
     try {
       if (step === 6 && !StepExperience) {
-        StepExperience = (await import('$lib/components/StepExperience.svelte')).default;
+        StepExperience = (await import('#lib/components/StepExperience.svelte')).default;
       }
       if (step === 8 && !StepExport) {
-        StepExport = (await import('$lib/components/StepExport.svelte')).default;
+        StepExport = (await import('#lib/components/StepExport.svelte')).default;
       }
     } catch (error) {
       console.error('[studio] optional step failed to load:', error);

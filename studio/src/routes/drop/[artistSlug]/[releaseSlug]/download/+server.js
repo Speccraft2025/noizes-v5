@@ -1,10 +1,9 @@
-import { json, error } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { error } from '@sveltejs/kit';import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
 
-import { resolveDropAddress, bumpDropAnalytics } from '$lib/server/drop-page.js';
-import { canDownloadPackage, packageFilename } from '$lib/domain/drop-availability.js';
+import { resolveDropAddress, bumpDropAnalytics } from '#lib/server/drop-page.js';
+import { canDownloadPackage, packageFilename } from '#lib/domain/drop-availability.js';
 
 // Hands back a download URL for the .nz, after checking on the server that
 // this viewer is entitled to it. The bytes are served straight from Supabase
@@ -16,14 +15,9 @@ import { canDownloadPackage, packageFilename } from '$lib/domain/drop-availabili
 // has lost the format: the extension is how the viewer, the OS and a stranger
 // ten years from now recognise what the file is.
 export async function GET({ params, locals }) {
-  const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { release } = await resolveDropAddress(sb, { artistSlug: params.artistSlug, slug: params.releaseSlug });
 
-  const { release } = await resolveDropAddress(sb, {
-    artistSlug: params.artistSlug,
-    slug: params.releaseSlug,
-  });
   if (!release) throw error(404, 'No release lives at this address.');
 
   const viewerId = locals.user?.id ?? null;
@@ -79,5 +73,5 @@ export async function GET({ params, locals }) {
 
   await bumpDropAnalytics(sb, release.id, 'download');
 
-  return json({ url, filename, entitlement: verdict.reason });
+  return Response.json({ url, filename, entitlement: verdict.reason });
 }

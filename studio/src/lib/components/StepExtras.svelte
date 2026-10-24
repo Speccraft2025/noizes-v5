@@ -1,6 +1,6 @@
 <script>
   import HelpTip from './HelpTip.svelte';
-  import { extras, releaseProject } from '$lib/stores/package.js';
+  import { extras, releaseProject } from '#lib/stores/package.js';
   import StepPlay from './StepPlay.svelte';
 
   function addLink() {

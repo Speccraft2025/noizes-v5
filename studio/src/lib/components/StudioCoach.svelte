@@ -18,10 +18,10 @@
    * so the information stays visible without the dialog staying in the way.
    */
   import { createEventDispatcher, onDestroy, onMount } from 'svelte';
-  import { portal } from '$lib/utils/portal.js';
+  import { portal } from '#lib/utils/portal.js';
   import HelpModal from './HelpModal.svelte';
-  import { PREFLIGHT, PRIMER, STEP_IDS, stepHelp } from '$lib/help/content.js';
-  import { blockerSummary, resolveBlockers } from '$lib/help/blockers.js';
+  import { PREFLIGHT, PRIMER, STEP_IDS, stepHelp } from '#lib/help/content.js';
+  import { blockerSummary, resolveBlockers } from '#lib/help/blockers.js';
 
   export let step = 1;
   export let validation = { errors: [], warnings: [] };

@@ -1,5 +1,4 @@
-import { json, error } from '@sveltejs/kit';
-
+import { error } from '@sveltejs/kit';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Offerer withdraws their own active offer. RLS restricts the update to the
@@ -25,5 +24,5 @@ export async function POST({ request, locals }) {
     .maybeSingle();
   if (upErr) throw error(500, 'Could not withdraw');
   if (!data) throw error(409, 'Offer is no longer active');
-  return json({ ok: true });
+  return Response.json({ ok: true });
 }

@@ -1,11 +1,11 @@
 import { error, redirect } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
 
-import { resolveDropAddress, bumpDropAnalytics } from '$lib/server/drop-page.js';
-import { dropPath } from '$lib/domain/drop-slug.js';
-import { signedPackageUrl } from '$lib/server/storage.js';
+import { resolveDropAddress, bumpDropAnalytics } from '#lib/server/drop-page.js';
+import { dropPath } from '#lib/domain/drop-slug.js';
+import { signedPackageUrl } from '#lib/server/storage.js';
 
 // The viewer fetches the whole package before it can start, so this window has
 // to cover a large download beginning on a slow connection — longer than the
@@ -21,14 +21,9 @@ const EXPERIENCE_URL_TTL_SECONDS = 300;
 // server involved — that property is the product, and this route must not
 // quietly become a dependency of it.
 export async function load({ params, locals, url }) {
-  const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { release, redirectTo } = await resolveDropAddress(sb, { artistSlug: params.artistSlug, slug: params.releaseSlug });
 
-  const { release, redirectTo } = await resolveDropAddress(sb, {
-    artistSlug: params.artistSlug,
-    slug: params.releaseSlug,
-  });
   if (redirectTo) throw redirect(301, `/experience/${release.artist_slug}/${release.slug}${url.hash ?? ''}`);
   if (!release) throw error(404, 'No release lives at this address.');
 

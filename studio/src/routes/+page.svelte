@@ -1,8 +1,8 @@
 <script>
   import { enhance } from '$app/forms';
   import { onMount, onDestroy } from 'svelte';
-  import NoizesOrb from '$lib/components/NoizesOrb.svelte';
-  import { introDone } from '$lib/stores/landing';
+  import NoizesOrb from '#lib/components/NoizesOrb.svelte';
+  import { introDone } from '#lib/stores/landing.js';
   export let form;
 
   let role = 'collector';

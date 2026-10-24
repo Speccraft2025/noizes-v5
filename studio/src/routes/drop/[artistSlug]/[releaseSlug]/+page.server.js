@@ -1,11 +1,11 @@
 import { error, redirect } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
 
-import { getDropPage } from '$lib/server/drop-page.js';
-import { metaDescription, openGraphTags, shareMessage, shareTargets } from '$lib/domain/drop-share.js';
-import { qrSvg } from '$lib/domain/qr.js';
+import { getDropPage } from '#lib/server/drop-page.js';
+import { metaDescription, openGraphTags, shareMessage, shareTargets } from '#lib/domain/drop-share.js';
+import { qrSvg } from '#lib/domain/qr.js';
 
 // Server-rendered, because the page's job is to be shared: a social crawler
 // does not run JavaScript, and a Drop Page whose card renders as a blank

@@ -39,7 +39,7 @@ route.
 
 ## Publishing
 
-`$lib/server/publish-release.js` → `finalizePublication()`.
+`#lib/server/publish-release.js` → `finalizePublication()`.
 
 PostgREST offers no transactions, so integrity is structural:
 
@@ -88,7 +88,7 @@ Added by `backend/drop-pages-2026-08-03.sql`:
 **Not** created: a table replacing `releases.nz_path` (acquisition, collection
 and download all resolve through it), or an `editions` table (an edition is
 the release's `edition_*` columns plus the acquisitions claiming numbers from
-it — splitting it would fork the sellout logic in `$lib/server/acquire.js`).
+it — splitting it would fork the sellout logic in `#lib/server/acquire.js`).
 
 `manifest.json` inside the .nz remains the source of truth for what the object
 *is*. The database is the publication and indexing layer.
@@ -140,7 +140,7 @@ migration still verifies.
 ## What the page may claim
 
 Every content row, experience section and trust indicator is derived from the
-package manifest (`$lib/domain/drop-contents.js`). If a package declares no
+package manifest (`#lib/domain/drop-contents.js`). If a package declares no
 video, the page has no Video row. A Drop Page listing contents the .nz does
 not contain is not a cosmetic bug — it is a false claim about something
 someone is about to buy.
@@ -155,7 +155,7 @@ certificate, that a signature is not a copyright registration.
 
 ## Availability and entitlement
 
-`$lib/domain/drop-availability.js` decides the primary button in one pure
+`#lib/domain/drop-availability.js` decides the primary button in one pure
 function — eight states, all reachable in tests. Ownership outranks
 everything: a collector who holds a copy can always reach it, even when the
 edition is sold out or the release has been withdrawn.
@@ -181,7 +181,7 @@ The shared URL is always the canonical Drop Page — never a storage URL (they
 move and they expose the object's location), never a URL carrying who shared
 it.
 
-`$lib/domain/qr.js` is a self-contained QR encoder (byte mode, EC level M,
+`#lib/domain/qr.js` is a self-contained QR encoder (byte mode, EC level M,
 versions 1–10, up to 216 bytes). Written here rather than added as a
 dependency: it puts no third-party code in the path of a page that renders
 creator-controlled text, and needs no runtime download. Its tests reverse the
@@ -235,7 +235,7 @@ cd studio && npm test
 Covered: slug generation and collision behaviour, manifest-derived contents,
 the availability state machine, share/OG construction, the QR encoder
 (round-trip decode), and the publish orchestration against an in-memory
-Supabase stand-in (`$lib/server/fake-supabase.js`) — idempotency, staged
+Supabase stand-in (`#lib/server/fake-supabase.js`) — idempotency, staged
 visibility, failure leaving a draft, and recovery on retry.
 
 Not covered by automated tests: Svelte component rendering (no component

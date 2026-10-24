@@ -1,7 +1,8 @@
 <script>
-  import { page } from '$app/stores';
+  import { afterNavigate } from '$app/navigation';
+  import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import WaveCanvas from '$lib/components/WaveCanvas.svelte';
+  import WaveCanvas from '#lib/components/WaveCanvas.svelte';
 
   export let data;
   $: ({ profile, user } = data);
@@ -18,12 +19,19 @@
     { label: 'Open .nz',  href: '/open',        icon: '⬟', creatorOnly: false },
   ];
 
-  $: visibleNav = navItems.filter(n => !n.creatorOnly || isCreator);
-  $: if ($page.url.pathname) mobileMenuOpen = false;
+  $: visibleNav = navItems.filter((n) => !n.creatorOnly || isCreator);
+  afterNavigate(() => {
+    mobileMenuOpen = false;
+  });
 </script>
 
-<div class="min-h-screen flex flex-col relative" style="background: var(--bg-deep);">
-  <WaveCanvas />
+<div
+  class="min-h-screen flex flex-col relative"
+  style="background: var(--bg-deep);"
+>
+  {#if page.url.pathname !== '/exchange'}
+    <WaveCanvas />
+  {/if}
 
   <header class="sticky top-0 z-50 border-b"
     style="background: rgba(3,3,3,0.92); backdrop-filter: blur(20px); border-color: var(--border-dim);">
@@ -39,7 +47,7 @@
         {#each visibleNav as item}
           <a href={item.href}
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200"
-            style={$page.url.pathname.startsWith(item.href)
+            style={page.url.pathname.startsWith(item.href)
               ? 'background: rgba(123,92,240,0.15); color: #fff; border: 1px solid rgba(123,92,240,0.3);'
               : 'color: var(--ink-tertiary); border: 1px solid transparent;'}>
             <span class="text-xs opacity-60">{item.icon}</span>{item.label}
@@ -92,7 +100,7 @@
         {#each visibleNav as item}
           <a href={item.href}
             class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
-            style={$page.url.pathname.startsWith(item.href)
+            style={page.url.pathname.startsWith(item.href)
               ? 'background: rgba(123,92,240,0.12); color: #fff;'
               : 'color: var(--ink-secondary);'}>
             <span style="color: #7B5CF0;">{item.icon}</span>{item.label}
@@ -115,7 +123,5 @@
     {/if}
   </header>
 
-  <main class="flex-1 relative z-10">
-    <slot />
-  </main>
+  <main class="flex-1 relative z-10"><slot></slot></main>
 </div>

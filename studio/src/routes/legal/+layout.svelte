@@ -1,5 +1,5 @@
 <script>
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
   const docs = [
     { href: '/legal/terms',       label: 'Terms of Service' },
@@ -31,7 +31,7 @@
       {#each docs as doc}
         <a href={doc.href}
           class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
-          style={$page.url.pathname === doc.href
+          style={page.url.pathname === doc.href
             ? 'background: rgba(123,92,240,0.15); color: #fff; border: 1px solid rgba(123,92,240,0.3);'
             : 'color: var(--ink-muted); border: 1px solid var(--border-dim);'}>
           {doc.label}
@@ -40,10 +40,7 @@
     </div>
 
     <!-- Document content -->
-    <article class="legal-prose">
-      <slot />
-    </article>
-
+    <article class="legal-prose"><slot></slot></article>
   </div>
 </div>
 

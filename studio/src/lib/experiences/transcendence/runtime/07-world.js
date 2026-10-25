@@ -171,7 +171,7 @@ class WorldRenderer {
       uBandWidth: { value: BAND_WIDTH },
       uDuration: { value: this.analysis.duration },
       uHeightScale: { value: HEIGHT_SCALE },
-      uHeightGamma: { value: 1.75 },
+      uHeightGamma: { value: 1.4 },
       uRidgeScale: { value: 3.4 * ART.ridgeEmphasis },
       uDetailScale: { value: this.profile.detailScale * 0.8 },
       uPlayhead: { value: 0 },
@@ -633,7 +633,7 @@ class WorldRenderer {
     const foot = Math.pow(_fbm2(x * 0.0030 + 41.0, z * 0.0015 + 41.0), 2) * hs * 0.5;
     let macro = Math.max(Math.max(peakHeight, shoulderHeight), foot);
     macro += rangeEnvelope * hs * 2.0;
-    macro *= mix(0.3, 1.0, energy);
+    macro *= mix(0.65, 1.0, energy);
     const vCenterX = -31;
     const vDist = Math.abs(x - vCenterX);
     const vEdge = _fbm2(z * 0.0012 + 77, x * 0.001 + 77) * 10;
@@ -642,7 +642,7 @@ class WorldRenderer {
     const vWallZone = smoothstep(30, 55, vEffDist) * (1 - smoothstep(55, 130, vEffDist));
     macro *= mix(1, 0.04, vFloor);
     macro += vWallZone * hs * 3.5;
-    const spectral = Math.pow(T.energy, this.field.uHeightGamma.value + 0.5) * hs * mass * 0.12 * mix(1, 0.15, vFloor);
+    const spectral = Math.pow(T.energy, this.field.uHeightGamma.value + 0.5) * hs * mass * 0.22 * mix(1, 0.15, vFloor);
     const sRidge = T.ridge * T.energy * this.field.uRidgeScale.value * mix(0.6, 1.9, band) * 0.08 * mix(1, 0.1, vFloor);
     return Math.max(macro + spectral + sRidge, this.field.uBaseHeight.value);
   }

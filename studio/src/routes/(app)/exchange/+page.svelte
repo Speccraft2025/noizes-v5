@@ -31,6 +31,8 @@
   let returnFocusElement = null;
   let priorBodyOverflow = '';
   let priorHeaderInert = false;
+  let isNavigatingExchange = false;
+  let navigationRequest = 0;
   $: items = data.items ?? [];
   $: if (data.query !== undefined && data.query !== searchValue) searchValue = data.query ?? '';
 
@@ -118,13 +120,24 @@
     return `${next.pathname}${next.search}`;
   }
 
+  async function navigateExchange(url, options) {
+    const request = ++navigationRequest;
+    isNavigatingExchange = true;
+
+    try {
+      await goto(url, options);
+    } finally {
+      if (request === navigationRequest) isNavigatingExchange = false;
+    }
+  }
+
   function scheduleSearch() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       const normalized = searchValue.trim();
       if (normalized !== (data.query ?? '')) {
         trackAnalytics('search_performed');
-        void goto(searchUrl(normalized), { replace: true, reset: false });
+        void navigateExchange(searchUrl(normalized), { replace: true, reset: false });
       }
     }, 320);
   }
@@ -133,13 +146,13 @@
     event.preventDefault();
     clearTimeout(searchTimer);
     trackAnalytics('search_performed');
-    void goto(searchUrl(searchValue), { reset: false });
+    void navigateExchange(searchUrl(searchValue), { reset: false });
   }
 
   function clearSearch() {
     searchValue = '';
     clearTimeout(searchTimer);
-    void goto(searchUrl(''), { reset: false });
+    void navigateExchange(searchUrl(''), { reset: false });
   }
 
   function currentPageUrl() {

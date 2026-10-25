@@ -1,10 +1,9 @@
-import { json } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY, PAYSTACK_SECRET_KEY } from '$env/static/private';
-import { verifyPaystackSignature } from '$lib/server/paystack.js';
-import { fulfillAcquisition } from '$lib/server/acquire.js';
-import { fulfillResale } from '$lib/server/resale.js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY, PAYSTACK_SECRET_KEY } from '$app/env/private';
+import { verifyPaystackSignature } from '#lib/server/paystack.js';
+import { fulfillAcquisition } from '#lib/server/acquire.js';
+import { fulfillResale } from '#lib/server/resale.js';
 
 // Paystack webhook — the source of truth for payment success. Unauthenticated
 // (no session): trust comes from the HMAC signature over the raw body.
@@ -17,18 +16,18 @@ export async function POST({ request }) {
   const signature = request.headers.get('x-paystack-signature');
   if (!verifyPaystackSignature(raw, signature, PAYSTACK_SECRET_KEY)) {
     console.error('[webhook] invalid Paystack signature');
-    return json({ error: 'invalid signature' }, { status: 401 });
+    return Response.json({ error: 'invalid signature' }, { status: 401 });
   }
 
   let event;
   try {
     event = JSON.parse(raw);
   } catch {
-    return json({ error: 'malformed body' }, { status: 400 });
+    return Response.json({ error: 'malformed body' }, { status: 400 });
   }
 
   if (event?.event !== 'charge.success') {
-    return json({ received: true });
+    return Response.json({ received: true });
   }
 
   const data = event.data || {};
@@ -41,7 +40,7 @@ export async function POST({ request }) {
     .maybeSingle();
   if (!intent) {
     console.error(`[webhook] charge.success for unknown reference ${data.reference}`);
-    return json({ received: true });
+    return Response.json({ received: true });
   }
 
   // Defense against replay/tamper even with a valid signature envelope:
@@ -54,7 +53,7 @@ export async function POST({ request }) {
       .from('payment_intents')
       .update({ status: 'needs_reconciliation', paystack_data: { amount: data.amount, currency: data.currency, status: data.status } })
       .eq('reference', intent.reference);
-    return json({ received: true });
+    return Response.json({ received: true });
   }
 
   try {
@@ -72,8 +71,8 @@ export async function POST({ request }) {
     // 5xx → Paystack retries → idempotent re-fulfillment. This is the
     // "insert fails after payment confirmed" retry path from TODOS.md.
     console.error(`[webhook] fulfillment failed for ${intent.reference}: ${e.message}`);
-    return json({ error: 'fulfillment failed' }, { status: 500 });
+    return Response.json({ error: 'fulfillment failed' }, { status: 500 });
   }
 
-  return json({ received: true });
+  return Response.json({ received: true });
 }

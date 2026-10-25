@@ -10,6 +10,10 @@ For a new project, run these files in the Supabase SQL Editor in this order:
 4. `drop-pages-2026-08-03.sql`
 5. `performance-io-hardening-2026-09-11.sql`
 6. Any later dated hardening scripts not already folded into the base schema
+7. `exchange-rotation-2026-10-24.sql` for private appreciations, stable Exchange Rotation snapshots, impression records, and aggregate Exchange analytics
+8. `exchange-rotation-service-policies-2026-10-24.sql` for explicit service-role-only RLS policies on the private rotation and analytics tables
+9. `exchange-rotation-index-tuning-2026-10-24.sql` for the Exchange index review
+10. `exchange-rotation-index-coverage-2026-10-24.sql` for covering the release foreign keys on impression and analytics records
 
 `drop-pages-2026-08-03.sql` adds Drop Page routing, package version history,
 the authenticity index, creator links and aggregate analytics. It backfills a

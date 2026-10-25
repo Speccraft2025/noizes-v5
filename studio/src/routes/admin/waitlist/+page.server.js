@@ -1,10 +1,16 @@
 import { fail } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-import { env } from '$env/dynamic/private';
-import { buildInviteAcceptanceUrl, isExistingSupabaseUserError } from '$lib/server/collaborator-invites.js';
-import { buildWaitlistInviteEmail, resendInviteConfigured, sendResendEmail } from '$lib/server/resend.js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+
+import {
+  SUPABASE_SERVICE_ROLE_KEY,
+  RESEND_API_KEY,
+  RESEND_FROM_EMAIL,
+  RESEND_REPLY_TO
+} from '$app/env/private';
+
+import { buildInviteAcceptanceUrl, isExistingSupabaseUserError } from '#lib/server/collaborator-invites.js';
+import { buildWaitlistInviteEmail, resendInviteConfigured, sendResendEmail } from '#lib/server/resend.js';
 
 export async function load({ locals }) {
   const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -17,10 +23,10 @@ export async function load({ locals }) {
   // public.invites is the source of truth for who has been let in — a profile
   // row only appears once the invite is accepted, so it under-reports.
   const { data: invites } = await sb.from('invites').select('email');
-  const invitedEmails = new Set((invites ?? []).map(i => i.email));
+  const invitedEmails = new Set((invites ?? []).map((i) => i.email));
 
   return {
-    entries: (entries ?? []).map(e => ({ ...e, invited: invitedEmails.has(e.email?.toLowerCase()) }))
+    entries: (entries ?? []).map((e) => ({ ...e, invited: invitedEmails.has(e.email?.toLowerCase()) }))
   };
 }
 
@@ -72,9 +78,9 @@ export const actions = {
           const actionLink = buildInviteAcceptanceUrl('https://noizes.xyz', tokenHash);
           const tpl = buildWaitlistInviteEmail({ role, actionLink });
           await sendResendEmail({
-            apiKey: env.RESEND_API_KEY,
-            from: env.RESEND_FROM_EMAIL,
-            replyTo: env.RESEND_REPLY_TO,
+            apiKey: RESEND_API_KEY,
+            from: RESEND_FROM_EMAIL,
+            replyTo: RESEND_REPLY_TO,
             to: email,
             ...tpl,
             idempotencySeed: `waitlist:${email}:${tokenHash}`,

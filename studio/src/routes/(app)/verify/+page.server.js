@@ -1,8 +1,17 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
-import { validateKycFields, validateKycImage, parseLinks, canSubmitKyc, safeFileExt, ID_TYPES, YEARS_ACTIVE } from '$lib/server/kyc.js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
+
+import {
+  validateKycFields,
+  validateKycImage,
+  parseLinks,
+  canSubmitKyc,
+  safeFileExt,
+  ID_TYPES,
+  YEARS_ACTIVE
+} from '#lib/server/kyc.js';
 
 export async function load({ locals, url }) {
   if (!locals.user) {

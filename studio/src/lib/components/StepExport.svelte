@@ -1,11 +1,11 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { identity, edition, releaseProject, template, play, extras, transcendence } from '$lib/stores/package.js';
-  import { buildPackage } from '$lib/utils/packager.js';
-  import { editionErrors } from '$lib/utils/project.js';
-  import { validateReleaseProject } from '$lib/domain/release.js';
-  import { estimatePackageSize, formatBytes } from '$lib/domain/package-size.js';
-  import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '$lib/utils/viewer.js';
+  import { identity, edition, releaseProject, template, play, extras, transcendence } from '#lib/stores/package.js';
+  import { buildPackage } from '#lib/utils/packager.js';
+  import { editionErrors } from '#lib/utils/project.js';
+  import { validateReleaseProject } from '#lib/domain/release.js';
+  import { estimatePackageSize, formatBytes } from '#lib/domain/package-size.js';
+  import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '#lib/utils/viewer.js';
   import { goto } from '$app/navigation';
 
   const dispatch = createEventDispatcher();

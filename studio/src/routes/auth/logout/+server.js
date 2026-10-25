@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { createSupabaseServerClient } from '$lib/server/supabase.js';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 
 export async function GET(event) {
   const supabase = createSupabaseServerClient(event);

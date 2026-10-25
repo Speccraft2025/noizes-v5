@@ -27,7 +27,7 @@ describe('Studio workflow contract', () => {
 
   it('keeps the system selector inside the Experience step rather than adding a ninth', () => {
     const experienceStep = readFileSync(new URL('../../../lib/components/StepExperience.svelte', import.meta.url), 'utf8');
-    expect(page).toContain("import('$lib/components/StepExperience.svelte')");
+    expect(page).toContain("import('#lib/components/StepExperience.svelte')");
     expect(page).toContain('<svelte:component this={StepExperience}');
     expect(experienceStep).toContain('CANONICAL_TEMPLATE');
     expect(experienceStep).toContain('TRANSCENDENCE_V2_TEMPLATE');

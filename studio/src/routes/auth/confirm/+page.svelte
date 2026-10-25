@@ -1,6 +1,6 @@
 <script>
   import { enhance } from '$app/forms';
-  import WaveCanvas from '$lib/components/WaveCanvas.svelte';
+  import WaveCanvas from '#lib/components/WaveCanvas.svelte';
   export let data;
   let loading = false;
 </script>

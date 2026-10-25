@@ -1,10 +1,9 @@
-import { json, error } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { error } from '@sveltejs/kit';import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
 
-import { resolveDropAddress } from '$lib/server/drop-page.js';
-import { unpublishRelease, PublishError } from '$lib/server/publish-release.js';
+import { resolveDropAddress } from '#lib/server/drop-page.js';
+import { unpublishRelease, PublishError } from '#lib/server/publish-release.js';
 
 const MAX_LABEL = 60;
 const MAX_LINKS = 12;
@@ -30,14 +29,9 @@ function validateExternalUrl(value) {
 export async function POST({ params, request, locals }) {
   if (!locals.user) throw error(401, 'Sign in to manage this release.');
 
-  const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { release } = await resolveDropAddress(sb, { artistSlug: params.artistSlug, slug: params.releaseSlug });
 
-  const { release } = await resolveDropAddress(sb, {
-    artistSlug: params.artistSlug,
-    slug: params.releaseSlug,
-  });
   if (!release) throw error(404, 'No release lives at this address.');
   if (release.artist_id !== locals.user.id) throw error(403, 'This is not your release.');
 
@@ -51,7 +45,7 @@ export async function POST({ params, request, locals }) {
   try {
     if (body.action === 'withdraw') {
       const updated = await unpublishRelease(sb, { releaseId: release.id, artistId: locals.user.id });
-      return json({ ok: true, status: updated.status });
+      return Response.json({ ok: true, status: updated.status });
     }
 
     if (body.action === 'republish') {
@@ -62,7 +56,7 @@ export async function POST({ params, request, locals }) {
         .select('status')
         .single();
       if (err) throw error(500, `Could not publish again: ${err.message}`);
-      return json({ ok: true, status: data.status });
+      return Response.json({ ok: true, status: data.status });
     }
 
     if (body.action === 'links') {
@@ -90,7 +84,7 @@ export async function POST({ params, request, locals }) {
         const { error: insertErr } = await sb.from('release_links').insert(rows);
         if (insertErr) throw error(500, `Could not update links: ${insertErr.message}`);
       }
-      return json({ ok: true, links: rows.length });
+      return Response.json({ ok: true, links: rows.length });
     }
 
     if (body.action === 'update') {
@@ -112,11 +106,11 @@ export async function POST({ params, request, locals }) {
         if (!['public', 'unlisted'].includes(body.visibility)) throw error(400, 'Unknown visibility.');
         patch.visibility = body.visibility;
       }
-      if (!Object.keys(patch).length) return json({ ok: true, changed: 0 });
+      if (!Object.keys(patch).length) return Response.json({ ok: true, changed: 0 });
 
       const { error: err } = await sb.from('releases').update(patch).eq('id', release.id);
       if (err) throw error(500, `Could not save those changes: ${err.message}`);
-      return json({ ok: true, changed: Object.keys(patch).length });
+      return Response.json({ ok: true, changed: Object.keys(patch).length });
     }
   } catch (cause) {
     if (cause instanceof PublishError) throw error(cause.status, cause.message);

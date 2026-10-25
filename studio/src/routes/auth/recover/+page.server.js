@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { createSupabaseServerClient } from '$lib/server/supabase.js';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 
 // Request a password-reset link. Supabase emails a recovery link that lands on
 // /auth/callback, which exchanges it for a short-lived session and forwards to

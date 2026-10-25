@@ -1,15 +1,14 @@
-import { json, error } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { error } from '@sveltejs/kit';import { createClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
 import nodeCrypto from 'node:crypto';
 import JSZip from 'jszip';
-import { signHash } from '$lib/server/signing.js';
-import { validateNzArchive } from '$lib/domain/package-validation.js';
-import { findPublishSchemaError, publishSchemaMessage } from '$lib/server/publish-schema.js';
-import { PACKAGE_BUCKET, COVER_BUCKET } from '$lib/server/storage.js';
-import { finalizePublication, PublishError } from '$lib/server/publish-release.js';
-import { summarizeExperience } from '$lib/domain/drop-contents.js';
+import { signHash } from '#lib/server/signing.js';
+import { validateNzArchive } from '#lib/domain/package-validation.js';
+import { findPublishSchemaError, publishSchemaMessage } from '#lib/server/publish-schema.js';
+import { PACKAGE_BUCKET, COVER_BUCKET } from '#lib/server/storage.js';
+import { finalizePublication, PublishError } from '#lib/server/publish-release.js';
+import { summarizeExperience } from '#lib/domain/drop-contents.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -34,7 +33,7 @@ export async function POST({ request, locals }) {
 
   const { release_id: releaseId, meta } = await request.json();
   if (!UUID_RE.test(releaseId || '')) throw error(400, 'release_id must be the uuid returned by upload-urls');
-  if (!meta?.title || (!meta?.artist && meta?.release_type !== 'compilation')) {
+  if (!meta?.title || !meta?.artist && meta?.release_type !== 'compilation') {
     throw error(400, 'meta.title and a primary artist are required (Compilation may use Various Artists)');
   }
 
@@ -103,13 +102,8 @@ export async function POST({ request, locals }) {
   }
   const inventoryEntries = declaredComponents.length
     ? declaredComponents.map((component) => component.path).filter(Boolean)
-    : Object.keys(zip.files).filter((path) =>
-        !zip.files[path].dir && (
-          path.startsWith('audio/')
-          || /^tracks\/[^/]+\/audio\//.test(path)
-          || path.startsWith('release/audio/')
-        )
-      );
+    : Object.keys(zip.files).filter((path) => !zip.files[path].dir && (path.startsWith('audio/') || (/^tracks\/[^/]+\/audio\//).test(path) || path.startsWith('release/audio/')));
+
   let signedAuthenticity = null;
   if (inventoryEntries.length) {
     const components = [];
@@ -173,7 +167,7 @@ export async function POST({ request, locals }) {
   // Parsed once, used by both the experience summary below and the normalized
   // inventory written during publication.
   const trackRecords = [];
-  for (const path of Object.keys(zip.files).filter((name) => /^tracks\/[^/]+\/track\.json$/.test(name)).sort()) {
+  for (const path of Object.keys(zip.files).filter((name) => (/^tracks\/[^/]+\/track\.json$/).test(name)).sort()) {
     try {
       trackRecords.push(JSON.parse(await zip.files[path].async('string')));
     } catch {
@@ -268,95 +262,95 @@ export async function POST({ request, locals }) {
   // normalized rows from the service-role publish boundary; acquisitions
   // remain linked only to the complete release row.
   async function writeNormalizedInventory() {
-  if (packageManifest?.package_type === 'music_release') {
-    // Clear release-scoped audio explicitly before replacing tracks. Track
-    // deletion cascades track versions/assets, but intentionally cannot remove
-    // a continuous release master. This also makes re-publish idempotent.
-    const { error: clearAssetsErr } = await sb.from('audio_assets').delete().eq('release_id', releaseId);
-    if (clearAssetsErr) throw error(500, `Could not replace published audio inventory: ${clearAssetsErr.message}`);
-    const { error: clearErr } = await sb.from('tracks').delete().eq('release_id', releaseId);
-    if (clearErr) throw error(500, `Could not replace published tracklist: ${clearErr.message}`);
+    if (packageManifest?.package_type === 'music_release') {
+      // Clear release-scoped audio explicitly before replacing tracks. Track
+      // deletion cascades track versions/assets, but intentionally cannot remove
+      // a continuous release master. This also makes re-publish idempotent.
+      const { error: clearAssetsErr } = await sb.from('audio_assets').delete().eq('release_id', releaseId);
+      if (clearAssetsErr) throw error(500, `Could not replace published audio inventory: ${clearAssetsErr.message}`);
+      const { error: clearErr } = await sb.from('tracks').delete().eq('release_id', releaseId);
+      if (clearErr) throw error(500, `Could not replace published tracklist: ${clearErr.message}`);
 
-    if (trackRecords.length) {
-      const { error: trackErr } = await sb.from('tracks').insert(trackRecords.map((track) => ({
-        id: track.track_id,
-        release_id: releaseId,
-        position: track.position,
-        disc_number: track.disc_number,
-        track_number: track.track_number,
-        title: track.title,
-        subtitle: track.subtitle || null,
-        primary_artist: track.primary_artist,
-        featured_artists: track.featured_artists || [],
-        producers: track.producers || [],
-        writers: track.writers || [],
-        isrc: track.isrc || null,
-        explicit: Boolean(track.explicit),
-        bonus: Boolean(track.bonus),
-        hidden: Boolean(track.hidden),
-        description: track.description || null,
-        release_date: track.release_date || null,
-        source_release: track.source_release || null,
-        recording_date: track.recording_date || null,
-        recording_location: track.recording_location || null,
-        artwork_ref: track.artwork_ref || null,
-        primary_version_id: track.audio_versions?.find((version) => version.is_primary)?.version_id || null,
-        primary_audio_asset_id: track.primary_audio_component || null,
-        appears_in_journey: track.appears_in_journey !== false,
-        appears_in_archive: track.appears_in_archive !== false,
-        inherit_release_artist: track.inherit_release_artist !== false,
-        inherit_release_credits: track.inherit_release_credits !== false,
-        inherit_release_rights: track.inherit_release_rights !== false,
-        lyrics: track.lyrics || {},
-        credits: track.credits || {},
+      if (trackRecords.length) {
+        const { error: trackErr } = await sb.from('tracks').insert(trackRecords.map((track) => ({
+          id: track.track_id,
+          release_id: releaseId,
+          position: track.position,
+          disc_number: track.disc_number,
+          track_number: track.track_number,
+          title: track.title,
+          subtitle: track.subtitle || null,
+          primary_artist: track.primary_artist,
+          featured_artists: track.featured_artists || [],
+          producers: track.producers || [],
+          writers: track.writers || [],
+          isrc: track.isrc || null,
+          explicit: Boolean(track.explicit),
+          bonus: Boolean(track.bonus),
+          hidden: Boolean(track.hidden),
+          description: track.description || null,
+          release_date: track.release_date || null,
+          source_release: track.source_release || null,
+          recording_date: track.recording_date || null,
+          recording_location: track.recording_location || null,
+          artwork_ref: track.artwork_ref || null,
+          primary_version_id: track.audio_versions?.find((version) => version.is_primary)?.version_id || null,
+          primary_audio_asset_id: track.primary_audio_component || null,
+          appears_in_journey: track.appears_in_journey !== false,
+          appears_in_archive: track.appears_in_archive !== false,
+          inherit_release_artist: track.inherit_release_artist !== false,
+          inherit_release_credits: track.inherit_release_credits !== false,
+          inherit_release_rights: track.inherit_release_rights !== false,
+          lyrics: track.lyrics || {},
+          credits: track.credits || {},
         rights: track.rights || {},
-      })));
-      if (trackErr) throw error(500, `Could not publish tracklist: ${trackErr.message}`);
+        })));
+        if (trackErr) throw error(500, `Could not publish tracklist: ${trackErr.message}`);
 
-      const versions = trackRecords.flatMap((track) => (track.audio_versions || []).map((version) => ({
-        id: version.version_id,
-        release_id: releaseId,
-        track_id: track.track_id,
-        role: version.role,
-        title: version.title || '',
-        is_primary: Boolean(version.is_primary),
+        const versions = trackRecords.flatMap((track) => (track.audio_versions || []).map((version) => ({
+          id: version.version_id,
+          release_id: releaseId,
+          track_id: track.track_id,
+          role: version.role,
+          title: version.title || '',
+          is_primary: Boolean(version.is_primary),
         notes: version.notes || null,
-      })));
-      if (versions.length) {
-        const { error: versionErr } = await sb.from('audio_versions').insert(versions);
-        if (versionErr) throw error(500, `Could not publish audio versions: ${versionErr.message}`);
+        })));
+        if (versions.length) {
+          const { error: versionErr } = await sb.from('audio_versions').insert(versions);
+          if (versionErr) throw error(500, `Could not publish audio versions: ${versionErr.message}`);
+        }
+
       }
 
-    }
-
-    // Release-level audio also exists for intentionally trackless DJ mixes, so
-    // component persistence cannot depend on a non-empty tracklist.
-    const audioAssets = declaredComponents.filter((component) => component.type === 'audio').map((component) => ({
-      id: component.component_id,
-      release_id: releaseId,
-      track_id: component.track_id || null,
-      version_id: component.version_id || null,
-      scope: component.scope,
-      role: component.role,
-      title: component.title || null,
-      filename: component.filename || null,
-      storage_path: `${nz_path}#${component.path}`,
-      mime: component.mime || null,
-      duration_ms: Number(component.duration_ms) || 0,
-      sample_rate: Number(component.sample_rate) || 0,
-      bit_depth: Number(component.bit_depth) || 0,
-      channels: Number(component.channels) || 0,
-      size_bytes: Number(component.size) || 0,
+      // Release-level audio also exists for intentionally trackless DJ mixes, so
+      // component persistence cannot depend on a non-empty tracklist.
+      const audioAssets = declaredComponents.filter((component) => component.type === 'audio').map((component) => ({
+        id: component.component_id,
+        release_id: releaseId,
+        track_id: component.track_id || null,
+        version_id: component.version_id || null,
+        scope: component.scope,
+        role: component.role,
+        title: component.title || null,
+        filename: component.filename || null,
+        storage_path: `${nz_path}#${component.path}`,
+        mime: component.mime || null,
+        duration_ms: Number(component.duration_ms) || 0,
+        sample_rate: Number(component.sample_rate) || 0,
+        bit_depth: Number(component.bit_depth) || 0,
+        channels: Number(component.channels) || 0,
+        size_bytes: Number(component.size) || 0,
       sha256: component.sha256 || null,
-    }));
-    if (audioAssets.length) {
-      const { error: assetErr } = await sb.from('audio_assets').insert(audioAssets);
-      if (assetErr) throw error(500, `Could not publish audio assets: ${assetErr.message}`);
+      }));
+      if (audioAssets.length) {
+        const { error: assetErr } = await sb.from('audio_assets').insert(audioAssets);
+        if (assetErr) throw error(500, `Could not publish audio assets: ${assetErr.message}`);
+      }
     }
   }
-  }
 
-  return json({
+  return Response.json({
     success: true,
     release_id: release.id,
     // The creator's destination after publishing: their release's permanent

@@ -22,7 +22,7 @@
  * already in progress.
  */
 
-import { dropSlugCandidates, dropPath } from '$lib/domain/drop-slug.js';
+import { dropSlugCandidates, dropPath } from '#lib/domain/drop-slug.js';
 import { RELEASE_CHAIN_EDITION, appendEvent, loadChain } from './provenance.js';
 
 /** Stage labels, surfaced to the creator so a slow publish is legible. */

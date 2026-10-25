@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { PUBLIC_SUPABASE_URL } from '$app/env/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
 
 export async function load() {
   const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -15,5 +15,5 @@ export async function load() {
       .select('id, reference, kind, amount_subunits, currency, status, created_at, paystack_data')
       .eq('status', 'pending').lt('created_at', cutoff).order('created_at', { ascending: true }),
   ]);
-  return { intents: [...(stuck ?? []), ...(stale ?? [])] };
+  return { intents: [...stuck ?? [], ...stale ?? []] };
 }

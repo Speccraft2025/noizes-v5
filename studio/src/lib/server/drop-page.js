@@ -11,9 +11,9 @@
  * provenance visibility allows it.
  */
 
-import { isCanonicalAddress, dropPath } from '$lib/domain/drop-slug.js';
-import { describePackageContents, describeExperienceSections, describeTrustIndicators } from '$lib/domain/drop-contents.js';
-import { dropAvailability, canDownloadPackage, copiesAvailable } from '$lib/domain/drop-availability.js';
+import { isCanonicalAddress, dropPath } from '#lib/domain/drop-slug.js';
+import { describePackageContents, describeExperienceSections, describeTrustIndicators } from '#lib/domain/drop-contents.js';
+import { dropAvailability, canDownloadPackage, copiesAvailable } from '#lib/domain/drop-availability.js';
 import { RELEASE_CHAIN_EDITION } from './provenance.js';
 
 const RELEASE_COLUMNS = `

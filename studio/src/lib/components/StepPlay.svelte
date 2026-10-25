@@ -1,5 +1,5 @@
 <script>
-  import { play, GAME_CATALOG } from '$lib/stores/package.js';
+  import { play, GAME_CATALOG } from '#lib/stores/package.js';
 
   const DIFFICULTIES = [
     { id: 'gentle',   label: 'Gentle',   desc: 'wide timing windows' },

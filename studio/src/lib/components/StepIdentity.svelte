@@ -1,7 +1,7 @@
 <script>
-  import HelpTip from '$lib/components/HelpTip.svelte';
-  import { identity } from '$lib/stores/package.js';
-  import { RELEASE_TYPES, RELEASE_TYPE_LABELS } from '$lib/domain/release.js';
+  import HelpTip from '#lib/components/HelpTip.svelte';
+  import { identity } from '#lib/stores/package.js';
+  import { RELEASE_TYPES, RELEASE_TYPE_LABELS } from '#lib/domain/release.js';
 
   function setList(field, value) {
     identity.update((current) => ({

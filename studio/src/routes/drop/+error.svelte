@@ -1,26 +1,26 @@
 <script>
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
   // A shared link that fails is often the first thing a stranger ever sees of
   // Noizes, so these states get real copy rather than a status code. The
   // message thrown by the loader is shown verbatim — it is written for a
   // reader, and it distinguishes "no such release" from "we are broken",
   // which are very different things to be told.
-  $: status = $page.status;
-  $: message = $page.error?.message ?? '';
+  let status = $derived(page.status);
+  let message = $derived(page.error?.message ?? '');
 
-  $: heading = status === 404
+  let heading = $derived(status === 404
     ? 'Nothing lives at this address'
     : status === 410 || status === 409
       ? 'This drop is not available'
-      : 'This page could not be loaded';
+      : 'This page could not be loaded');
 
   // The loader's own message is written for a reader and is more specific than
   // anything generic, so it leads whenever there is one.
-  $: explanation = status === 404
+  let explanation = $derived(status === 404
     ? 'The link may have a typo, or the release may never have been published. Drop Page links do not expire — a release that has been withdrawn still keeps its page.'
     : message
-      || 'This is a fault on our side, not an empty shelf. Nothing about the release, or about any package already downloaded, has changed.';
+      || 'This is a fault on our side, not an empty shelf. Nothing about the release, or about any package already downloaded, has changed.');
 </script>
 
 <svelte:head>

@@ -1,11 +1,13 @@
-import { createSupabaseServerClient } from '$lib/server/supabase.js';
-import { getSupabaseServiceRoleClient } from '$lib/server/supabase.js';
-import { authenticatedUserFromClaims } from '$lib/server/auth-claims.js';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
+import { getSupabaseServiceRoleClient } from '#lib/server/supabase.js';
+import { authenticatedUserFromClaims } from '#lib/server/auth-claims.js';
 import { redirect } from '@sveltejs/kit';
 
-export function handleError({ error, event }) {
-  console.error('[handleError]', event.url.pathname, error?.message ?? error);
-  return { message: 'An error occurred.' };
+export function handleError({ error, event, status, message }) {
+  if (status >= 500) {
+    console.error('[handleError]', event.url.pathname, error?.message ?? error);
+  }
+  return { message: status >= 500 ? 'An error occurred.' : message ?? 'An error occurred.' };
 }
 
 const CREATOR_ROUTES = ['/studio'];

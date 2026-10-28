@@ -273,11 +273,10 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    opacity: 0.08;
+    opacity: 0.25;
     pointer-events: none;
-    filter: blur(1px);
   }
-  .slide.active .slide-video { opacity: 0.12; }
+  .slide.active .slide-video { opacity: 0.45; }
 
   @media (min-width: 640px) {
     .slide { padding: 2.5rem 2.5rem 3rem; }

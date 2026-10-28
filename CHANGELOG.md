@@ -3,6 +3,11 @@
 All notable changes to Noizes are documented here.
 Version format: MAJOR.MINOR.PATCH.MICRO — dates are YYYY-MM-DD.
 
+## [0.1.2.1] - 2026-10-28
+
+### Changed
+- **Drop page showcase carousel**: replaced the static "What you get" and "How it opens" sections with a single auto-playing carousel (DropShowcase). Three slides: The Experience (interactive section cards), How to Explore (acquire/open/explore walkthrough), and What's Inside (package inventory). Pauses on hover, progress-bar navigation.
+
 ## [0.1.2.0] - 2026-07-20
 
 ### Changed

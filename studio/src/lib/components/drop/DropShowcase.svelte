@@ -69,6 +69,15 @@
 
     <!-- Slide 1: The Experience -->
     <div class="slide" class:active={current === 0} aria-hidden={current !== 0}>
+      <video
+        class="slide-video"
+        src="/videos/showcase/experience-demo.webm"
+        autoplay
+        loop
+        muted
+        playsinline
+        aria-hidden="true"
+      ></video>
       <div class="slide-inner">
         <div class="slide-header">
           <span class="slide-label">The Experience</span>
@@ -102,6 +111,15 @@
 
     <!-- Slide 2: How to Explore -->
     <div class="slide" class:active={current === 1} aria-hidden={current !== 1}>
+      <video
+        class="slide-video"
+        src="/videos/showcase/how-to-explore.webm"
+        autoplay
+        loop
+        muted
+        playsinline
+        aria-hidden="true"
+      ></video>
       <div class="slide-inner">
         <div class="slide-header">
           <span class="slide-label">How to explore</span>
@@ -160,6 +178,15 @@
 
     <!-- Slide 3: What's Inside -->
     <div class="slide" class:active={current === 2} aria-hidden={current !== 2}>
+      <video
+        class="slide-video"
+        src="/videos/showcase/whats-inside.webm"
+        autoplay
+        loop
+        muted
+        playsinline
+        aria-hidden="true"
+      ></video>
       <div class="slide-inner">
         <div class="slide-header">
           <div class="slide-header-row">
@@ -230,19 +257,35 @@
   }
 
   .slide {
+    position: relative;
     width: 33.3333%;
     flex-shrink: 0;
     padding: 2rem 1.5rem 2.5rem;
     opacity: 0.3;
     transition: opacity 0.6s ease;
+    overflow: hidden;
   }
   .slide.active { opacity: 1; }
+
+  .slide-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.08;
+    pointer-events: none;
+    filter: blur(1px);
+  }
+  .slide.active .slide-video { opacity: 0.12; }
 
   @media (min-width: 640px) {
     .slide { padding: 2.5rem 2.5rem 3rem; }
   }
 
   .slide-inner {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
     gap: 1.75rem;

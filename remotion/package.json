@@ -1,0 +1,25 @@
+{
+  "name": "remotion",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "studio": "remotion studio src/Root.jsx",
+    "render:all": "node render.mjs",
+    "render:experience": "remotion render src/Root.jsx ExperienceDemo out/experience-demo.webm --codec=vp8",
+    "render:explore": "remotion render src/Root.jsx HowToExplore out/how-to-explore.webm --codec=vp8",
+    "render:contents": "remotion render src/Root.jsx WhatsInside out/whats-inside.webm --codec=vp8"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@remotion/bundler": "^4.0.539",
+    "@remotion/cli": "^4.0.539",
+    "@remotion/renderer": "^4.0.539",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.539"
+  }
+}

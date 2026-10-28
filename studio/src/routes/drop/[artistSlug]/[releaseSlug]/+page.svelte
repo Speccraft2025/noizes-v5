@@ -1,8 +1,7 @@
 <script>
   import { goto } from '$app/navigation';
   import DropHero from '#lib/components/drop/DropHero.svelte';
-  import DropContents from '#lib/components/drop/DropContents.svelte';
-  import DropExperiencePreview from '#lib/components/drop/DropExperiencePreview.svelte';
+  import DropShowcase from '#lib/components/drop/DropShowcase.svelte';
   import DropEditionInfo from '#lib/components/drop/DropEditionInfo.svelte';
   import DropAuthenticity from '#lib/components/drop/DropAuthenticity.svelte';
   import DropProvenance from '#lib/components/drop/DropProvenance.svelte';
@@ -225,10 +224,10 @@
       on:action={onAction}
     />
 
-    <DropContents contents={data.contents} packageSize={data.package?.file_size || release.package_size} />
-
-    <DropExperiencePreview
+    <DropShowcase
+      contents={data.contents}
       sections={data.sections}
+      packageSize={data.package?.file_size || release.package_size}
       available={experienceAvailable}
       on:open={(event) => openExperience(event.detail)}
     />

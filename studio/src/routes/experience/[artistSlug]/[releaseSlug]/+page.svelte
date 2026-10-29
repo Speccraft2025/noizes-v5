@@ -63,12 +63,14 @@
 <div class="fixed inset-0" style="background: #030303;">
   <h1 class="sr-only">{data.release.title} by {data.release.artist_name}</h1>
 
-  <a
-    href={data.dropPath}
-    class="fixed z-[60] flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold"
-    style="top: max(14px, env(safe-area-inset-top)); left: 14px; border: 1px solid rgba(255,255,255,.16);
-           color: rgba(255,255,255,.78); background: rgba(4,7,7,.5); backdrop-filter: blur(18px);"
-  >← Drop page</a>
+  {#if !data.embedded}
+    <a
+      href={data.dropPath}
+      class="fixed z-[60] flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold"
+      style="top: max(14px, env(safe-area-inset-top)); left: 14px; border: 1px solid rgba(255,255,255,.16);
+             color: rgba(255,255,255,.78); background: rgba(4,7,7,.5); backdrop-filter: blur(18px);"
+    >← Drop page</a>
+  {/if}
 
   {#if status === 'ready'}
     <!-- Opaque sandbox: creator-authored experience code never inherits the

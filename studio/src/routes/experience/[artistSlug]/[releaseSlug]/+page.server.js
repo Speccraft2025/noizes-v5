@@ -5,6 +5,7 @@ import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
 
 import { resolveDropAddress, bumpDropAnalytics } from '#lib/server/drop-page.js';
 import { dropPath } from '#lib/domain/drop-slug.js';
+import { isEmbeddedExperience } from '#lib/domain/experience-preview.js';
 import { signedPackageUrl } from '#lib/server/storage.js';
 
 // The viewer fetches the whole package before it can start, so this window has
@@ -21,6 +22,7 @@ const EXPERIENCE_URL_TTL_SECONDS = 300;
 // server involved — that property is the product, and this route must not
 // quietly become a dependency of it.
 export async function load({ params, locals, url }) {
+  const embedded = isEmbeddedExperience(url);
   const sb = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const { release, redirectTo } = await resolveDropAddress(sb, { artistSlug: params.artistSlug, slug: params.releaseSlug });
 
@@ -57,7 +59,10 @@ export async function load({ params, locals, url }) {
     throw error(500, 'The package location could not be resolved.');
   }
 
-  await bumpDropAnalytics(sb, release.id, 'experience_open');
+  // A showcase preview is an automatic part of the Drop Page. Counting that
+  // as an intentional open would inflate the experience metric every time the
+  // carousel starts or loops.
+  if (!embedded) await bumpDropAnalytics(sb, release.id, 'experience_open');
 
   return {
     release: {
@@ -70,5 +75,6 @@ export async function load({ params, locals, url }) {
     },
     packageUrl,
     dropPath: dropPath(release.artist_slug, release.slug),
+    embedded,
   };
 }

@@ -225,6 +225,7 @@
     />
 
     <DropShowcase
+      {release}
       contents={data.contents}
       sections={data.sections}
       packageSize={data.package?.file_size || release.package_size}

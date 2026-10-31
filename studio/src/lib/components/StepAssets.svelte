@@ -1,5 +1,7 @@
 <script>
   import HelpTip from '#lib/components/HelpTip.svelte';
+  import MagneticDropZone from '#lib/components/ui/MagneticDropZone.svelte';
+  import ScrollFadeList from '#lib/components/ui/ScrollFadeList.svelte';
   import { releaseProject } from '#lib/stores/package.js';
   import {
     AUDIO_VERSION_ROLES,
@@ -232,10 +234,12 @@
             <button type="button" class="text-[10px]" style="color:var(--ink-muted);" on:click={() => removeReleaseFile(mainCover.asset_id)}>remove</button>
           </div>
         {:else}
-          <label class="block rounded-lg py-5 text-center cursor-pointer" style="border:1px dashed var(--border-dim);">
-            <span class="text-xs text-white">Choose image</span>
-            <input class="hidden" type="file" accept="image/*" on:change={(event) => setReleaseFile('main_cover', 'image', event.currentTarget.files?.[0])} />
-          </label>
+          <MagneticDropZone
+            accept="image/*"
+            label="Drop cover artwork"
+            hint="PNG · JPG · WebP"
+            on:files={(e) => setReleaseFile('main_cover', 'image', e.detail[0])}
+          />
         {/if}
       </div>
 
@@ -248,10 +252,12 @@
             <button type="button" class="text-[10px]" style="color:var(--ink-muted);" on:click={() => removeReleaseFile(continuousMaster.asset_id)}>remove</button>
           </div>
         {:else}
-          <label class="block rounded-lg py-5 text-center cursor-pointer" style="border:1px dashed var(--border-dim);">
-            <span class="text-xs text-white">Optional mix / concert master</span>
-            <input class="hidden" type="file" accept="audio/*,.wav,.flac,.mp3,.m4a" on:change={(event) => setContinuousMaster(event.currentTarget.files?.[0])} />
-          </label>
+          <MagneticDropZone
+            accept="audio/*,.wav,.flac,.mp3,.m4a"
+            label="Drop mix / concert master"
+            hint="WAV · FLAC · MP3 · M4A"
+            on:files={(e) => setContinuousMaster(e.detail[0])}
+          />
         {/if}
       </div>
     </div>
@@ -284,15 +290,17 @@
     </div>
 
     {#if tracks.length}
-      <div class="flex gap-2 overflow-x-auto pb-1">
-        {#each tracks as track}
-          <button type="button" class="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold" style={selectedTrackId === track.track_id
-            ? 'background:#7B5CF0;color:white;'
-            : 'background:rgba(255,255,255,.05);color:var(--ink-muted);'} on:click={() => selectedTrackId = track.track_id}>
-            {track.disc_number}.{track.track_number} {track.title || 'Untitled'}
-          </button>
-        {/each}
-      </div>
+      <ScrollFadeList direction="horizontal" fadeSize={24}>
+        <div class="flex gap-2 pb-1">
+          {#each tracks as track}
+            <button type="button" class="shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors duration-200" style={selectedTrackId === track.track_id
+              ? 'background:#7B5CF0;color:white;'
+              : 'background:rgba(255,255,255,.05);color:var(--ink-muted);'} on:click={() => selectedTrackId = track.track_id}>
+              {track.disc_number}.{track.track_number} {track.title || 'Untitled'}
+            </button>
+          {/each}
+        </div>
+      </ScrollFadeList>
 
       {#if selectedTrack}
         <div class="glass rounded-xl p-4 space-y-4">
@@ -336,12 +344,13 @@
 
           {#if !selectedVersions.some((version) => version.is_primary)}
             <div class="relative">
-              <label class="rounded-xl flex flex-col items-center justify-center py-7 cursor-pointer" style="border:1px dashed rgba(123,92,240,.35);background:rgba(123,92,240,.05);">
-                <span class="font-bold text-sm text-white">Upload primary master *</span>
-                <span class="text-xs mt-1" style="color:var(--ink-muted);">WAV · FLAC · MP3 · M4A</span>
-                <input class="hidden" type="file" accept="audio/*,.wav,.flac,.mp3,.m4a" on:change={(event) => attachAudio(event.currentTarget.files?.[0], 'primary_master')} />
-              </label>
-              <span class="absolute top-2 right-3"><HelpTip field="primary_master" align="right" /></span>
+              <MagneticDropZone
+                accept="audio/*,.wav,.flac,.mp3,.m4a"
+                label="Drop primary master *"
+                hint="WAV · FLAC · MP3 · M4A"
+                on:files={(e) => attachAudio(e.detail[0], 'primary_master')}
+              />
+              <span class="absolute top-2 right-3 z-10"><HelpTip field="primary_master" align="right" /></span>
             </div>
           {/if}
 

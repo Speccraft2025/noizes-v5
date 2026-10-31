@@ -1,5 +1,8 @@
 <script>
   import { describeVerificationStatus } from '#lib/domain/drop-contents.js';
+  import AnimatedSignature from '#lib/components/ui/AnimatedSignature.svelte';
+  import IridescentFoil from '#lib/components/ui/IridescentFoil.svelte';
+  import TactileButton from '#lib/components/ui/TactileButton.svelte';
 
   // Authenticity here means one specific, checkable thing: the creator signed
   // a hash of the package's component inventory, and the signature verifies.
@@ -54,9 +57,14 @@
       {/each}
     </div>
 
+    {#if signature.tone === 'good' && release.artist_name}
+      <div class="flex items-center gap-4 py-2 px-3 rounded-xl" style="background: rgba(123,92,240,0.04); border: 1px solid rgba(123,92,240,0.12);">
+        <AnimatedSignature name={release.artist_name} color="#7B5CF0" duration={2} />
+        <p class="text-[10px] uppercase tracking-widest font-semibold shrink-0" style="color: var(--ink-muted);">Creator signature</p>
+      </div>
+    {/if}
+
     {#if validation.tone === 'bad'}
-      <!-- A failed check is worth a sentence, not just a label: the reader's
-           next question is whether the object is safe to acquire. -->
       <p class="text-xs leading-relaxed rounded-xl px-4 py-3"
         style="background: rgba(240,160,160,.07); border: 1px solid rgba(240,160,160,.2); color: var(--ink-secondary);">
         This package did not pass every structural check. Its contents and signature are recorded above and can still be
@@ -77,12 +85,20 @@
 
     <div class="flex flex-wrap gap-2 pt-1">
       {#if certificateHref}
-        <a class="btn-ghost rounded-full px-4 py-2 text-xs" href={certificateHref} download>View certificate</a>
+        <IridescentFoil intensity={0.8}>
+          <TactileButton variant="ghost" size="sm" href={certificateHref}>
+            ✦ View certificate
+          </TactileButton>
+        </IridescentFoil>
       {/if}
       {#if manifestHref}
-        <a class="btn-ghost rounded-full px-4 py-2 text-xs" href={manifestHref} download>View manifest</a>
+        <TactileButton variant="ghost" size="sm" href={manifestHref}>
+          View manifest
+        </TactileButton>
       {/if}
-      <a class="btn-ghost rounded-full px-4 py-2 text-xs" href="/validator">Verify a package</a>
+      <TactileButton variant="ghost" size="sm" href="/validator">
+        Verify a package
+      </TactileButton>
     </div>
 
     <p class="text-xs leading-relaxed pt-1" style="color: var(--ink-muted); border-top: 1px solid var(--border-dim); padding-top: 1rem;">

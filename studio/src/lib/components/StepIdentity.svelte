@@ -1,7 +1,16 @@
 <script>
   import HelpTip from '#lib/components/HelpTip.svelte';
+  import ScrollFadeList from '#lib/components/ui/ScrollFadeList.svelte';
   import { identity } from '#lib/stores/package.js';
   import { RELEASE_TYPES, RELEASE_TYPE_LABELS } from '#lib/domain/release.js';
+
+  const GENRE_SUGGESTIONS = [
+    'Afrobeats', 'Amapiano', 'Afro-Soul', 'Afro-Pop', 'Bongo Flava', 'Gengetone',
+    'Hip-Hop', 'R&B', 'Jazz', 'Gospel', 'Dancehall', 'Reggae', 'Electronic',
+    'House', 'Gqom', 'Highlife', 'Soukous', 'Kwaito', 'Benga', 'Taarab',
+    'Soul', 'Neo-Soul', 'Funk', 'Pop', 'Rock', 'Acoustic', 'Classical',
+    'Spoken Word', 'Drill', 'Trap', 'Lo-fi', 'Ambient', 'World',
+  ];
 
   function setList(field, value) {
     identity.update((current) => ({
@@ -9,6 +18,20 @@
       [field]: String(value).split(',').map((entry) => entry.trim()).filter(Boolean),
     }));
   }
+
+  function toggleGenre(genre) {
+    const current = String($identity.genre || '');
+    const list = current.split(',').map((g) => g.trim()).filter(Boolean);
+    const index = list.indexOf(genre);
+    if (index >= 0) {
+      list.splice(index, 1);
+    } else {
+      list.push(genre);
+    }
+    $identity.genre = list.join(', ');
+  }
+
+  $: selectedGenres = String($identity.genre || '').split(',').map((g) => g.trim()).filter(Boolean);
 </script>
 
 <div class="space-y-5">
@@ -87,6 +110,20 @@
     <div>
       <label class="label-dark" for="genre">Genres<HelpTip field="genre" /></label>
       <input id="genre" class="input-dark" type="text" bind:value={$identity.genre} placeholder="Afro-Soul, Jazz" />
+      <ScrollFadeList direction="horizontal" fadeSize={24}>
+        <div class="flex gap-1.5 py-2">
+          {#each GENRE_SUGGESTIONS as genre}
+            <button
+              type="button"
+              class="shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-all duration-200"
+              style={selectedGenres.includes(genre)
+                ? 'background:#7B5CF0;color:white;'
+                : 'background:rgba(255,255,255,.05);color:var(--ink-muted);'}
+              on:click={() => toggleGenre(genre)}
+            >{genre}</button>
+          {/each}
+        </div>
+      </ScrollFadeList>
     </div>
     <div>
       <label class="label-dark" for="location">Location<HelpTip field="location" /></label>

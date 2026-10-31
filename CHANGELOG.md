@@ -3,6 +3,18 @@
 All notable changes to Noizes are documented here.
 Version format: MAJOR.MINOR.PATCH.MICRO — dates are YYYY-MM-DD.
 
+## [0.2.0.0] - 2026-10-31
+
+### Added
+- **Focused Noizes Studio workflow**: creators now move through a seven-step, section-by-section release flow with a persistent progress dock, autosaving status, and a mobile-friendly layout.
+
+### Changed
+- **Studio authoring flow**: Assets now includes an expandable track manager; Rights & export combines validation, credits, packaging, and Exchange publishing in one final step.
+- **Studio drafts**: saves now restore the active step, section, and completion state while retaining compatibility with drafts from the former eight-step flow.
+
+### Fixed
+- Optional email, signing, and Exchange environment settings no longer prevent local Studio builds from starting.
+
 ## [0.1.2.1] - 2026-10-28
 
 ### Changed

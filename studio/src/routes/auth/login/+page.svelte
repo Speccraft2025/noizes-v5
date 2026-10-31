@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { enhance } from '$app/forms';
   import WaveCanvas from '#lib/components/WaveCanvas.svelte';
+  import TactileButton from '#lib/components/ui/TactileButton.svelte';
   export let form;
   export let data;
 
@@ -86,9 +87,11 @@
               <input id="email" name="email" type="email" class="input-dark" placeholder="you@example.com"
                 required autocomplete="email" />
             </div>
-            <button type="submit" class="btn-spectral w-full justify-center py-3 rounded-xl mt-1" disabled={loading}>
-              {loading ? 'Sending…' : 'Email me a sign-in link'}
-            </button>
+            <div class="mt-1">
+              <TactileButton variant="spectral" size="md" type="submit" disabled={loading}>
+                {loading ? 'Sending…' : 'Email me a sign-in link'}
+              </TactileButton>
+            </div>
           </form>
           <p class="text-center text-xs mt-4" style="color: var(--ink-muted);">
             No password needed. <button type="button" class="text-white hover:underline" on:click={() => (mode = 'password')}>Use a password instead</button>
@@ -107,9 +110,11 @@
               <input id="password" name="password" type="password" class="input-dark" placeholder="••••••••"
                 required autocomplete="current-password" />
             </div>
-            <button type="submit" class="btn-spectral w-full justify-center py-3 rounded-xl mt-1" disabled={loading}>
-              {loading ? 'Signing in…' : 'Sign in'}
-            </button>
+            <div class="mt-1">
+              <TactileButton variant="spectral" size="md" type="submit" disabled={loading}>
+                {loading ? 'Signing in…' : 'Sign in'}
+              </TactileButton>
+            </div>
           </form>
           <div class="flex items-center justify-between text-xs mt-4">
             <button type="button" class="text-white hover:underline" on:click={() => (mode = 'magic')}>Email me a link instead</button>

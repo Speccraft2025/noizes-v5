@@ -9,6 +9,8 @@
   export let message = '';
 
   import { createEventDispatcher } from 'svelte';
+  import TactileButton from '#lib/components/ui/TactileButton.svelte';
+  import HoldToConfirm from '#lib/components/ui/HoldToConfirm.svelte';
   const dispatch = createEventDispatcher();
 
   let open = false;
@@ -114,9 +116,9 @@
       </div>
 
       <div class="flex flex-wrap gap-2 pt-1">
-        <button
-          type="button"
-          class="btn-spectral rounded-full px-5 py-2 text-xs"
+        <TactileButton
+          variant="spectral"
+          size="sm"
           disabled={busy}
           on:click={() => dispatch('save', {
             price: priceDraft,
@@ -124,16 +126,28 @@
             offers_enabled: offersDraft,
             drop_description: descriptionDraft,
           })}
-        >Save changes</button>
+        >Save changes</TactileButton>
 
-        <a class="btn-ghost rounded-full px-5 py-2 text-xs" href="/studio">Edit release in Studio</a>
+        <TactileButton variant="ghost" size="sm" href="/studio">Edit release in Studio</TactileButton>
 
-        <button
-          type="button"
-          class="btn-ghost rounded-full px-5 py-2 text-xs"
-          disabled={busy}
-          on:click={() => dispatch(withdrawn ? 'republish' : 'withdraw')}
-        >{withdrawn ? 'Publish again' : 'Withdraw from Exchange'}</button>
+        {#if withdrawn}
+          <TactileButton
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            on:click={() => dispatch('republish')}
+          >Publish again</TactileButton>
+        {:else}
+          <div class="w-full mt-2">
+            <HoldToConfirm
+              label="Hold to withdraw from Exchange"
+              confirmLabel="Withdrawn"
+              variant="danger"
+              disabled={busy}
+              on:confirm={() => dispatch('withdraw')}
+            />
+          </div>
+        {/if}
       </div>
 
       <p class="text-xs min-h-[1rem]" role="status" aria-live="polite" style="color: var(--ink-muted);">{message}</p>

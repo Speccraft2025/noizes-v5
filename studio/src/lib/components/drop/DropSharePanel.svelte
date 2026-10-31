@@ -1,5 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import DynamicButton from '#lib/components/ui/DynamicButton.svelte';
+  import TactileButton from '#lib/components/ui/TactileButton.svelte';
   import DropQRCode from './DropQRCode.svelte';
 
   // Everything here shares the canonical Drop Page URL and nothing else. Never
@@ -54,9 +56,14 @@
           style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-dim); color: var(--ink-secondary);"
           title={share.url}
         >{share.url}</p>
-        <button type="button" class="btn-spectral rounded-xl px-5 py-3 text-xs shrink-0 justify-center" on:click={copyLink}>
-          {copied ? '✓ Copied' : 'Copy link'}
-        </button>
+        <DynamicButton
+          states={[
+            { label: 'Copy link', icon: '🔗' },
+            { label: 'Copied!', icon: '✓' },
+          ]}
+          current={copied ? 1 : 0}
+          on:click={copyLink}
+        />
       </div>
 
       <p class="text-xs min-h-[1rem]" role="status" aria-live="polite" style="color: {copyError ? '#F08A9D' : 'var(--ink-muted)'};">
@@ -65,16 +72,15 @@
 
       <div class="flex flex-wrap gap-2">
         {#if canNativeShare}
-          <button type="button" class="btn-ghost rounded-full px-4 py-2 text-xs" on:click={nativeShare}>Share…</button>
+          <TactileButton variant="ghost" size="sm" on:click={nativeShare}>Share…</TactileButton>
         {/if}
         {#each share.targets as target (target.key)}
-          <a
-            class="btn-ghost rounded-full px-4 py-2 text-xs"
+          <TactileButton
+            variant="ghost"
+            size="sm"
             href={target.href}
-            target="_blank"
-            rel="noopener noreferrer"
             on:click={() => dispatch('shared', target.key)}
-          >{target.label}</a>
+          >{target.label}</TactileButton>
         {/each}
       </div>
 

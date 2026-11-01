@@ -68,3 +68,19 @@ External alert delivery remains optional at current volume.
 **Effort estimate:** M (human) → S/M with CC. **Priority:** P2.
 
 **Depends on / blocked by:** Acquire endpoint live; Paystack KE split-payment support confirmed. Triggers when artist count or sale volume makes manual remittance painful.
+
+## Backfill markers.test.js for Transcendence template (2026-11-01)
+
+**What:** Add unit tests for `studio/src/lib/experiences/transcendence/markers.js` — the marker contract that guards exported packages. Tests should cover: `fillMarkers` (happy path, missing required, optional null, leftover detection), `escapeHtml` (XSS chars, null), `escapeJsonPayload` (script-breaking `<`), `findUnfilledMarkers` (TX_* regex), `timecode` (edge cases).
+
+**Why:** markers.js is part of the revenue-bearing compile pipeline but has no direct tests. It's tested indirectly through assembly, but a direct test suite catches contract drift faster. Journey-v1 will ship its own markers.test.js — Transcendence should have parity.
+
+**Pros:** Improves coverage of the most critical build path. Tests are straightforward (pure functions, ~30 min CC effort).
+
+**Cons:** Low urgency — markers.js is stable and hasn't changed since initial implementation.
+
+**Context:** Identified during journey-v1 engineering review. Journey's markers.test.js can serve as a template — same function signatures, different marker prefixes (JM_* vs TX_*).
+
+**Effort estimate:** S (human) → XS with CC. **Priority:** P3.
+
+**Depends on / blocked by:** Nothing. Can be done anytime.

@@ -1,7 +1,8 @@
 import JSZip from 'jszip';
 import { buildExperienceHTML, buildGuide } from './experience.js';
-import { CANONICAL_TEMPLATE, normalizeEdition, normalizeTemplate, TRANSCENDENCE_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE, TRANSCENDENCE_V3_TEMPLATE } from './project.js';
+import { CANONICAL_TEMPLATE, JOURNEY_TEMPLATE, normalizeEdition, normalizeTemplate, TRANSCENDENCE_TEMPLATE, TRANSCENDENCE_V2_TEMPLATE, TRANSCENDENCE_V3_TEMPLATE } from './project.js';
 import { buildTranscendenceHTML, TRANSCENDENCE_SCHEMA, QUALITY_PROFILES } from './transcendence.js';
+import { buildJourneyHTML, JOURNEY_SCHEMA } from './journey.js';
 import { describeFailures, validateTranscendence } from './validateTranscendence.js';
 import { buildWorldData } from '../experiences/transcendence/world-data.js';
 import { normalizeReleaseProject, orderedTracks } from '../domain/release.js';
@@ -57,6 +58,7 @@ export async function buildPackage(input) {
   const isTranscendenceV3Build = template === TRANSCENDENCE_V3_TEMPLATE;
   const isGeographicBuild = isTranscendenceV2Build || isTranscendenceV3Build;
   const isTranscendenceBuild = template === TRANSCENDENCE_TEMPLATE || isGeographicBuild;
+  const isJourneyBuild = template === JOURNEY_TEMPLATE;
   const transcendenceSchema = isTranscendenceV3Build ? TRANSCENDENCE_V3_SCHEMA
     : isTranscendenceV2Build ? TRANSCENDENCE_V2_SCHEMA : TRANSCENDENCE_SCHEMA;
   const transcendence = input.transcendence ?? {};
@@ -448,6 +450,52 @@ export async function buildPackage(input) {
     onProgress({ percent: 66, stage: 'Writing the terrain' });
   }
 
+  /* ------------------------------------------------- the Road, if any */
+  let journeyBuild = null;
+  if (isJourneyBuild) {
+    const journeyTrack = tracks.find((track) => !track.hidden) ?? tracks[0];
+    if (!journeyTrack) throw new Error('Journey needs a track.');
+    const journeyInput = input.journey_experience ?? {};
+    if (!journeyInput.analysis) throw new Error('Journey needs an analysis payload. Run the analysis in the Experience step.');
+
+    const audioComponent = components.find((component) =>
+      component.track_id === journeyTrack.track_id && component.type !== 'image' && component.path.includes('/audio/'));
+    if (!audioComponent) throw new Error('Journey needs the selected track to have packaged audio.');
+
+    journeyBuild = await buildJourneyHTML({
+      identity: {
+        title: release.title,
+        artist: release.primary_artist,
+        release_id: releaseId,
+      },
+      edition: fixedEdition,
+      analysis: journeyInput.analysis,
+      track: {
+        track_id: journeyTrack.track_id,
+        title: journeyTrack.title,
+        primary_artist: journeyTrack.primary_artist,
+        audio: { src: audioComponent.path, mime: audioComponent.mime },
+      },
+      artDirection: journeyInput.art_direction ?? {},
+      arcEndSeconds: journeyInput.arc_end_seconds ?? null,
+      creditLine: [journeyTrack.primary_artist, ...(journeyTrack.featured_artists ?? [])].filter(Boolean).join(' · '),
+    });
+
+    journeyBuild.descriptor = {
+      entry: 'experience.html',
+      schema: JOURNEY_SCHEMA,
+      template,
+      type: 'road',
+      default_mode: 'road',
+      reduced_motion_supported: false,
+      navigation: 'music-directed',
+      clock: 'audio.currentTime',
+      quality_profiles: QUALITY_PROFILES,
+      authored_arc: { track_id: journeyTrack.track_id, start_seconds: 0, end_seconds: journeyBuild.arcEnd },
+    };
+    onProgress({ percent: 66, stage: 'Building the road' });
+  }
+
   const authoredJourney = materializeJourney(project.journey, tracks);
   const runtimeJourney = {
     ...stripFiles(authoredJourney),
@@ -540,6 +588,15 @@ export async function buildPackage(input) {
       lyric_landmarks: 'creator-placed',
     });
   }
+  if (journeyBuild) {
+    Object.assign(experienceJson, journeyBuild.descriptor, {
+      schema_version: JOURNEY_SCHEMA,
+      art_direction: journeyBuild.config.artDirection,
+      interaction: {
+        threshold: 'click to begin the ride; unlocks media and AudioContext',
+      },
+    });
+  }
   zip.file('experience.json', JSON.stringify(experienceJson, null, 2));
 
   const safeLinks = (extras.links || []).filter((link) =>
@@ -609,7 +666,9 @@ export async function buildPackage(input) {
     components,
     experience: transcendenceBuild
       ? transcendenceBuild.descriptor
-      : { entry: 'experience.html', schema: '3.0.0', template },
+      : journeyBuild
+        ? journeyBuild.descriptor
+        : { entry: 'experience.html', schema: '3.0.0', template },
     edition: { path: 'edition.json', edition_id: project.edition.edition_id, applies_to: 'release' },
     authenticity: { path: 'authenticity.json', method: authenticity.method },
     rights: { path: 'rights.json' },
@@ -757,7 +816,8 @@ export async function buildPackage(input) {
   // their media rather than 1.4x that.
   const experienceHTML = isGeographicBuild
     ? (await import('./transcendence-v2.js')).injectTranscendenceArchive(transcendenceBuild.html, archiveData)
-    : transcendenceBuild ? transcendenceBuild.html : buildExperienceHTML({
+    : transcendenceBuild ? transcendenceBuild.html
+    : journeyBuild ? journeyBuild.html : buildExperienceHTML({
     identity: legacyIdentity,
     edition: fixedEdition,
     rights: releaseRights,

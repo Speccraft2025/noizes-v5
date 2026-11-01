@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "check:schema": "node scripts/check-schema.mjs",
-    "build:transcendence-template": "node scripts/build-transcendence-template.mjs"
+    "build:transcendence-template": "node scripts/build-transcendence-template.mjs",
+    "build:journey-template": "node scripts/build-journey-template.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-netlify": "7.0.1",

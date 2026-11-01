@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ovacado — Journey Mode Studio</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Lato:wght@100;300;400;700;900&family=Barlow+Condensed:wght@400;600;700&family=Playfair+Display:ital,wght@1,400&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  width:100%;height:100%;
+  font-family:'IBM Plex Sans',sans-serif;
+  color:#e0e0e0;
+  background:#111;
+  overflow:hidden;
+}
+
+/* ─── STUDIO PANEL ─── */
+.studio-panel{
+  position:fixed;left:0;top:0;bottom:0;
+  width:280px;
+  background:rgba(18,18,22,0.95);
+  border-right:1px solid rgba(255,255,255,0.08);
+  z-index:1000;
+  overflow-y:auto;
+  overflow-x:hidden;
+  transition:transform .3s ease;
+  backdrop-filter:blur(12px);
+}
+.studio-panel.collapsed{transform:translateX(-280px)}
+.studio-panel::-webkit-scrollbar{width:4px}
+.studio-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px}
+
+.studio-header{
+  padding:16px 16px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  position:sticky;top:0;
+  background:rgba(18,18,22,0.98);
+  z-index:2;
+}
+.studio-header h1{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:18px;font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:#fff;
+}
+.studio-header span{
+  font-size:11px;color:#666;
+  letter-spacing:.05em;
+}
+
+.studio-toggle{
+  position:fixed;
+  left:280px;top:12px;
+  z-index:1001;
+  width:32px;height:32px;
+  background:rgba(18,18,22,0.9);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:6px;
+  color:#aaa;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;
+  transition:left .3s ease, background .2s;
+}
+.studio-toggle:hover{background:rgba(40,40,50,0.95);color:#fff}
+.studio-toggle.collapsed{left:12px}
+
+/* ─── SECTION ─── */
+.section{
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.section-head{
+  padding:10px 16px;
+  font-size:11px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  color:#888;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;
+  user-select:none;
+}
+.section-head:hover{color:#bbb}
+.section-head .arrow{
+  font-size:9px;
+  transition:transform .2s;
+}
+.section.closed .section-head .arrow{transform:rotate(-90deg)}
+.section-body{
+  padding:0 16px 12px;
+}
+.section.closed .section-body{display:none}
+
+/* ─── CONTROL ROW ─── */
+.ctrl{
+  display:flex;align-items:center;
+  margin-bottom:8px;
+  gap:8px;
+}
+.ctrl label{
+  font-size:11px;color:#999;
+  min-width:72px;flex-shrink:0;
+  white-space:nowrap;
+}
+.ctrl input[type="range"]{
+  flex:1;
+  -webkit-appearance:none;
+  height:3px;
+  background:rgba(255,255,255,0.12);
+  border-radius:2px;
+  outline:none;
+}
+.ctrl input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:12px;height:12px;
+  border-radius:50%;
+  background:#87a92e;
+  cursor:pointer;
+}
+.ctrl input[type="number"]{
+  width:52px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:4px;
+  color:#ddd;
+  font-size:11px;
+  padding:3px 6px;
+  text-align:right;
+}
+.ctrl input[type="color"]{
+  width:28px;height:22px;
+  border:1px solid rgba(255,255,255,0.15);
+  border-radius:4px;
+  background:none;
+  cursor:pointer;
+  padding:0;
+}
+.ctrl .val{
+  font-size:10px;
+  color:#666;
+  min-width:32px;
+  text-align:right;
+}
+
+/* ─── BUTTONS ─── */
+.btn-row{
+  padding:12px 16px;
+  display:flex;gap:8px;
+  flex-wrap:wrap;
+}
+.btn{
+  padding:6px 12px;
+  font-size:11px;font-weight:500;
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:5px;
+  background:rgba(255,255,255,0.04);
+  color:#ccc;
+  cursor:pointer;
+  transition:all .15s;
+  letter-spacing:.02em;
+}
+.btn:hover{background:rgba(135,169,46,0.15);border-color:rgba(135,169,46,0.3);color:#fff}
+.btn.primary{background:rgba(135,169,46,0.2);border-color:rgba(135,169,46,0.35);color:#c8e060}
+
+/* ─── CANVAS AREA ─── */
+.canvas-area{
+  position:fixed;
+  left:280px;top:0;right:0;bottom:0;
+  transition:left .3s ease;
+}
+.canvas-area.expanded{left:0}
+
+/* ─── SCENE (from journey-mode) ─── */
+.scene{position:absolute;inset:0;z-index:100}
+.scene canvas{width:100%;height:100%;position:relative}
+
+.scroll-text{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);z-index:200;
+  font-family:'Playfair Display',serif;font-style:italic;
+  font-size:28px;letter-spacing:.15em;color:#c8d89a;
+  opacity:.6;pointer-events:none;
+  transition:opacity .5s linear 1.5s;
+}
+.scroll-text.hidden{opacity:0;transition:opacity .5s linear}
+
+.project-info{
+  position:absolute;z-index:150;opacity:0;
+  transition:opacity .4s ease;pointer-events:none;
+  left:40px;top:50%;transform:translateY(-50%);
+}
+.project-info.visible{opacity:1}
+.project-info__title{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:clamp(22px,2.2vw,40px);font-weight:700;line-height:1.2;color:#c8d89a;
+}
+.project-info__subtitle{
+  font-family:'Playfair Display',serif;font-style:italic;
+  font-size:clamp(12px,1.1vw,20px);color:#c8d89a;
+}
+.project-info__awards{
+  margin-top:6px;font-family:Lato,sans-serif;font-weight:300;
+  font-size:clamp(10px,0.8vw,14px);color:#c8d89a;
+}
+
+.menu{
+  color:#c8d89a;padding-top:50px;
+  position:absolute;top:0;right:30px;
+  text-align:right;display:flex;flex-direction:column;z-index:300;
+}
+.menu__icon{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:clamp(16px,1.6vw,28px);font-weight:700;
+  letter-spacing:.03em;line-height:1.2;text-transform:uppercase;
+  display:inline-block;cursor:pointer;opacity:.5;color:#c8d89a;
+  transition:opacity .2s linear;
+}
+.menu__icon:hover{opacity:1}
+.menu__icon.active{pointer-events:none;opacity:1;color:#e0f585}
+.menu__icon.menu-hidden{opacity:0;pointer-events:none}
+
+/* ─── TOAST ─── */
+.toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  z-index:2000;
+  background:rgba(135,169,46,0.2);
+  border:1px solid rgba(135,169,46,0.35);
+  color:#c8e060;
+  padding:8px 20px;border-radius:8px;
+  font-size:12px;font-weight:500;
+  opacity:0;transition:opacity .3s;
+  pointer-events:none;
+}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- ─── STUDIO PANEL ─── -->
+<div class="studio-panel" id="panel">
+  <div class="studio-header">
+    <h1>Journey Mode</h1>
+    <span>Noizes R&D Studio</span>
+  </div>
+
+  <!-- ROAD -->
+  <div class="section" id="sec-road">
+    <div class="section-head" onclick="toggleSection('sec-road')">Road Particles <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="ctrl">
+        <label>Count</label>
+        <input type="range" min="5000" max="40000" step="1000" value="20000" data-param="roadCount">
+        <span class="val">20k</span>
+      </div>
+      <div class="ctrl">
+        <label>Width</label>
+        <input type="range" min="20" max="120" step="2" value="60" data-param="roadWidth">
+        <span class="val">60</span>
+      </div>
+      <div class="ctrl">
+        <label>Min size</label>
+        <input type="range" min="0.2" max="3" step="0.1" value="0.8" data-param="roadSizeMin">
+        <span class="val">0.8</span>
+      </div>
+      <div class="ctrl">
+        <label>Max size</label>
+        <input type="range" min="1" max="6" step="0.1" value="2.8" data-param="roadSizeMax">
+        <span class="val">2.8</span>
+      </div>
+      <div class="ctrl">
+        <label>Point cap</label>
+        <input type="range" min="10" max="80" step="1" value="28" data-param="roadPointCap">
+        <span class="val">28</span>
+      </div>
+      <div class="ctrl">
+        <label>Opacity</label>
+        <input type="range" min="0.2" max="1" step="0.05" value="0.85" data-param="roadOpacity">
+        <span class="val">0.85</span>
+      </div>
+      <div class="ctrl">
+        <label>Color</label>
+        <input type="color" value="#121a09" data-param="roadColor">
+      </div>
+    </div>
+  </div>
+
+  <!-- CAMERA -->
+  <div class="section" id="sec-cam">
+    <div class="section-head" onclick="toggleSection('sec-cam')">Camera <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="ctrl">
+        <label>Height</label>
+        <input type="range" min="1" max="8" step="0.25" value="2.5" data-param="camHeight">
+        <span class="val">2.5</span>
+      </div>
+      <div class="ctrl">
+        <label>Side offset</label>
+        <input type="range" min="0" max="20" step="0.5" value="4" data-param="camSide">
+        <span class="val">4</span>
+      </div>
+      <div class="ctrl">
+        <label>Look ahead</label>
+        <input type="range" min="1" max="15" step="0.5" value="5" data-param="camLookAhead">
+        <span class="val">5</span>
+      </div>
+      <div class="ctrl">
+        <label>FOV</label>
+        <input type="range" min="30" max="120" step="1" value="60" data-param="camFov">
+        <span class="val">60</span>
+      </div>
+      <div class="ctrl">
+        <label>Smoothing</label>
+        <input type="range" min="0.01" max="0.15" step="0.005" value="0.04" data-param="camSmooth">
+        <span class="val">0.04</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SKY -->
+  <div class="section" id="sec-sky">
+    <div class="section-head" onclick="toggleSection('sec-sky')">Sky <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="ctrl">
+        <label>Top</label>
+        <input type="color" value="#4d6e1c" data-param="skyTop">
+      </div>
+      <div class="ctrl">
+        <label>Mid</label>
+        <input type="color" value="#87a92e" data-param="skyMid">
+      </div>
+      <div class="ctrl">
+        <label>Bottom</label>
+        <input type="color" value="#d1e066" data-param="skyBottom">
+      </div>
+      <div class="ctrl">
+        <label>Ground</label>
+        <input type="color" value="#0f1e0a" data-param="skyGround">
+      </div>
+    </div>
+  </div>
+
+  <!-- FOG -->
+  <div class="section" id="sec-fog">
+    <div class="section-head" onclick="toggleSection('sec-fog')">Fog <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="ctrl">
+        <label>Density</label>
+        <input type="range" min="0" max="0.01" step="0.0005" value="0.0025" data-param="fogDensity">
+        <span class="val">0.0025</span>
+      </div>
+      <div class="ctrl">
+        <label>Color</label>
+        <input type="color" value="#0f1e0a" data-param="fogColor">
+      </div>
+    </div>
+  </div>
+
+  <!-- MARKERS -->
+  <div class="section" id="sec-markers">
+    <div class="section-head" onclick="toggleSection('sec-markers')">Markers <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="ctrl">
+        <label>Particles</label>
+        <input type="range" min="200" max="2000" step="50" value="800" data-param="markerCount">
+        <span class="val">800</span>
+      </div>
+      <div class="ctrl">
+        <label>Side dist</label>
+        <input type="range" min="5" max="40" step="1" value="15" data-param="markerSide">
+        <span class="val">15</span>
+      </div>
+      <div class="ctrl">
+        <label>Color</label>
+        <input type="color" value="#f0f585" data-param="markerColor">
+      </div>
+    </div>
+  </div>
+
+  <!-- ATMOSPHERE -->
+  <div class="section closed" id="sec-atmo">
+    <div class="section-head" onclick="toggleSection('sec-atmo')">Atmosphere <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="ctrl">
+        <label>Count</label>
+        <input type="range" min="500" max="8000" step="250" value="3000" data-param="atmoCount">
+        <span class="val">3000</span>
+      </div>
+      <div class="ctrl">
+        <label>Opacity</label>
+        <input type="range" min="0.05" max="0.6" step="0.05" value="0.3" data-param="atmoOpacity">
+        <span class="val">0.3</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PATH -->
+  <div class="section closed" id="sec-path">
+    <div class="section-head" onclick="toggleSection('sec-path')">Path <span class="arrow">▼</span></div>
+    <div class="section-body">
+      <div class="ctrl">
+        <label>Radius</label>
+        <input type="range" min="40" max="200" step="5" value="100" data-param="pathRadius">
+        <span class="val">100</span>
+      </div>
+      <div class="ctrl">
+        <label>Spacing</label>
+        <input type="range" min="80" max="400" step="10" value="200" data-param="pathSpacing">
+        <span class="val">200</span>
+      </div>
+      <div class="ctrl">
+        <label>Y range</label>
+        <input type="range" min="5" max="60" step="1" value="26" data-param="pathYRange">
+        <span class="val">26</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="btn-row">
+    <button class="btn primary" onclick="copyConfig()">Copy Config</button>
+    <button class="btn" onclick="resetDefaults()">Reset</button>
+    <button class="btn" onclick="rebuildScene()">Rebuild</button>
+  </div>
+</div>
+
+<button class="studio-toggle" id="toggleBtn" onclick="togglePanel()">◀</button>
+
+<!-- ─── CANVAS AREA ─── -->
+<div class="canvas-area" id="canvasArea">
+  <section class="scene" id="scene">
+    <canvas id="webgl"></canvas>
+    <div class="scroll-text" id="scrollText">Scroll to explore</div>
+    <div class="project-info" id="projectInfo">
+      <div class="project-info__title" id="projTitle"></div>
+      <div class="project-info__subtitle" id="projSub"></div>
+      <div class="project-info__awards" id="projAwards"></div>
+    </div>
+    <div class="menu" id="menu">
+      <div class="menu__icon active" data-view="roadview">ROAD</div>
+      <div class="menu__icon" data-view="overview">OVERVIEW</div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast">Config copied to clipboard</div>
+
+<!-- THREE.JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+
+  // ─── LIVE CONFIG (studio-editable) ───
+  const CFG = {
+    roadCount: 20000,
+    roadWidth: 60,
+    roadSizeMin: 0.8,
+    roadSizeMax: 2.8,
+    roadPointCap: 28,
+    roadOpacity: 0.85,
+    roadColor: [0.07, 0.10, 0.035],
+
+    camHeight: 2.5,
+    camSide: 4,
+    camLookAhead: 5,
+    camFov: 60,
+    camSmooth: 0.04,
+
+    skyTop: [0.30, 0.43, 0.11],
+    skyMid: [0.53, 0.66, 0.18],
+    skyBottom: [0.82, 0.88, 0.40],
+    skyGround: [0.06, 0.12, 0.04],
+
+    fogDensity: 0.0028,
+    fogColor: 0x0f1e0a,
+
+    markerCount: 800,
+    markerSide: 15,
+    markerColor: [0.94, 0.96, 0.52],
+
+    atmoCount: 3000,
+    atmoOpacity: 0.3,
+
+    pathRadius: 100,
+    pathSpacing: 200,
+    pathYRange: 26,
+  };
+
+  const DEFAULTS = JSON.parse(JSON.stringify(CFG));
+
+  // ─── OVACADO SECTIONS ───
+  const PROJECTS = [
+    {id:"movement-1",title:"Opening",subtitle:"Movement I",awards:["Intro"]},
+    {id:"movement-2",title:"First Verse",subtitle:"Movement II",awards:["Vocals enter"]},
+    {id:"movement-3",title:"Building",subtitle:"Movement III",awards:["Energy rising"]},
+    {id:"movement-4",title:"Pre-Chorus",subtitle:"Movement IV",awards:["Tension"]},
+    {id:"movement-5",title:"Chorus",subtitle:"Movement V",awards:["Peak energy"]},
+    {id:"movement-6",title:"Interlude",subtitle:"Movement VI",awards:["Breathing room"]},
+    {id:"movement-7",title:"Second Verse",subtitle:"Movement VII",awards:["Deepening"]},
+    {id:"movement-8",title:"Bridge",subtitle:"Movement VIII",awards:["Harmonic shift"]},
+    {id:"movement-9",title:"Final Chorus",subtitle:"Movement IX",awards:["Full power"]},
+    {id:"movement-10",title:"Outro",subtitle:"Movement X",awards:["Resolution"]},
+  ];
+
+  // ─── THREE.JS ───
+  const canvas = document.getElementById('webgl');
+  const renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(CFG.camFov, 1, 0.1, 2000);
+
+  function resizeRenderer() {
+    const area = document.getElementById('canvasArea');
+    const w = area.clientWidth, h = area.clientHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  resizeRenderer();
+  window.addEventListener('resize', resizeRenderer);
+
+  // ─── PATH ───
+  let mainTrail, trailPoints;
+  function degToRad(d){ return d * Math.PI / 180; }
+
+  function buildPath() {
+    const R = CFG.pathRadius;
+    const S = CFG.pathSpacing;
+    const PPC = 100;
+    const STEP = 360 / PPC;
+    const YR = CFG.pathYRange;
+    const YS = YR / PPC;
+
+    const centers = [
+      new THREE.Vector3(-S, 0, 0),
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(S, 0, 0),
+    ];
+
+    function genCircle(ci) {
+      const c = centers[ci];
+      const pts = [];
+      let angle = 180 - STEP;
+      let yPos = ci === 0 ? 0 : -YR / 2;
+      const dir = ci === 1 ? -1 : 1;
+      for (let i = 0; i < PPC; i++) {
+        angle += STEP;
+        pts.push({
+          position: new THREE.Vector3(
+            Math.cos(degToRad(angle)) * R + c.x,
+            yPos,
+            Math.sin(degToRad(angle)) * R * dir
+          )
+        });
+        if (ci === 0) { yPos += YS; if (i + 1 === PPC / 2) yPos = -YR / 2; }
+        else if (ci === 1) { yPos += YS * 2; if (i === PPC / 2) yPos = -YR / 2; }
+        else { yPos += YS; }
+      }
+      return pts;
+    }
+
+    const circles = [genCircle(0), genCircle(1), genCircle(2)];
+    circles[1].reverse();
+    const half = PPC / 2;
+    const all = [];
+    for (let i = 0; i < half; i++) all.push(circles[0][i].position);
+    all.push(circles[1][PPC - 1].position);
+    for (let i = 0; i < half - 1; i++) all.push(circles[1][i].position);
+    for (let i = 0; i < PPC; i++) all.push(circles[2][i].position);
+    all.push(circles[1][half - 1].position);
+    const lh = circles[1].slice(half); lh.pop();
+    for (const p of lh) all.push(p.position);
+    for (let i = half; i < PPC; i++) all.push(circles[0][i].position);
+    all.push(circles[0][0].position);
+
+    mainTrail = new THREE.CatmullRomCurve3(all, false, 'catmullrom', 0.5);
+    trailPoints = mainTrail.getPoints(2000);
+  }
+  buildPath();
+
+  // ─── SKY ───
+  let skyMesh;
+  function buildSky() {
+    if (skyMesh) scene.remove(skyMesh);
+    const geo = new THREE.SphereGeometry(900, 32, 32);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTop: {value: new THREE.Vector3(...CFG.skyTop)},
+        uMid: {value: new THREE.Vector3(...CFG.skyMid)},
+        uBottom: {value: new THREE.Vector3(...CFG.skyBottom)},
+        uGround: {value: new THREE.Vector3(...CFG.skyGround)},
+      },
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main(){
+          vWorldPos = (modelMatrix * vec4(position,1.0)).xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uTop, uMid, uBottom, uGround;
+        varying vec3 vWorldPos;
+        void main(){
+          float h = normalize(vWorldPos).y;
+          vec3 col;
+          if(h > 0.0) col = mix(uMid, uTop, smoothstep(0.0, 0.6, h));
+          else col = mix(uMid, uGround, smoothstep(0.0, -0.3, h));
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+      side: THREE.BackSide, depthWrite: false,
+    });
+    skyMesh = new THREE.Mesh(geo, mat);
+    scene.add(skyMesh);
+  }
+  buildSky();
+
+  // ─── FOG ───
+  scene.fog = new THREE.FogExp2(CFG.fogColor, CFG.fogDensity);
+
+  // ─── ROAD PARTICLES ───
+  let roadMesh, roadMat;
+  function buildRoad() {
+    if (roadMesh) scene.remove(roadMesh);
+    const N = CFG.roadCount;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(N * 3);
+    const sizes = new Float32Array(N);
+    const scaleH = new Float32Array(N);
+    const sizeRange = CFG.roadSizeMax - CFG.roadSizeMin;
+    for (let i = 0; i < N; i++) {
+      const t = Math.random();
+      const pt = mainTrail.getPoint(t);
+      const tan = mainTrail.getTangent(t);
+      const side = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+      const off = (Math.random() - 0.5) * CFG.roadWidth;
+      pos[i*3] = pt.x + side.x * off + tan.x * (Math.random()-0.5)*4;
+      pos[i*3+1] = pt.y - 0.5 + Math.random()*0.15;
+      pos[i*3+2] = pt.z + side.z * off + tan.z * (Math.random()-0.5)*4;
+      sizes[i] = Math.random() * sizeRange + CFG.roadSizeMin;
+      scaleH[i] = 0.4 + Math.random() * 0.6;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+    geo.setAttribute('aScaleH', new THREE.BufferAttribute(scaleH, 1));
+
+    roadMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uPixelRatio: {value: renderer.getPixelRatio()},
+        uTime: {value: 0},
+        uPointCap: {value: CFG.roadPointCap},
+        uColor: {value: new THREE.Vector3(...CFG.roadColor)},
+        uOpacity: {value: CFG.roadOpacity},
+      },
+      vertexShader: `
+        attribute float aSize;
+        attribute float aScaleH;
+        varying float vScaleH;
+        varying float vDist;
+        uniform float uPixelRatio;
+        uniform float uPointCap;
+        void main(){
+          vScaleH = aScaleH;
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          float dist = -mvPos.z;
+          vDist = dist;
+          gl_PointSize = min(aSize * uPixelRatio * (150.0 / dist), uPointCap);
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        varying float vScaleH;
+        varying float vDist;
+        void main(){
+          vec2 uv = gl_PointCoord - 0.5;
+          uv.y /= vScaleH;
+          float d = length(uv);
+          if(d > 0.5) discard;
+          float a = 1.0 - smoothstep(0.0, 0.45, d);
+          float fogFade = smoothstep(400.0, 50.0, vDist);
+          gl_FragColor = vec4(uColor, a * uOpacity * fogFade);
+        }
+      `,
+      transparent: true, depthWrite: false,
+    });
+    roadMesh = new THREE.Points(geo, roadMat);
+    scene.add(roadMesh);
+  }
+  buildRoad();
+
+  // ─── MARKERS ───
+  const BLUE = CFG.markerColor;
+  let markerMeshes = [];
+  const shapes = ['rect','cylinder','sphere','rect','cylinder','sphere','rect','cylinder','rect','sphere','cylinder','rect','sphere','cylinder','rect'];
+
+  function fillRect(pos, sizes, c, n, w, h, d) {
+    for (let i = 0; i < n; i++) {
+      pos[i*3]=c.x+(Math.random()-0.5)*w; pos[i*3+1]=c.y+Math.random()*h; pos[i*3+2]=c.z+(Math.random()-0.5)*d;
+      const onSurf = Math.random() < 0.7;
+      if (onSurf) { const f=Math.floor(Math.random()*6); if(f<2) pos[i*3]=c.x+(f===0?-w/2:w/2); else if(f<4) pos[i*3+1]=c.y+(f===2?0:h); else pos[i*3+2]=c.z+(f===4?-d/2:d/2); }
+      sizes[i] = Math.random()*1.5+0.5;
+    }
+  }
+  function fillCyl(pos, sizes, c, n, r, h) {
+    for (let i = 0; i < n; i++) { const a=Math.random()*Math.PI*2; const rr=r*(0.85+Math.random()*0.3); pos[i*3]=c.x+Math.cos(a)*rr; pos[i*3+1]=c.y+Math.random()*h; pos[i*3+2]=c.z+Math.sin(a)*rr; sizes[i]=Math.random()*1.5+0.5; }
+  }
+  function fillSph(pos, sizes, c, n, r) {
+    for (let i = 0; i < n; i++) { const th=Math.random()*Math.PI*2; const ph=Math.acos(2*Math.random()-1); const rr=r*(0.8+Math.random()*0.4); pos[i*3]=c.x+rr*Math.sin(ph)*Math.cos(th); pos[i*3+1]=c.y+rr*Math.sin(ph)*Math.sin(th)+r; pos[i*3+2]=c.z+rr*Math.cos(ph); sizes[i]=Math.random()*1.5+0.5; }
+  }
+
+  let markerGroups = [];
+  function buildMarkers() {
+    markerMeshes.forEach(m => scene.remove(m));
+    markerMeshes = [];
+    markerGroups = [];
+    PROJECTS.forEach((proj, idx) => {
+      const t = idx / PROJECTS.length;
+      const center = mainTrail.getPoint(t);
+      const tan = mainTrail.getTangent(t);
+      const sd = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+      const sc = new THREE.Vector3(center.x + sd.x * CFG.markerSide, center.y, center.z + sd.z * CFG.markerSide);
+      const shape = shapes[idx % shapes.length];
+      const n = CFG.markerCount;
+      const geo = new THREE.BufferGeometry();
+      const pos = new Float32Array(n * 3);
+      const sizes = new Float32Array(n);
+      if (shape === 'rect') fillRect(pos, sizes, sc, n, 18, 12, 2);
+      else if (shape === 'cylinder') fillCyl(pos, sizes, sc, n, 4, 20);
+      else fillSph(pos, sizes, sc, n, 6);
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+      const mat = new THREE.ShaderMaterial({
+        uniforms: { uPixelRatio:{value:renderer.getPixelRatio()}, uTime:{value:0}, uColor:{value:new THREE.Vector3(...CFG.markerColor)} },
+        vertexShader: `attribute float aSize; varying float vAlpha; uniform float uPixelRatio, uTime; void main(){ vec3 p=position; p+=sin(uTime*0.8+p.y*0.3)*0.15; vec4 mv=modelViewMatrix*vec4(p,1.0); float d=-mv.z; gl_PointSize=aSize*uPixelRatio*(100.0/d); gl_Position=projectionMatrix*mv; vAlpha=smoothstep(500.0,30.0,d); }`,
+        fragmentShader: `uniform vec3 uColor; varying float vAlpha; void main(){ float d=length(gl_PointCoord-0.5); if(d>0.5) discard; float a=1.0-smoothstep(0.0,0.5,d); gl_FragColor=vec4(uColor,a*vAlpha*0.7); }`,
+        transparent: true, depthWrite: false,
+      });
+      const mesh = new THREE.Points(geo, mat);
+      scene.add(mesh);
+      markerMeshes.push(mesh);
+      markerGroups.push({mesh, center, t, proj, mat});
+    });
+  }
+  buildMarkers();
+
+  // ─── ATMOSPHERE ───
+  let atmoMesh, atmoMat;
+  function buildAtmo() {
+    if (atmoMesh) scene.remove(atmoMesh);
+    const N = CFG.atmoCount;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(N * 3);
+    const sizes = new Float32Array(N);
+    const speeds = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      pos[i*3]=(Math.random()-0.5)*600; pos[i*3+1]=Math.random()*40-5; pos[i*3+2]=(Math.random()-0.5)*400;
+      sizes[i]=Math.random()*1.8+0.3; speeds[i]=Math.random()*2+0.5;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+    geo.setAttribute('aSpeed', new THREE.BufferAttribute(speeds, 1));
+    atmoMat = new THREE.ShaderMaterial({
+      uniforms: { uPixelRatio:{value:renderer.getPixelRatio()}, uTime:{value:0}, uOpacity:{value:CFG.atmoOpacity} },
+      vertexShader: `attribute float aSize, aSpeed; varying float vAlpha; uniform float uPixelRatio, uTime, uOpacity; void main(){ vec3 p=position; p.x+=sin(uTime*aSpeed*0.3+p.z*0.01)*2.0; p.y+=cos(uTime*aSpeed*0.2+p.x*0.02)*1.5; p.z+=sin(uTime*aSpeed*0.15)*1.0; vec4 mv=modelViewMatrix*vec4(p,1.0); gl_PointSize=aSize*uPixelRatio*(80.0/(-mv.z)); gl_Position=projectionMatrix*mv; vAlpha=smoothstep(400.0,20.0,-mv.z)*uOpacity; }`,
+      fragmentShader: `varying float vAlpha; void main(){ float d=length(gl_PointCoord-0.5); if(d>0.5) discard; float a=1.0-smoothstep(0.0,0.5,d); gl_FragColor=vec4(vec3(0.53,0.66,0.18),a*vAlpha); }`,
+      transparent: true, depthWrite: false,
+    });
+    atmoMesh = new THREE.Points(geo, atmoMat);
+    scene.add(atmoMesh);
+  }
+  buildAtmo();
+
+  // ─── STATE ───
+  let viewType = 'roadview';
+  let scrollValue = 0, targetScrollValue = 0, scrollPixels = 0;
+
+  document.getElementById('canvasArea').addEventListener('wheel', (e) => {
+    if (viewType !== 'roadview') return;
+    scrollPixels = Math.max(0, Math.min(15000, scrollPixels + e.deltaY));
+    targetScrollValue = scrollPixels / 15000;
+  }, {passive: true});
+
+  // ─── MENU ───
+  document.querySelectorAll('.menu__icon').forEach(icon => {
+    icon.addEventListener('click', () => {
+      const v = icon.dataset.view;
+      if (icon.classList.contains('active')) return;
+      viewType = v;
+      document.querySelectorAll('.menu__icon').forEach(m => m.classList.toggle('active', m.dataset.view === v));
+    });
+  });
+
+  // ─── CAMERA ───
+  let camPos = new THREE.Vector3(-100, 3, 12);
+  let camLookAt = new THREE.Vector3(0, 0, 0);
+  let targetCamPos = camPos.clone();
+  let targetLookAt = new THREE.Vector3(0, 0, 0);
+  camera.position.copy(camPos);
+
+  function getRoadCamPos(t) {
+    const pt = mainTrail.getPoint(t);
+    const tan = mainTrail.getTangent(t);
+    const side = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+    return new THREE.Vector3(
+      pt.x + side.x * CFG.camSide + tan.x * CFG.camLookAhead,
+      pt.y + CFG.camHeight,
+      pt.z + side.z * CFG.camSide + tan.z * CFG.camLookAhead
+    );
+  }
+
+  function getActiveProject(sv) {
+    let closest = 0, minD = Infinity;
+    markerGroups.forEach((mg, i) => { const d = Math.abs(sv - mg.t); const dw = Math.min(d, 1-d); if(dw < minD){minD=dw;closest=i;} });
+    return {index: closest, distance: minD};
+  }
+
+  // ─── ANIMATE ───
+  const clock = new THREE.Clock();
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const time = clock.getElapsedTime();
+    scrollValue = lerp(scrollValue, targetScrollValue, 0.06);
+
+    if (viewType === 'roadview') {
+      targetCamPos.copy(getRoadCamPos(scrollValue));
+      targetLookAt.copy(mainTrail.getPoint(Math.min(1, scrollValue + 0.05)));
+      const active = getActiveProject(scrollValue);
+      const projInfo = document.getElementById('projectInfo');
+      if (active.distance < 0.04 && scrollValue > 0.005) {
+        const p = PROJECTS[active.index];
+        projInfo.classList.add('visible');
+        document.getElementById('projTitle').textContent = p.title;
+        document.getElementById('projSub').textContent = p.subtitle;
+        document.getElementById('projAwards').textContent = p.awards.join(' · ');
+      } else { projInfo.classList.remove('visible'); }
+      if (scrollValue > 0.01) document.getElementById('scrollText').classList.add('hidden');
+    } else if (viewType === 'overview') {
+      targetCamPos.set(0, 700, 0);
+      targetLookAt.set(0, 0, 0);
+    }
+
+    camPos.lerp(targetCamPos, CFG.camSmooth);
+    camLookAt.lerp(targetLookAt, CFG.camSmooth);
+    camera.position.copy(camPos);
+    camera.lookAt(camLookAt);
+    skyMesh.position.copy(camera.position);
+
+    roadMat.uniforms.uTime.value = time;
+    if (atmoMat) atmoMat.uniforms.uTime.value = time;
+    markerGroups.forEach(mg => { mg.mat.uniforms.uTime.value = time; });
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // ─── STUDIO CONTROLS ───
+  window.toggleSection = function(id) {
+    document.getElementById(id).classList.toggle('closed');
+  };
+
+  window.togglePanel = function() {
+    const panel = document.getElementById('panel');
+    const btn = document.getElementById('toggleBtn');
+    const area = document.getElementById('canvasArea');
+    panel.classList.toggle('collapsed');
+    btn.classList.toggle('collapsed');
+    area.classList.toggle('expanded');
+    btn.textContent = panel.classList.contains('collapsed') ? '▶' : '◀';
+    setTimeout(resizeRenderer, 320);
+  };
+
+  function hexToRGB01(hex) {
+    const r = parseInt(hex.slice(1,3), 16) / 255;
+    const g = parseInt(hex.slice(3,5), 16) / 255;
+    const b = parseInt(hex.slice(5,7), 16) / 255;
+    return [r, g, b];
+  }
+
+  function rgb01ToHex(arr) {
+    const r = Math.round(arr[0]*255).toString(16).padStart(2,'0');
+    const g = Math.round(arr[1]*255).toString(16).padStart(2,'0');
+    const b = Math.round(arr[2]*255).toString(16).padStart(2,'0');
+    return '#' + r + g + b;
+  }
+
+  const needsRebuild = new Set(['roadCount','roadWidth','roadSizeMin','roadSizeMax','atmoCount','markerCount','markerSide','pathRadius','pathSpacing','pathYRange']);
+
+  document.querySelectorAll('[data-param]').forEach(input => {
+    const param = input.dataset.param;
+
+    input.addEventListener('input', () => {
+      let val;
+      if (input.type === 'color') {
+        val = hexToRGB01(input.value);
+      } else {
+        val = parseFloat(input.value);
+        const valSpan = input.parentElement.querySelector('.val');
+        if (valSpan) valSpan.textContent = val >= 1000 ? (val/1000).toFixed(0)+'k' : val;
+      }
+
+      // Update CFG
+      if (Array.isArray(CFG[param])) {
+        CFG[param] = val;
+      } else {
+        CFG[param] = val;
+      }
+
+      // Live updates (no rebuild needed)
+      if (param === 'camFov') { camera.fov = val; camera.updateProjectionMatrix(); }
+      if (param === 'fogDensity') { scene.fog.density = val; }
+      if (param === 'fogColor') {
+        const c = hexToRGB01(input.value);
+        scene.fog.color.setRGB(c[0], c[1], c[2]);
+        CFG.fogColor = parseInt(input.value.slice(1), 16);
+      }
+      if (param === 'roadOpacity' && roadMat) { roadMat.uniforms.uOpacity.value = val; }
+      if (param === 'roadPointCap' && roadMat) { roadMat.uniforms.uPointCap.value = val; }
+      if (param === 'roadColor' && roadMat) { roadMat.uniforms.uColor.value.set(...val); }
+      if (param === 'markerColor') { markerGroups.forEach(mg => mg.mat.uniforms.uColor.value.set(...val)); }
+      if (param === 'atmoOpacity' && atmoMat) { atmoMat.uniforms.uOpacity.value = val; }
+      if (param.startsWith('sky') && skyMesh) {
+        const u = 'u' + param.charAt(3).toUpperCase() + param.slice(4);
+        if (skyMesh.material.uniforms[u]) skyMesh.material.uniforms[u].value.set(...val);
+      }
+    });
+  });
+
+  window.rebuildScene = function() {
+    buildPath();
+    buildRoad();
+    buildMarkers();
+    buildAtmo();
+    showToast('Scene rebuilt');
+  };
+
+  window.resetDefaults = function() {
+    Object.assign(CFG, JSON.parse(JSON.stringify(DEFAULTS)));
+    document.querySelectorAll('[data-param]').forEach(input => {
+      const p = input.dataset.param;
+      const v = CFG[p];
+      if (input.type === 'color') {
+        input.value = Array.isArray(v) ? rgb01ToHex(v) : '#' + v.toString(16).padStart(6, '0');
+      } else {
+        input.value = v;
+        const vs = input.parentElement.querySelector('.val');
+        if (vs) vs.textContent = v >= 1000 ? (v/1000).toFixed(0)+'k' : v;
+      }
+    });
+    camera.fov = CFG.camFov; camera.updateProjectionMatrix();
+    scene.fog.density = CFG.fogDensity;
+    rebuildScene();
+    showToast('Reset to defaults');
+  };
+
+  window.copyConfig = function() {
+    const out = {};
+    for (const [k, v] of Object.entries(CFG)) {
+      if (JSON.stringify(v) !== JSON.stringify(DEFAULTS[k])) out[k] = v;
+    }
+    const text = Object.keys(out).length ? JSON.stringify(out, null, 2) : JSON.stringify(CFG, null, 2);
+    navigator.clipboard.writeText(text).then(() => showToast('Config copied')).catch(() => showToast('Copy failed'));
+  };
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+})();
+</script>
+</body>
+</html>

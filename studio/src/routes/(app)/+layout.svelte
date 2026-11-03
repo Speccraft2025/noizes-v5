@@ -33,6 +33,7 @@
     <WaveCanvas />
   {/if}
 
+  {#if page.url.pathname !== '/studio'}
   <header class="sticky top-0 z-50 border-b"
     style="background: rgba(3,3,3,0.92); backdrop-filter: blur(20px); border-color: var(--border-dim);">
     <div class="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between h-14">
@@ -122,6 +123,7 @@
       </div>
     {/if}
   </header>
+  {/if}
 
   <main class="flex-1 relative z-10"><slot></slot></main>
 </div>

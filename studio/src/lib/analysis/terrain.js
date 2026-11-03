@@ -38,8 +38,10 @@ export const SCHEMA_VERSION = '3.0.0';
 const DB_FLOOR_PERCENTILE_SPARSE = 0.62;
 const DB_FLOOR_PERCENTILE_DENSE = 0.32;
 const DB_CEIL_PERCENTILE = 0.9995;
-const TERRAIN_GAMMA_SPARSE = 0.72;
-const TERRAIN_GAMMA_DENSE = 0.52;
+// Preserve the difference between quiet troughs and active peaks. Lower gamma
+// values made dense masters read as a broad plateau instead of a spectrogram.
+const TERRAIN_GAMMA_SPARSE = 0.98;
+const TERRAIN_GAMMA_DENSE = 0.82;
 
 // Pitch is the most expensive measurement in the pipeline by an order of
 // magnitude. The voice curve it feeds is smoothed over +-4 frames (~0.19 s) and
@@ -421,7 +423,7 @@ export function* analyseSamplesChunked(samples, {
   // must stay sharp, because that is where the erosion comes from.
   const melGeom = new Float32Array(frames * MEL_BANDS);
   {
-    const RADIUS = 4;   // +-4 frames ~ +-0.09 s
+    const RADIUS = 2;   // keep phrase-scale ridges, but retain readable trough walls
     for (let b = 0; b < MEL_BANDS; b++) {
       for (let f = 0; f < frames; f++) {
         let sum = 0, n = 0;

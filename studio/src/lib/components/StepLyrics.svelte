@@ -341,6 +341,7 @@
         style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-dim); color: #fff; min-height: 220px; outline: none;"
         placeholder={"I never thought I'd see the day\nI thought that I had finally moved along\n..."}
         bind:value={rawText}
+        on:input={() => updateLyricRecord({ plain_text: rawText })}
         on:blur={() => updateLyricRecord({ plain_text: rawText })}
       ></textarea>
       <p class="text-xs mt-1" style="color: var(--ink-muted);">
@@ -348,9 +349,18 @@
       </p>
     </div>
 
-    <button class="btn-spectral w-full py-3.5 text-base rounded-xl" disabled={!rawText.trim()} on:click={startSync}>
-      Start lyric sync →
-    </button>
+    <div class="rounded-2xl p-3" style="background:rgba(123,92,240,.08);border:1px solid rgba(123,92,240,.24);">
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <div>
+          <p class="text-sm font-bold text-white">Lyrics pasted</p>
+          <p class="text-[11px]" style="color:var(--ink-muted);">Tap to play the track and stamp each line as it arrives.</p>
+        </div>
+        <span class="text-xs font-mono" style="color:#B7A8FF;">{rawText.split('\n').filter(l => l.trim()).length} lines</span>
+      </div>
+      <button class="btn-spectral w-full py-3.5 text-base rounded-xl" disabled={!rawText.trim()} on:click={startSync}>
+        Tap to sync lyrics →
+      </button>
+    </div>
 
     {#if lyricRecord.timed_lines && lyricRecord.timed_lines.length}
       <p class="text-xs text-center" style="color: var(--ink-muted);">

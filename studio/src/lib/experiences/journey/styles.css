@@ -1,0 +1,83 @@
+/* Journey — Road experience styles */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;background:#000;color:#e0e5f5}
+
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+
+/* ─── Stage ─── */
+#stage{position:fixed;inset:0;overflow:hidden}
+#world{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* ─── Threshold ─── */
+#threshold{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:10;background:rgba(0,0,0,.6);transition:opacity .8s ease,visibility .8s ease}
+[data-mode="playing"] #threshold,[data-mode="ended"] #threshold{opacity:0;visibility:hidden;pointer-events:none}
+.threshold-inner{text-align:center;max-width:28rem;padding:2rem}
+.threshold-title{font-size:clamp(1.4rem,4vw,2.4rem);font-weight:300;letter-spacing:.04em;margin-bottom:2rem;color:#b8c2eb}
+#threshold-action{position:relative;display:inline-flex;align-items:center;justify-content:center;width:5rem;height:5rem;border-radius:50%;border:2px solid rgba(147,157,202,.5);background:transparent;color:#e0e5f5;cursor:pointer;font:inherit;transition:border-color .3s}
+#threshold-action:hover{border-color:rgba(147,157,202,.9)}
+.threshold-ring{position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(147,157,202,.25);animation:ring-pulse 2.4s ease-in-out infinite}
+@keyframes ring-pulse{0%,100%{transform:scale(1);opacity:.4}50%{transform:scale(1.12);opacity:.15}}
+.threshold-copy{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em}
+#threshold-hint{margin-top:1.5rem;font-size:.8rem;opacity:.45;font-weight:300}
+[data-holding="true"] .threshold-ring{animation-play-state:paused}
+
+/* ─── HUD ─── */
+#hud{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;transition:opacity .6s ease}
+[data-mode="playing"] #hud[data-visible="true"]{opacity:1}
+
+/* Timeline */
+#timeline{position:absolute;bottom:2.5rem;left:2rem;right:2rem}
+#timeline-rail{height:2px;background:rgba(255,255,255,.12);border-radius:1px;position:relative}
+#timeline-head{position:absolute;top:-3px;left:0;width:8px;height:8px;border-radius:50%;background:#939dca;transition:left .15s linear}
+
+/* Identity */
+#identity{position:absolute;top:1.5rem;left:2rem}
+.identity-track{font-size:.85rem;font-weight:500;letter-spacing:.03em}
+.identity-rule{border:none;border-top:1px solid rgba(255,255,255,.15);margin:.5rem 0;width:3rem}
+.identity-sub{font-size:.72rem;opacity:.55;font-weight:300}
+.identity-time{font-size:.65rem;opacity:.4;margin-top:.3rem;font-variant-numeric:tabular-nums}
+
+/* ─── Utility sheet ─── */
+#utility{position:absolute;top:1.5rem;right:1.5rem;z-index:8;background:transparent;border:none;color:rgba(255,255,255,.5);cursor:pointer;padding:.5rem;transition:color .2s}
+#utility:hover{color:rgba(255,255,255,.85)}
+
+#sheet{position:absolute;inset:0 0 0 auto;z-index:20;width:min(22rem,85vw);background:rgba(12,12,18,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);overflow-y:auto;padding:1.5rem;border-left:1px solid rgba(255,255,255,.06)}
+#sheet[hidden]{display:none}
+#sheet header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem}
+#sheet h1{font-size:1.1rem;font-weight:500}
+#sheet small{font-size:.7rem;opacity:.45;display:block;margin-bottom:.25rem}
+#sheet .credit{font-size:.7rem;opacity:.5;margin-top:.25rem}
+#sheet-close{background:transparent;border:none;color:rgba(255,255,255,.5);font-size:1.5rem;cursor:pointer;padding:.25rem .5rem}
+#sheet h2{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;opacity:.4;margin:1.5rem 0 .75rem}
+#sheet h3{font-size:.85rem;margin-bottom:.35rem}
+#sheet p{font-size:.78rem;line-height:1.5;opacity:.7}
+#sheet .note{font-size:.68rem;opacity:.35;margin-top:.75rem;font-style:italic}
+
+.sheet-transport .transport-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem}
+.sheet-transport button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:.35rem;color:#e0e5f5;padding:.4rem .8rem;font:inherit;font-size:.75rem;cursor:pointer}
+.sheet-transport span{font-size:.72rem;opacity:.5;font-variant-numeric:tabular-nums}
+.field{display:block;font-size:.7rem;opacity:.5;margin-bottom:.5rem}
+.field input[type=range]{width:100%;margin-top:.25rem;accent-color:#939dca}
+
+.quality-row{display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.75rem}
+.quality-row button{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:.25rem;color:rgba(255,255,255,.5);padding:.3rem .6rem;font:inherit;font-size:.68rem;cursor:pointer;transition:background .2s,color .2s}
+.quality-row button[aria-pressed="true"]{background:rgba(147,157,202,.2);color:#e0e5f5;border-color:rgba(147,157,202,.4)}
+
+.settings button{display:block;width:100%;text-align:left;background:transparent;border:none;color:rgba(255,255,255,.55);font:inherit;font-size:.75rem;padding:.4rem 0;cursor:pointer}
+.settings button b{float:right;font-weight:400;opacity:.6}
+
+.keys{list-style:none;font-size:.72rem;opacity:.55}
+.keys li{margin-bottom:.35rem}
+.keys kbd{display:inline-block;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:.2rem;padding:.1rem .35rem;font-family:inherit;font-size:.65rem;margin-right:.2rem}
+
+.colophon{border-top:1px solid rgba(255,255,255,.06);padding-top:.75rem}
+
+/* ─── Residue ─── */
+#residue{position:absolute;inset:0;z-index:12;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(0,0,0,.7);transition:opacity .8s ease}
+#residue[hidden]{display:none}
+.residue-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.15em;opacity:.4}
+.residue-rule{border:none;border-top:1px solid rgba(255,255,255,.12);margin:.75rem 0;width:4rem}
+#residue-hash{font-size:.8rem;font-weight:400;font-family:ui-monospace,monospace;letter-spacing:.04em;opacity:.7;word-break:break-all;max-width:20rem;display:block}
+#residue-statement{font-size:.78rem;opacity:.5;margin-top:1rem;max-width:22rem;line-height:1.5}
+#replay{margin-top:2rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:.35rem;color:#e0e5f5;padding:.5rem 1.2rem;font:inherit;font-size:.75rem;cursor:pointer;transition:background .2s}
+#replay:hover{background:rgba(255,255,255,.14)}

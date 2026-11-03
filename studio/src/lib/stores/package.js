@@ -245,6 +245,7 @@ export const transcendence = writable({
   analysis: null,         // object, session only
   terrain_data: null,     // { rgba, width, height }, session only
   landmarks: [],
+  guided_points: [],
   art_direction: {},
   direction_tracks: {},
   arc_end_seconds: null,
@@ -255,6 +256,7 @@ export const transcendence = writable({
 export const draftableTranscendence = (value) => ({
   track_id: value.track_id || '',
   landmarks: value.landmarks || [],
+  guided_points: value.guided_points || [],
   art_direction: value.art_direction || {},
   direction_tracks: value.direction_tracks || {},
   arc_end_seconds: value.arc_end_seconds ?? null,

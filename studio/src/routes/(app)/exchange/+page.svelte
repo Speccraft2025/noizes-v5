@@ -663,10 +663,10 @@
 
   .exchange-heading {
     display: grid;
-    grid-template-columns: minmax(300px, 0.45fr) minmax(420px, 1fr);
-    align-items: start;
-    gap: clamp(28px, 4vw, 70px);
-    margin-bottom: 14px;
+    grid-template-columns: minmax(240px, .6fr) minmax(320px, 1fr) auto;
+    align-items: center;
+    gap: clamp(20px, 3vw, 48px);
+    margin-bottom: 24px;
   }
 
   .heading-copy h1 {
@@ -757,15 +757,17 @@
   .release-row {
     position: relative;
     display: grid;
-    grid-template-columns: 60px clamp(112px, 10vw, 154px) minmax(0, 1fr) 152px;
+    grid-template-columns: clamp(112px, 10vw, 154px) minmax(0, 1fr) 76px 132px;
     align-items: center;
     gap: clamp(18px, 2.3vw, 32px);
-    min-height: clamp(144px, 9.8vw, 150px);
-    padding: 2px 0;
+    min-height: clamp(152px, 10vw, 166px);
+    padding: 8px 0;
     border-bottom: 1px solid rgba(92, 113, 142, 0.25);
   }
 
   .appreciation-column {
+    grid-column: 3;
+    grid-row: 1;
     display: flex;
     min-width: 0;
     flex-direction: column;
@@ -778,8 +780,8 @@
   .appreciation-button {
     display: grid;
     place-items: center;
-    width: 56px;
-    height: 48px;
+    width: 46px;
+    height: 42px;
     border: 1px solid #6f2cff;
     border-radius: 9px;
     background: rgba(45, 13, 112, 0.28);
@@ -829,7 +831,7 @@
     display: block;
     margin-top: 5px;
     color: #f4f5f9;
-    font-size: 1.45rem;
+    font-size: 1rem;
     font-weight: 800;
     line-height: 1;
     font-variant-numeric: tabular-nums;
@@ -837,7 +839,7 @@
 
   .appreciation-label {
     color: #cbd9ee;
-    font-size: 0.82rem;
+    font-size: 0.65rem;
     line-height: 1.15;
   }
 
@@ -878,6 +880,8 @@
   }
 
   .cover-link {
+    grid-column: 1;
+    grid-row: 1;
     display: block;
     width: 100%;
     aspect-ratio: 1;
@@ -910,6 +914,8 @@
   }
 
   .release-copy {
+    grid-column: 2;
+    grid-row: 1;
     min-width: 0;
     align-self: center;
   }
@@ -965,12 +971,14 @@
   }
 
   .explore-link {
+    grid-column: 4;
+    grid-row: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
-    min-height: 39px;
-    padding: 0 20px;
+    min-height: 42px;
+    padding: 0 17px;
     border: 1px solid transparent;
     border-radius: 9px;
     background: #4c0cf5;
@@ -1087,22 +1095,21 @@
   }
 
   .market-handle {
-    position: fixed;
-    z-index: 40;
-    top: 68px;
-    right: 0;
+    position: relative;
+    z-index: auto;
+    top: auto;
+    right: auto;
     display: flex;
-    width: 57px;
-    min-height: 204px;
+    width: max-content;
+    min-height: 42px;
     align-items: center;
     justify-content: center;
-    gap: 13px;
-    padding: 17px 9px;
-    border: 1px solid rgba(112, 126, 156, 0.36);
-    border-right: 0;
-    border-radius: 28px 0 0 28px;
-    background: rgba(12, 17, 30, 0.97);
-    box-shadow: -8px 12px 34px rgba(0, 0, 0, 0.18);
+    gap: 8px;
+    padding: 0 13px;
+    border: 1px solid rgba(112, 126, 156, 0.42);
+    border-radius: 99px;
+    background: rgba(6, 10, 18, 0.84);
+    box-shadow: none;
     color: #eef1f7;
     cursor: pointer;
     transform: none;
@@ -1110,20 +1117,13 @@
   }
 
   .market-handle::after {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 5px;
-    height: 100%;
-    border-radius: 8px 0 0 8px;
-    background: #6319ff;
-    content: '';
+    display: none;
   }
 
   .market-handle > span {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    font-size: 0.9rem;
+    writing-mode: horizontal-tb;
+    transform: none;
+    font-size: 0.75rem;
     font-weight: 650;
     letter-spacing: 0.02em;
   }
@@ -1137,6 +1137,7 @@
     stroke-width: 2.2;
     stroke-linecap: round;
     stroke-linejoin: round;
+    order: -1;
   }
 
   .market-handle:hover,
@@ -1559,8 +1560,8 @@
   }
 
   @media (max-width: 900px) {
-    .exchange-heading { grid-template-columns: minmax(230px, 0.7fr) minmax(300px, 1fr); gap: 22px; }
-    .release-row { grid-template-columns: 54px clamp(100px, 13vw, 126px) minmax(0, 1fr) 126px; gap: 17px; }
+    .exchange-heading { grid-template-columns: minmax(230px, .7fr) minmax(280px, 1fr) auto; gap: 22px; }
+    .release-row { grid-template-columns: clamp(100px, 13vw, 126px) minmax(0, 1fr) 54px 110px; gap: 17px; }
     .description { max-width: 500px; }
     .explore-link { gap: 6px; padding: 0 12px; }
   }
@@ -1574,7 +1575,7 @@
     .search { height: 52px; }
     .search input { font-size: 0.87rem; }
     .release-list { padding-bottom: 68px; }
-    .release-row { grid-template-columns: 43px 74px minmax(0, 1fr) 36px; gap: 10px; min-height: 112px; padding: 9px 0; }
+    .release-row { grid-template-columns: 74px minmax(0, 1fr) 43px 36px; gap: 10px; min-height: 112px; padding: 9px 0; }
     .appreciation-column { gap: 2px; }
     .appreciation-button { width: 41px; height: 39px; border-radius: 8px; }
     .appreciation-button svg { width: 21px; height: 21px; }
@@ -1589,10 +1590,7 @@
     .explore-link span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
     .explore-link svg { width: 20px; height: 20px; }
     .row-feedback { max-width: 180px; font-size: 0.63rem; transform: translateY(43px); }
-    .market-handle { position: relative; z-index: auto; width: max-content; min-height: 44px; justify-self: end; flex-direction: row; gap: 8px; margin-top: -5px; padding: 0 13px; border: 1px solid rgba(112, 126, 156, 0.42); border-radius: 25px; box-shadow: 0 7px 24px rgba(0, 0, 0, 0.38); transform: none; }
-    .market-handle::after { top: 8px; right: 0; width: 3px; height: 30px; }
-    .market-handle > span { writing-mode: horizontal-tb; transform: none; font-size: 0.75rem; }
-    .market-handle svg { width: 15px; height: 15px; order: -1; }
+    .market-handle { justify-self: start; margin-top: -5px; }
     .market-drawer { width: min(94vw, 460px); }
     .drawer-header { padding: calc(20px + env(safe-area-inset-top)) 18px 17px; }
     .drawer-header h2 { font-size: 1.65rem; }
@@ -1618,7 +1616,7 @@
 
   @media (max-width: 390px) {
     .exchange-page { padding-inline: 11px; }
-    .release-row { grid-template-columns: 39px 66px minmax(0, 1fr) 32px; gap: 8px; }
+    .release-row { grid-template-columns: 66px minmax(0, 1fr) 39px 32px; gap: 8px; }
     .appreciation-button { width: 38px; height: 37px; }
     .appreciation-label { font-size: 0.54rem; }
     .edition-summary { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

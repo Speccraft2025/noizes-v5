@@ -1,0 +1,128 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:;script-src 'self' 'unsafe-inline' blob:;style-src 'self' 'unsafe-inline';media-src 'self' blob:;img-src 'self' data: blob:;font-src 'self' data:;connect-src 'none';form-action 'none';base-uri 'none';object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<title>/* JM_TITLE */ — Road</title>
+<style>/* JOURNEY_CSS */</style>
+</head><body>
+
+<main id="stage" data-mode="sealed" data-chrome="visible" data-quality="balanced">
+
+  <canvas id="world" aria-hidden="true"></canvas>
+
+  <!-- Threshold. The object, before there is a clock. -->
+  <section id="threshold" aria-labelledby="threshold-label" data-holding="false">
+    <div class="threshold-inner">
+      <p id="threshold-label" class="threshold-title">/* JM_THRESHOLD_TITLE */</p>
+      <button id="threshold-action" type="button">
+        <span class="threshold-ring" aria-hidden="true"></span>
+        <span class="threshold-copy">/* JM_THRESHOLD_ACTION */</span>
+      </button>
+      <p id="threshold-hint">/* JM_THRESHOLD_HINT */</p>
+    </div>
+  </section>
+
+  <!-- Instrument layer. Position on the road, elapsed time, identity. -->
+  <div id="hud" data-visible="true" aria-hidden="true">
+
+    <!-- Road progress. -->
+    <div id="timeline">
+      <div id="timeline-rail"><span id="timeline-head"></span></div>
+    </div>
+
+    <!-- Identity, kept to the corner. -->
+    <div id="identity">
+      <p class="identity-track">/* JM_TITLE */</p>
+      <hr class="identity-rule" aria-hidden="true">
+      <p class="identity-sub">/* JM_SUBTITLE */</p>
+      <p class="identity-time"><span id="hud-elapsed">0:00</span> / /* JM_DURATION_LABEL */</p>
+    </div>
+  </div>
+
+  <!-- The single discreet control. Everything conventional lives behind it. -->
+  <button id="utility" type="button" aria-expanded="false" aria-controls="sheet" aria-label="Open controls and accessibility">
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="5.2" r="1.7" fill="currentColor"/>
+      <circle cx="12" cy="12" r="1.7" fill="currentColor"/>
+      <circle cx="12" cy="18.8" r="1.7" fill="currentColor"/>
+    </svg>
+  </button>
+
+  <aside id="sheet" hidden aria-label="Controls and accessibility">
+    <header>
+      <div>
+        <small>/* JM_SUBTITLE */</small>
+        <h1>/* JM_TITLE */</h1>
+        <p class="credit">/* JM_CREDIT */</p>
+      </div>
+      <button id="sheet-close" type="button" aria-label="Close controls">×</button>
+    </header>
+
+    <section class="sheet-transport">
+      <h2>Recording</h2>
+      <div class="transport-row">
+        <button id="transport" type="button" aria-label="Pause the recording"><b>Pause</b></button>
+        <span id="elapsed">0:00 / /* JM_DURATION_LABEL */</span>
+      </div>
+      <label class="field" for="sheet-seek">Position
+        <input id="sheet-seek" type="range" min="0" max="/* JM_ARC_END */" step="0.05" value="0" aria-label="Position in the recording">
+      </label>
+      <label class="field" for="volume">Volume
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume">
+      </label>
+    </section>
+
+    <section class="settings">
+      <h2>Experience</h2>
+      <div class="quality-row" role="group" aria-label="Quality">
+        <button type="button" data-quality-option="cinematic" aria-pressed="false">Cinematic</button>
+        <button type="button" data-quality-option="balanced" aria-pressed="true">Balanced</button>
+        <button type="button" data-quality-option="lite" aria-pressed="false">Lite</button>
+      </div>
+      <button id="motion-toggle" type="button" aria-pressed="false">Motion <b>Full</b></button>
+      <button id="hud-toggle" type="button" aria-pressed="true">Instrument layer <b>On</b></button>
+    </section>
+
+    <section>
+      <h2>Navigation</h2>
+      <ul class="keys">
+        <li><kbd>Space</kbd> pause and resume</li>
+        <li><kbd>Esc</kbd> close this panel</li>
+      </ul>
+      <p class="note">The road follows the recording. Nothing you do changes the track or the path it carves.</p>
+    </section>
+
+    <section class="colophon">
+      <h2>This edition</h2>
+      <p id="colophon-text"></p>
+    </section>
+  </aside>
+
+  <!-- Residue. The final state, after the recording finishes. -->
+  <div id="residue" hidden role="group" aria-label="The pressed artefact">
+    <p class="residue-label">Pressed copy</p>
+    <hr class="residue-rule" aria-hidden="true">
+    <strong id="residue-hash">—</strong>
+    <p id="residue-statement"></p>
+    <button id="replay" type="button">Ride it again</button>
+  </div>
+
+  <audio id="audio" preload="auto" crossorigin="anonymous">
+    <!-- JM_AUDIO_SOURCES -->
+  </audio>
+
+  <p id="live" class="sr-only" role="status" aria-live="polite"></p>
+  <p id="status" class="sr-only" aria-live="assertive"></p>
+
+  <!-- DEBUG_PANEL -->
+</main>
+
+<script type="application/json" id="analysis-payload">/* ANALYSIS_PAYLOAD */</script>
+<script type="application/json" id="edition-payload">/* EDITION_PAYLOAD */</script>
+<script type="application/json" id="config-payload">/* CONFIG_PAYLOAD */</script>
+<script type="application/json" id="sequence-payload">/* SEQUENCE_PAYLOAD */</script>
+<script>/* THREE_RUNTIME */</script>
+<script>/* GSAP_RUNTIME */</script>
+<script>/* JOURNEY_RUNTIME */</script>
+</body></html>

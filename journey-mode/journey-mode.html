@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ovacado — Journey Mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Lato:wght@100;300;400;700;900&family=Barlow+Condensed:wght@400;600;700&family=Playfair+Display:ital,wght@1,400&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  width:100%;height:100%;
+  font-family:Lato,sans-serif;
+  color:#e4f0c0;
+  background:#0f1e0a;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  line-height:1.3;
+  overflow:hidden;
+}
+body.can-scroll{overflow-y:auto}
+
+.fixed-container{
+  position:fixed;inset:0;
+  z-index:200;
+  pointer-events:none;
+}
+.fixed-container>*{pointer-events:auto}
+
+.scene{
+  position:absolute;inset:0;
+  z-index:100;
+}
+.scene canvas{
+  width:100%;height:100%;
+  position:relative;
+}
+
+.scene__overlay{
+  position:absolute;inset:0;
+  background:#0f1e0a;
+  opacity:0;
+  transition:opacity .6s ease;
+  pointer-events:none;
+  z-index:50;
+}
+
+.scroll-container{
+  position:relative;
+  width:100%;
+  height:15000px;
+  z-index:10;
+}
+
+/* ─── INTRO ─── */
+.intro{
+  position:absolute;inset:0;
+  z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;
+  background:#0f1e0a;
+  color:#e4f0c0;
+  transition:opacity .4s ease;
+}
+.intro.hidden{opacity:0;pointer-events:none}
+.intro__logo{
+  display:flex;
+  margin:40px 0;
+  transform:scaleY(-1);
+}
+.intro__logo svg{
+  width:260px;height:100px;
+  fill:none;stroke:#87a92e;stroke-width:1.3;
+}
+.intro__logo svg path{
+  stroke-dasharray:1470;
+  stroke-dashoffset:1470;
+  animation:loop-path-outer 3s ease-in-out forwards;
+}
+.intro__logo svg path:nth-child(2){
+  stroke-dasharray:1360;
+  stroke-dashoffset:1360;
+  animation:loop-path-middle 3s ease-in-out forwards;
+}
+.intro__logo svg path:nth-child(3){
+  stroke-dasharray:1244;
+  stroke-dashoffset:1244;
+  animation:loop-path-inner 3s ease-in-out forwards;
+}
+@keyframes loop-path-outer{0%,25%{stroke-dashoffset:1470}to{stroke-dashoffset:0}}
+@keyframes loop-path-middle{0%,25%{stroke-dashoffset:1360}to{stroke-dashoffset:0}}
+@keyframes loop-path-inner{0%,25%{stroke-dashoffset:1244}to{stroke-dashoffset:0}}
+
+.intro__text{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:42px;font-weight:700;
+  letter-spacing:.06em;
+  text-align:center;
+}
+.intro__note{
+  margin-top:12px;
+  font-size:12px;
+  color:#999;
+}
+.intro__btn{
+  margin-top:30px;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:32px;
+  cursor:pointer;
+  color:#c8d89a;
+  background:none;border:none;
+  letter-spacing:.03em;
+  transition:opacity .2s;
+}
+.intro__btn:hover{opacity:.6}
+
+/* ─── MENU ─── */
+.menu{
+  color:#c8d89a;
+  padding-top:60px;
+  position:absolute;top:0;right:40px;
+  text-align:right;
+  display:flex;flex-direction:column;
+  z-index:300;
+  pointer-events:auto;
+}
+.menu__icon{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:clamp(20px,2vw,36px);
+  font-weight:700;
+  letter-spacing:.03em;
+  line-height:1.2;
+  text-transform:uppercase;
+  transform:scaleX(1.1);
+  display:inline-block;
+  cursor:pointer;
+  opacity:.5;
+  color:#c8d89a;
+  transition:opacity .2s linear;
+}
+.menu__icon:hover{opacity:1}
+.menu__icon.active{pointer-events:none;opacity:1;color:#e0f585}
+.menu__icon.menu-hidden{opacity:0;pointer-events:none}
+
+/* ─── SCROLL TEXT ─── */
+.scroll-text{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  z-index:200;
+  font-family:'Playfair Display',serif;
+  font-style:italic;
+  font-size:36px;
+  letter-spacing:.15em;
+  color:#c8d89a;
+  opacity:.6;
+  pointer-events:none;
+  transition:opacity .5s linear 1.5s;
+}
+.scroll-text.hidden{opacity:0;transition:opacity .5s linear}
+
+/* ─── PROJECT INFO ─── */
+.project-info{
+  position:absolute;
+  z-index:150;
+  opacity:0;
+  transition:opacity .4s ease;
+  pointer-events:none;
+  left:40px;top:50%;
+  transform:translateY(-50%);
+}
+.project-info.visible{opacity:1}
+.project-info__title{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:clamp(28px,2.6vw,50px);
+  font-weight:700;
+  letter-spacing:0;
+  line-height:1.2;
+}
+.project-info__subtitle{
+  font-family:'Playfair Display',serif;
+  font-style:italic;
+  font-size:clamp(14px,1.25vw,24px);
+  line-height:1.2;
+}
+.project-info__awards{
+  margin-top:8px;
+  font-family:Lato,sans-serif;
+  font-weight:300;
+  font-size:clamp(11px,0.9vw,16px);
+}
+
+/* ─── OVERVIEW LABELS ─── */
+.overview-labels{
+  position:absolute;inset:0;
+  z-index:150;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .4s ease;
+}
+.overview-labels.visible{opacity:1}
+.overview-labels__title{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:clamp(34px,5.6vw,108px);
+  line-height:1.4;
+  opacity:.75;
+}
+.overview-labels__subtitle{
+  font-family:'Playfair Display',serif;
+  font-style:italic;
+  font-size:clamp(28px,4.8vw,92px);
+  line-height:1;
+  opacity:.75;
+}
+
+/* ─── LIST VIEW ─── */
+.listview{
+  position:absolute;inset:0;
+  z-index:160;
+  padding:60px calc(40px + 16%) 60px 40px;
+  overflow-y:auto;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .5s linear;
+}
+.listview.visible{opacity:1;pointer-events:auto;transition:opacity 1s linear}
+.listview__head{
+  font-family:'IBM Plex Sans',sans-serif;
+  font-size:clamp(16px,1.3vw,24px);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  margin-bottom:36px;
+}
+.listview__head--project{color:#e0f585}
+.listview__head--lab{color:#87a92e}
+.listview__project{
+  display:flex;align-items:baseline;
+  position:relative;
+  margin-bottom:34px;
+}
+.listview__project::before{
+  content:"";position:absolute;
+  bottom:0;left:0;width:0;height:1px;
+  background:#c8d89a;
+  transition:width 1.3s cubic-bezier(.25,.46,.45,.94);
+}
+.listview__project.visible::before{width:100%}
+.listview__title{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:clamp(20px,2.6vw,50px);
+  font-weight:700;
+  letter-spacing:0;
+  line-height:1.2;
+  cursor:pointer;
+  flex-shrink:0;
+  margin-right:16px;
+  opacity:0;
+  transform:translateX(-20px);
+  transition:transform 1.6s cubic-bezier(.19,1,.22,1),opacity 1s linear,color .2s linear;
+}
+.listview__project.visible .listview__title{opacity:1;transform:none}
+.listview__title[data-type="project"]:hover{color:#e0f585}
+.listview__title[data-type="lab"]:hover{color:#87a92e}
+.listview__subtitle{
+  font-family:'Playfair Display',serif;
+  font-style:italic;
+  font-size:clamp(12px,1.25vw,24px);
+  flex-shrink:0;
+  margin-right:auto;
+  opacity:0;
+  transform:translateX(-10px);
+  transition:transform 1.6s cubic-bezier(.19,1,.22,1) .1s,opacity 1s linear .1s;
+}
+.listview__project.visible .listview__subtitle{opacity:1;transform:none}
+.listview__awards{
+  font-family:Lato,sans-serif;
+  font-size:clamp(10px,0.9vw,16px);
+  opacity:0;
+  transition:opacity 1s linear .3s;
+  text-align:right;
+  white-space:nowrap;
+}
+.listview__project.visible .listview__awards{opacity:1}
+
+/* ─── ABOUT VIEW ─── */
+.about-view{
+  position:absolute;inset:0;
+  z-index:160;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;
+  text-align:center;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .5s linear;
+}
+.about-view.visible{opacity:1;pointer-events:auto;transition:opacity 1s linear}
+.about-view__text{
+  max-width:600px;
+  font-family:Lato,sans-serif;
+  font-weight:300;
+  font-size:clamp(14px,1.25vw,20px);
+  line-height:1.7;
+  color:#c8d89a;
+  padding:0 24px;
+}
+.about-view__text p{margin-bottom:20px}
+.about-view__links{
+  display:flex;gap:20px;
+  margin-top:24px;
+}
+.about-view__link{
+  width:36px;height:36px;
+  display:flex;align-items:center;justify-content:center;
+  border:1.5px solid #c8d89a;
+  border-radius:50%;
+  color:#c8d89a;
+  text-decoration:none;
+  transition:opacity .2s;
+}
+.about-view__link:hover{opacity:.6}
+.about-view__link svg{width:16px;height:16px;fill:currentColor}
+
+/* ─── FOOTER ─── */
+.footer{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  z-index:200;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  padding:20px 40px 24px;
+  pointer-events:none;
+}
+.footer__left{
+  display:flex;align-items:flex-end;gap:16px;
+  pointer-events:auto;
+  opacity:0;
+  transition:opacity .2s linear;
+}
+.footer__left.visible{opacity:1}
+.footer__indicators{width:110px;position:relative}
+.footer__indicator{
+  transform:scaleX(-1);
+  stroke:#c8d89a;stroke-width:16;fill:none;
+  display:block;
+}
+.footer__indicator--progress{
+  position:absolute;
+  stroke-dashoffset:-1352;
+  stroke-dasharray:1352;
+  width:100%;height:100%;
+  left:0;top:0;
+}
+.footer__indicator--bkg{position:relative;opacity:.4}
+
+.equalizer{
+  width:36px;height:24px;
+  display:flex;align-items:flex-end;gap:3px;
+  cursor:pointer;
+}
+.equalizer__bar{
+  width:4px;
+  background:#c8d89a;
+  border-radius:1px 1px 0 0;
+  animation:eqBounce 1.2s ease-in-out infinite;
+}
+.equalizer__bar:nth-child(1){animation-delay:0s}
+.equalizer__bar:nth-child(2){animation-delay:.15s}
+.equalizer__bar:nth-child(3){animation-delay:.3s}
+.equalizer__bar:nth-child(4){animation-delay:.45s}
+.equalizer__bar:nth-child(5){animation-delay:.1s}
+@keyframes eqBounce{0%,100%{height:6px}50%{height:22px}}
+
+.footer__links{
+  display:flex;gap:16px;
+  pointer-events:auto;
+}
+.footer__link{
+  display:flex;align-items:center;justify-content:center;
+  width:25px;height:25px;
+  color:#c8d89a;text-decoration:none;
+  transition:opacity .2s;
+}
+.footer__link:hover{opacity:.6}
+.footer__link svg{width:20px;height:20px;fill:#c8d89a;stroke:#c8d89a}
+.footer__link svg path{fill:#c8d89a;stroke:#c8d89a}
+.footer__link:last-child{transform:scale(1.25)}
+
+/* ─── COOKIE ─── */
+.cookie{
+  position:fixed;bottom:0;left:0;right:0;z-index:500;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 24px;
+  background:rgba(15,30,10,0.95);
+  font-size:13px;color:#c8d89a;
+  transition:transform .4s ease;
+}
+.cookie.hidden{transform:translateY(100%)}
+.cookie a{color:#e0f585;margin-left:4px}
+.cookie__btn{
+  background:#87a92e;color:#0f1e0a;
+  border:none;border-radius:50%;
+  width:44px;height:44px;
+  font-size:12px;font-weight:600;
+  cursor:pointer;flex-shrink:0;margin-left:20px;
+}
+
+/* ─── LYRICS OVERLAY ─── */
+.lyrics-overlay{
+  position:absolute;
+  z-index:200;
+  left:50%;bottom:80px;
+  max-width:min(46rem,84vw);
+  transform:translateX(-50%);
+  text-align:center;
+  color:#f4f7c5;
+  font-family:'Playfair Display',serif;
+  font-style:italic;
+  font-size:clamp(16px,2.4vw,28px);
+  line-height:1.35;
+  letter-spacing:.01em;
+  text-shadow:0 2px 22px rgba(19,32,8,.92);
+  opacity:0;
+  transition:opacity .35s ease;
+  pointer-events:none;
+}
+.lyrics-overlay.visible{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- ─── FIXED CONTAINER ─── -->
+<section class="fixed-container">
+  <section class="scene" id="scene">
+    <canvas id="webgl"></canvas>
+    <div class="scene__overlay" id="overlay"></div>
+
+    <!-- Lyrics overlay -->
+    <div class="lyrics-overlay" id="lyricsOverlay"></div>
+
+    <!-- Scroll text -->
+    <div class="scroll-text" id="scrollText">Scroll to explore</div>
+
+    <!-- Project info (road view) -->
+    <div class="project-info" id="projectInfo">
+      <div class="project-info__title" id="projTitle"></div>
+      <div class="project-info__subtitle" id="projSub"></div>
+      <div class="project-info__awards" id="projAwards"></div>
+    </div>
+
+    <!-- Overview labels -->
+    <div class="overview-labels" id="overviewLabels">
+      <div class="overview-labels__title" id="ovTitle"></div>
+      <div class="overview-labels__subtitle" id="ovSub"></div>
+    </div>
+
+    <!-- List view -->
+    <div class="listview" id="listview"></div>
+
+    <!-- About view -->
+    <div class="about-view" id="aboutView">
+      <div class="about-view__text">
+        <p>Ovacado — Journey Mode</p>
+        <p>The road responds to the master recording. Audio energy shapes the terrain of the ride, section boundaries become landmarks, and timed lyrics surface exactly on the recording clock. Nothing in this landscape was modelled: it is the measured form of the track.</p>
+        <p>A Noizes experience template.</p>
+      </div>
+      <div class="about-view__links">
+        <a href="#" class="about-view__link"><svg viewBox="0 0 1000.78 936.69"><path d="m2.44,0l386.39,516.64L0,936.69h87.51l340.42-367.76,275.05,367.76h297.8l-408.13-545.7L954.57,0h-87.51l-313.51,338.7L300.24,0H2.44Zm128.69,64.46h136.81l604.13,807.76h-136.81L131.13,64.46Z"/></svg></a>
+        <a href="#" class="about-view__link"><svg viewBox="0 0 32.58 31.77"><path d="M16.29,0a16.29,16.29,0,0,0-5.15,31.75c.82.15,1.11-.36,1.11-.79s0-1.41,0-2.77C7.7,29.18,6.74,26,6.74,26a4.36,4.36,0,0,0-1.81-2.39c-1.47-1,.12-1,.12-1a3.43,3.43,0,0,1,2.49,1.68,3.48,3.48,0,0,0,4.74,1.36,3.46,3.46,0,0,1,1-2.18c-3.62-.41-7.42-1.81-7.42-8a6.3,6.3,0,0,1,1.67-4.37,5.94,5.94,0,0,1,.16-4.31s1.37-.44,4.48,1.67a15.41,15.41,0,0,1,8.16,0c3.11-2.11,4.47-1.67,4.47-1.67A5.91,5.91,0,0,1,25,11.07a6.3,6.3,0,0,1,1.67,4.37c0,6.26-3.81,7.63-7.44,8a3.85,3.85,0,0,1,1.11,3c0,2.18,0,3.94,0,4.47s.29.94,1.12.78A16.29,16.29,0,0,0,16.29,0Z"/></svg></a>
+        <a href="#" class="about-view__link"><svg viewBox="0 0 492 318.2"><path d="M143.6,83.9q51.3,33.15,102.5,66.2a21.41,21.41,0,0,0,1.9-1.3q67-43.35,134-86.6L477.1.7a19,19,0,0,0-5.4-.7H20.4A23.47,23.47,0,0,0,15,.7Q79.35,42.4,143.6,83.9Z"/><path d="M389.6,203.9q51.15,48.15,102.3,96.2a17.7,17.7,0,0,0,.1-2.3V20.4a20.1,20.1,0,0,0-2.5-9.8Q422.75,53.65,356.1,96.8c-15.9,10.3-31.7,20.5-47.6,30.8Z"/><path d="M348.6,191.3q-28.2-26.55-56.4-53l-42.3,27.3a7.4,7.4,0,0,1-7.6,0c-1.9-1.2-3.8-2.5-5.7-3.7q-18.3-11.85-36.6-23.6l-89.9,84.5Q60.6,269.3,11,315.9a21,21,0,0,0,9.3,2.3H471.6a19.41,19.41,0,0,0,9.3-2.3Q414.9,253.5,348.6,191.3Z"/><path d="M2,298.4q67.05-63,134-126c15.9-14.9,31.7-29.8,47.6-44.8q-40.5-26.25-81.1-52.4Q52.55,43,2.5,10.6A20.1,20.1,0,0,0,0,20.4V297.7c0,.8.1,1.6.1,2.3A14.62,14.62,0,0,0,2,298.4Z"/></svg></a>
+        <a href="#" class="about-view__link"><svg viewBox="0 0 72 72"><path d="M61.115,18.856C63.666,21.503,64,25.709,64,36s-0.334,14.497-2.885,17.144C58.563,55.791,55.906,56,36,56s-22.563-0.209-25.115-2.856C8.334,50.497,8,46.291,8,36s0.334-14.497,2.885-17.144S16.094,16,36,16S58.563,16.209,61.115,18.856z M31.464,44.476l13.603-8.044l-13.603-7.918V44.476z"/></svg></a>
+      </div>
+    </div>
+
+    <!-- Menu -->
+    <div class="menu" id="menu">
+      <div class="menu__icon active" data-view="roadview">ROAD</div>
+      <div class="menu__icon" data-view="overview">OVERVIEW</div>
+      <div class="menu__icon" data-view="listview">LIST</div>
+      <div class="menu__icon menu-hidden" data-view="about">ABOUT</div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer__left visible" id="footerLeft">
+        <div class="footer__indicators">
+          <svg class="footer__indicator footer__indicator--bkg" viewBox="0 0 448 160">
+            <path d="M440,80c0,39.8-32.2,72-72,72s-72-32.2-72-72c-0.1-39.8-32.3-72-72-72s-72,32.2-72,72s-32.2,72-72,72c-39.7,0-72-32.2-72-72C8,40.2,40.2,8,80,8s72,32.2,72,72s32.2,72,72,72s72-32.2,72-72s32.2-72,72-72S440,40.2,440,80z"/>
+          </svg>
+          <svg class="footer__indicator footer__indicator--progress" id="progressIndicator" viewBox="0 0 448 160">
+            <path d="M440,80c0,39.8-32.2,72-72,72s-72-32.2-72-72c-0.1-39.8-32.3-72-72-72s-72,32.2-72,72s-32.2,72-72,72c-39.7,0-72-32.2-72-72C8,40.2,40.2,8,80,8s72,32.2,72,72s32.2,72,72,72s72-32.2,72-72s32.2-72,72-72S440,40.2,440,80z"/>
+          </svg>
+        </div>
+        <div class="equalizer" id="equalizer">
+          <div class="equalizer__bar"></div>
+          <div class="equalizer__bar"></div>
+          <div class="equalizer__bar"></div>
+          <div class="equalizer__bar"></div>
+          <div class="equalizer__bar"></div>
+        </div>
+      </div>
+      <div class="footer__links">
+        <a href="#" class="footer__link"><svg viewBox="0 0 1000.78 936.69"><path d="m2.44,0l386.39,516.64L0,936.69h87.51l340.42-367.76,275.05,367.76h297.8l-408.13-545.7L954.57,0h-87.51l-313.51,338.7L300.24,0H2.44Zm128.69,64.46h136.81l604.13,807.76h-136.81L131.13,64.46Z"/></svg></a>
+        <a href="#" class="footer__link"><svg viewBox="0 0 32.58 31.77"><path d="M16.29,0a16.29,16.29,0,0,0-5.15,31.75c.82.15,1.11-.36,1.11-.79s0-1.41,0-2.77C7.7,29.18,6.74,26,6.74,26a4.36,4.36,0,0,0-1.81-2.39c-1.47-1,.12-1,.12-1a3.43,3.43,0,0,1,2.49,1.68,3.48,3.48,0,0,0,4.74,1.36,3.46,3.46,0,0,1,1-2.18c-3.62-.41-7.42-1.81-7.42-8a6.3,6.3,0,0,1,1.67-4.37,5.94,5.94,0,0,1,.16-4.31s1.37-.44,4.48,1.67a15.41,15.41,0,0,1,8.16,0c3.11-2.11,4.47-1.67,4.47-1.67A5.91,5.91,0,0,1,25,11.07a6.3,6.3,0,0,1,1.67,4.37c0,6.26-3.81,7.63-7.44,8a3.85,3.85,0,0,1,1.11,3c0,2.18,0,3.94,0,4.47s.29.94,1.12.78A16.29,16.29,0,0,0,16.29,0Z"/></svg></a>
+        <a href="#" class="footer__link"><svg viewBox="0 0 492 318.2"><path d="M143.6,83.9q51.3,33.15,102.5,66.2a21.41,21.41,0,0,0,1.9-1.3q67-43.35,134-86.6L477.1.7a19,19,0,0,0-5.4-.7H20.4A23.47,23.47,0,0,0,15,.7Q79.35,42.4,143.6,83.9Z"/><path d="M389.6,203.9q51.15,48.15,102.3,96.2a17.7,17.7,0,0,0,.1-2.3V20.4a20.1,20.1,0,0,0-2.5-9.8Q422.75,53.65,356.1,96.8c-15.9,10.3-31.7,20.5-47.6,30.8Z"/><path d="M348.6,191.3q-28.2-26.55-56.4-53l-42.3,27.3a7.4,7.4,0,0,1-7.6,0c-1.9-1.2-3.8-2.5-5.7-3.7q-18.3-11.85-36.6-23.6l-89.9,84.5Q60.6,269.3,11,315.9a21,21,0,0,0,9.3,2.3H471.6a19.41,19.41,0,0,0,9.3-2.3Q414.9,253.5,348.6,191.3Z"/><path d="M2,298.4q67.05-63,134-126c15.9-14.9,31.7-29.8,47.6-44.8q-40.5-26.25-81.1-52.4Q52.55,43,2.5,10.6A20.1,20.1,0,0,0,0,20.4V297.7c0,.8.1,1.6.1,2.3A14.62,14.62,0,0,0,2,298.4Z"/></svg></a>
+        <a href="#" class="footer__link"><svg viewBox="0 0 72 72"><path d="M61.115,18.856C63.666,21.503,64,25.709,64,36s-0.334,14.497-2.885,17.144C58.563,55.791,55.906,56,36,56s-22.563-0.209-25.115-2.856C8.334,50.497,8,46.291,8,36s0.334-14.497,2.885-17.144S16.094,16,36,16S58.563,16.209,61.115,18.856z M31.464,44.476l13.603-8.044l-13.603-7.918V44.476z"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Intro -->
+  <section class="intro" id="intro">
+    <div class="intro__logo">
+      <svg viewBox="0 0 525 208">
+        <path d="M 80 10 A 70 70 0 0 1 150 80 A 70 70 0 0 1 80 150 A 70 70 0 0 1 10 80 A 70 70 0 0 1 80 10"/>
+        <path d="M 263 10 A 60 60 0 0 1 323 70 A 60 60 0 0 1 263 130 A 60 60 0 0 1 203 70 A 60 60 0 0 1 263 10"/>
+        <path d="M 445 10 A 50 50 0 0 1 495 60 A 50 50 0 0 1 445 110 A 50 50 0 0 1 395 60 A 50 50 0 0 1 445 10"/>
+      </svg>
+    </div>
+    <div class="intro__text">OVACADO</div>
+    <div class="intro__note">Ride the recording — Journey Mode</div>
+    <button class="intro__btn" id="enterBtn">Enter</button>
+  </section>
+</section>
+
+<!-- Scroll container -->
+<section class="scroll-container" id="scrollContainer"></section>
+
+<!-- Cookie -->
+<div class="cookie" id="cookie">
+  <span>This website uses cookies to ensure you get the best experience on our website. <a href="https://www.cookiesandyou.com" target="_blank" rel="noopener">Learn more</a></span>
+  <button class="cookie__btn" id="cookieBtn">Got it!</button>
+</div>
+
+<!-- THREE.JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+
+  // ─── OVACADO SECTIONS (measured from audio analysis) ───
+  const PROJECTS = [
+    {id:"movement-1",title:"Opening",subtitle:"Movement I",awards:["Intro"]},
+    {id:"movement-2",title:"First Verse",subtitle:"Movement II",awards:["Vocals enter"]},
+    {id:"movement-3",title:"Building",subtitle:"Movement III",awards:["Energy rising"]},
+    {id:"movement-4",title:"Pre-Chorus",subtitle:"Movement IV",awards:["Tension"]},
+    {id:"movement-5",title:"Chorus",subtitle:"Movement V",awards:["Peak energy"]},
+    {id:"movement-6",title:"Interlude",subtitle:"Movement VI",awards:["Breathing room"]},
+    {id:"movement-7",title:"Second Verse",subtitle:"Movement VII",awards:["Deepening"]},
+    {id:"movement-8",title:"Bridge",subtitle:"Movement VIII",awards:["Harmonic shift"]},
+    {id:"movement-9",title:"Final Chorus",subtitle:"Movement IX",awards:["Full power"]},
+    {id:"movement-10",title:"Outro",subtitle:"Movement X",awards:["Resolution"]},
+  ];
+
+  // ─── TIMED LYRICS (representative excerpt — full set from .nz package) ───
+  const TIMED_LYRICS = [
+    {t:12000,text:"the ground beneath is just a frequency"},
+    {t:22000,text:"we walk on vibrations we cannot see"},
+    {t:34000,text:"every footstep another waveform"},
+    {t:48000,text:"resonating through the terrain"},
+    {t:62000,text:"the road remembers what the air forgot"},
+    {t:78000,text:"harmonics folding into the distance"},
+    {t:94000,text:"a measured landscape, not a modelled one"},
+    {t:112000,text:"the shape of the recording, flown through"},
+    {t:130000,text:"time runs to the horizon"},
+    {t:148000,text:"frequency runs left to right"},
+    {t:168000,text:"elevation is loudness"},
+    {t:188000,text:"and the road carves itself from sound"},
+  ];
+  const LAB = [];
+
+  // ─── BUILD LIST VIEW ───
+  const listEl = document.getElementById('listview');
+  let listHTML = '<h3 class="listview__head listview__head--project">Movements</h3>';
+  PROJECTS.forEach(p => {
+    listHTML += `<div class="listview__project visible">
+      <span class="listview__title" data-type="project">${p.title}</span>
+      <span class="listview__subtitle">${p.subtitle}</span>
+      <span class="listview__awards">${p.awards.join(' &middot; ')}</span>
+    </div>`;
+  });
+  listHTML += '<h3 class="listview__head listview__head--lab" style="margin-top:40px">Lab</h3>';
+  LAB.forEach(p => {
+    listHTML += `<div class="listview__project visible">
+      <span class="listview__title" data-type="lab">${p.title}</span>
+      <span class="listview__subtitle">${p.subtitle}</span>
+      <span class="listview__awards">${p.awards.join(' &middot; ')}</span>
+    </div>`;
+  });
+  listEl.innerHTML = listHTML;
+
+  // ─── STATE ───
+  let viewType = 'roadview';
+  let scrollValue = 0;
+  let targetScrollValue = 0;
+  let entered = false;
+  let introFinished = false;
+
+  // ─── COOKIE ───
+  document.getElementById('cookieBtn').onclick = () => document.getElementById('cookie').classList.add('hidden');
+
+  // ─── THREE.JS SETUP ───
+  const canvas = document.getElementById('webgl');
+  const renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+
+  // ─── ROAD PATH: 3 circles forming figure-8 ───
+  const RADIUS = 100;
+  const CIRCLE_SPACING = 200;
+  const POINTS_PER_CIRCLE = 100;
+  const STEP_DEG = 360 / POINTS_PER_CIRCLE;
+  const Y_RANGE = 26;
+  const Y_STEP = Y_RANGE / POINTS_PER_CIRCLE;
+
+  function degToRad(d) { return d * Math.PI / 180; }
+
+  const circleCenters = [
+    new THREE.Vector3(-CIRCLE_SPACING, 0, 0),
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(CIRCLE_SPACING, 0, 0),
+  ];
+
+  function generateCirclePoints(centerIdx) {
+    const center = circleCenters[centerIdx];
+    const points = [];
+    let angle = 180 - STEP_DEG;
+    let yPos = 0;
+    const dir = centerIdx === 1 ? -1 : 1;
+
+    if (centerIdx === 0) yPos = 0;
+    else yPos = -Y_RANGE / 2;
+
+    for (let i = 0; i < POINTS_PER_CIRCLE; i++) {
+      angle += STEP_DEG;
+      const pt = new THREE.Vector3(
+        Math.cos(degToRad(angle)) * RADIUS + center.x,
+        yPos,
+        Math.sin(degToRad(angle)) * RADIUS * dir
+      );
+      angle = angle;
+
+      if (centerIdx === 0) {
+        yPos += Y_STEP;
+        if (i + 1 === POINTS_PER_CIRCLE / 2) yPos = -Y_RANGE / 2;
+      } else if (centerIdx === 1) {
+        yPos += Y_STEP * 2;
+        if (i === POINTS_PER_CIRCLE / 2) yPos = -Y_RANGE / 2;
+      } else {
+        yPos += Y_STEP;
+      }
+
+      points.push({
+        position: pt,
+        center: center,
+        angle: angle,
+      });
+    }
+    return points;
+  }
+
+  const circles = [
+    generateCirclePoints(0),
+    generateCirclePoints(1),
+    generateCirclePoints(2),
+  ];
+  circles[1].reverse();
+
+  const half = POINTS_PER_CIRCLE / 2;
+  const allPathPoints = [];
+
+  // First half of circle 0
+  for (let i = 0; i < half; i++) allPathPoints.push(circles[0][i].position);
+  // Crossover: last point of circle 1
+  allPathPoints.push(circles[1][POINTS_PER_CIRCLE - 1].position);
+  // First half of circle 1
+  for (let i = 0; i < half - 1; i++) allPathPoints.push(circles[1][i].position);
+  // All of circle 2
+  for (let i = 0; i < POINTS_PER_CIRCLE; i++) allPathPoints.push(circles[2][i].position);
+  // Crossover: middle point of circle 1
+  allPathPoints.push(circles[1][half - 1].position);
+  // Second half of circle 1
+  const lastHalf = circles[1].slice(half);
+  lastHalf.pop();
+  for (const pt of lastHalf) allPathPoints.push(pt.position);
+  // Second half of circle 0
+  for (let i = half; i < POINTS_PER_CIRCLE; i++) allPathPoints.push(circles[0][i].position);
+  // Close: back to start
+  allPathPoints.push(circles[0][0].position);
+
+  // Create smooth CatmullRom curve
+  const mainTrail = new THREE.CatmullRomCurve3(allPathPoints, false, 'catmullrom', 0.5);
+  const trailPoints = mainTrail.getPoints(2000);
+
+  // ─── SKY GRADIENT DOME ───
+  const skyGeo = new THREE.SphereGeometry(900, 32, 32);
+  const skyMat = new THREE.ShaderMaterial({
+    uniforms: {},
+    vertexShader: `
+      varying vec3 vWorldPos;
+      void main(){
+        vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vWorldPos;
+      void main(){
+        float h = normalize(vWorldPos).y;
+        vec3 topColor = vec3(0.30, 0.43, 0.11);
+        vec3 midColor = vec3(0.53, 0.66, 0.18);
+        vec3 bottomColor = vec3(0.82, 0.88, 0.40);
+        vec3 groundColor = vec3(0.06, 0.12, 0.04);
+        vec3 col;
+        if(h > 0.0){
+          col = mix(midColor, topColor, smoothstep(0.0, 0.6, h));
+        } else {
+          col = mix(midColor, groundColor, smoothstep(0.0, -0.3, h));
+        }
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `,
+    side: THREE.BackSide,
+    depthWrite: false,
+  });
+  const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+  scene.add(skyMesh);
+
+  // ─── FOG (matches sky color) ───
+  scene.fog = new THREE.FogExp2(0x0f1e0a, 0.0028);
+
+  // ─── ROAD PARTICLES (dense dark dots across wide road surface) ───
+  const ROAD_PARTICLE_COUNT = 20000;
+  const roadGeo = new THREE.BufferGeometry();
+  const roadPositions = new Float32Array(ROAD_PARTICLE_COUNT * 3);
+  const roadSizes = new Float32Array(ROAD_PARTICLE_COUNT);
+  const roadScaleH = new Float32Array(ROAD_PARTICLE_COUNT);
+
+  for (let i = 0; i < ROAD_PARTICLE_COUNT; i++) {
+    const t = Math.random();
+    const pt = mainTrail.getPoint(t);
+    const tangent = mainTrail.getTangent(t);
+    const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+    const laneOffset = (Math.random() - 0.5) * 60;
+    roadPositions[i*3] = pt.x + side.x * laneOffset + tangent.x * (Math.random() - 0.5) * 4;
+    roadPositions[i*3+1] = pt.y - 0.5 + Math.random() * 0.15;
+    roadPositions[i*3+2] = pt.z + side.z * laneOffset + tangent.z * (Math.random() - 0.5) * 4;
+    roadSizes[i] = Math.random() * 2.0 + 0.8;
+    roadScaleH[i] = 0.4 + Math.random() * 0.6;
+  }
+  roadGeo.setAttribute('position', new THREE.BufferAttribute(roadPositions, 3));
+  roadGeo.setAttribute('aSize', new THREE.BufferAttribute(roadSizes, 1));
+  roadGeo.setAttribute('aScaleH', new THREE.BufferAttribute(roadScaleH, 1));
+
+  const roadMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uPixelRatio: {value: renderer.getPixelRatio()},
+      uTime: {value: 0},
+    },
+    vertexShader: `
+      attribute float aSize;
+      attribute float aScaleH;
+      varying float vScaleH;
+      varying float vDist;
+      uniform float uPixelRatio;
+      uniform float uTime;
+      void main(){
+        vScaleH = aScaleH;
+        vec3 pos = position;
+        vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
+        float dist = -mvPos.z;
+        vDist = dist;
+        gl_PointSize = min(aSize * uPixelRatio * (150.0 / dist), 28.0);
+        gl_Position = projectionMatrix * mvPos;
+      }
+    `,
+    fragmentShader: `
+      varying float vScaleH;
+      varying float vDist;
+      void main(){
+        vec2 uv = gl_PointCoord - 0.5;
+        uv.y /= vScaleH;
+        float d = length(uv);
+        if(d > 0.5) discard;
+        float a = 1.0 - smoothstep(0.0, 0.45, d);
+        float fogFade = smoothstep(400.0, 50.0, vDist);
+        gl_FragColor = vec4(vec3(0.07, 0.10, 0.035), a * 0.85 * fogFade);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+  });
+  const roadMesh = new THREE.Points(roadGeo, roadMat);
+  scene.add(roadMesh);
+
+  // ─── PROJECT MARKERS (3D particle shapes: rectangles, cylinders, spheres) ───
+  const BLUE = [0.94, 0.96, 0.52];
+  const markerGroups = [];
+  const shapes = ['rect','cylinder','sphere','rect','cylinder','sphere','rect','cylinder','rect','sphere','cylinder','rect','sphere','cylinder','rect'];
+
+  function fillRect(pos, sizes, center, count, w, h, d) {
+    for (let i = 0; i < count; i++) {
+      pos[i*3] = center.x + (Math.random() - 0.5) * w;
+      pos[i*3+1] = center.y + Math.random() * h;
+      pos[i*3+2] = center.z + (Math.random() - 0.5) * d;
+      const onSurface = Math.random() < 0.7;
+      if (onSurface) {
+        const face = Math.floor(Math.random() * 6);
+        if (face < 2) pos[i*3] = center.x + (face === 0 ? -w/2 : w/2);
+        else if (face < 4) pos[i*3+1] = center.y + (face === 2 ? 0 : h);
+        else pos[i*3+2] = center.z + (face === 4 ? -d/2 : d/2);
+      }
+      sizes[i] = Math.random() * 1.5 + 0.5;
+    }
+  }
+
+  function fillCylinder(pos, sizes, center, count, radius, height) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = radius * (0.85 + Math.random() * 0.3);
+      pos[i*3] = center.x + Math.cos(a) * r;
+      pos[i*3+1] = center.y + Math.random() * height;
+      pos[i*3+2] = center.z + Math.sin(a) * r;
+      sizes[i] = Math.random() * 1.5 + 0.5;
+    }
+  }
+
+  function fillSphere(pos, sizes, center, count, radius) {
+    for (let i = 0; i < count; i++) {
+      const th = Math.random() * Math.PI * 2;
+      const ph = Math.acos(2 * Math.random() - 1);
+      const r = radius * (0.8 + Math.random() * 0.4);
+      pos[i*3] = center.x + r * Math.sin(ph) * Math.cos(th);
+      pos[i*3+1] = center.y + r * Math.sin(ph) * Math.sin(th) + radius;
+      pos[i*3+2] = center.z + r * Math.cos(ph);
+      sizes[i] = Math.random() * 1.5 + 0.5;
+    }
+  }
+
+  PROJECTS.forEach((proj, idx) => {
+    const t = idx / PROJECTS.length;
+    const center = mainTrail.getPoint(t);
+    const tangent = mainTrail.getTangent(t);
+    const sideDir = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+    const shapeCenter = new THREE.Vector3(
+      center.x + sideDir.x * 15,
+      center.y,
+      center.z + sideDir.z * 15
+    );
+    const shape = shapes[idx % shapes.length];
+    const count = 800;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+
+    if (shape === 'rect') fillRect(pos, sizes, shapeCenter, count, 18, 12, 2);
+    else if (shape === 'cylinder') fillCylinder(pos, sizes, shapeCenter, count, 4, 20);
+    else fillSphere(pos, sizes, shapeCenter, count, 6);
+
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uPixelRatio: {value: renderer.getPixelRatio()},
+        uTime: {value: 0},
+        uColor: {value: new THREE.Vector3(BLUE[0], BLUE[1], BLUE[2])},
+      },
+      vertexShader: `
+        attribute float aSize;
+        varying float vAlpha;
+        varying float vDist;
+        uniform float uPixelRatio;
+        uniform float uTime;
+        void main(){
+          vec3 pos = position;
+          pos += sin(uTime * 0.8 + position.y * 0.3) * 0.15;
+          vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
+          float dist = -mvPos.z;
+          vDist = dist;
+          gl_PointSize = aSize * uPixelRatio * (100.0 / dist);
+          gl_Position = projectionMatrix * mvPos;
+          vAlpha = smoothstep(500.0, 30.0, dist);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        varying float vAlpha;
+        varying float vDist;
+        void main(){
+          float d = length(gl_PointCoord - 0.5);
+          if(d > 0.5) discard;
+          float a = 1.0 - smoothstep(0.0, 0.5, d);
+          gl_FragColor = vec4(uColor, a * vAlpha * 0.7);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Points(geo, mat);
+    scene.add(mesh);
+    markerGroups.push({mesh, center, t: t, proj, mat});
+  });
+
+  // ─── ATMOSPHERIC PARTICLES (floating in air for depth) ───
+  const ATMO_COUNT = 3000;
+  const atmoGeo = new THREE.BufferGeometry();
+  const atmoPos = new Float32Array(ATMO_COUNT * 3);
+  const atmoSizes = new Float32Array(ATMO_COUNT);
+  const atmoSpeeds = new Float32Array(ATMO_COUNT);
+  for (let i = 0; i < ATMO_COUNT; i++) {
+    atmoPos[i*3] = (Math.random() - 0.5) * 600;
+    atmoPos[i*3+1] = Math.random() * 40 - 5;
+    atmoPos[i*3+2] = (Math.random() - 0.5) * 400;
+    atmoSizes[i] = Math.random() * 1.8 + 0.3;
+    atmoSpeeds[i] = Math.random() * 2 + 0.5;
+  }
+  atmoGeo.setAttribute('position', new THREE.BufferAttribute(atmoPos, 3));
+  atmoGeo.setAttribute('aSize', new THREE.BufferAttribute(atmoSizes, 1));
+  atmoGeo.setAttribute('aSpeed', new THREE.BufferAttribute(atmoSpeeds, 1));
+
+  const atmoMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uPixelRatio: {value: renderer.getPixelRatio()},
+      uTime: {value: 0},
+    },
+    vertexShader: `
+      attribute float aSize;
+      attribute float aSpeed;
+      varying float vAlpha;
+      uniform float uPixelRatio;
+      uniform float uTime;
+      void main(){
+        vec3 pos = position;
+        pos.x += sin(uTime * aSpeed * 0.3 + position.z * 0.01) * 2.0;
+        pos.y += cos(uTime * aSpeed * 0.2 + position.x * 0.02) * 1.5;
+        pos.z += sin(uTime * aSpeed * 0.15) * 1.0;
+        vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
+        gl_PointSize = aSize * uPixelRatio * (80.0 / (-mvPos.z));
+        gl_Position = projectionMatrix * mvPos;
+        vAlpha = smoothstep(400.0, 20.0, -mvPos.z) * 0.3;
+      }
+    `,
+    fragmentShader: `
+      varying float vAlpha;
+      void main(){
+        float d = length(gl_PointCoord - 0.5);
+        if(d > 0.5) discard;
+        float a = 1.0 - smoothstep(0.0, 0.5, d);
+        gl_FragColor = vec4(vec3(0.53, 0.66, 0.18), a * vAlpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+  });
+  const atmoMesh = new THREE.Points(atmoGeo, atmoMat);
+  scene.add(atmoMesh);
+
+  // ─── CAMERA STATES ───
+  const CAM = {
+    roadview: {pos: new THREE.Vector3(-100, 3, 12), lookAhead: 0.03},
+    overview: {pos: new THREE.Vector3(0, 700, 0), lookAt: new THREE.Vector3(0, 0, 0)},
+    listview: {pos: new THREE.Vector3(0, 700, 0), lookAt: new THREE.Vector3(0, 0, 0)},
+    about: {pos: new THREE.Vector3(0, 400, 350), lookAt: new THREE.Vector3(0, 0, 0)},
+  };
+
+  let camPos = CAM.roadview.pos.clone();
+  let camLookAt = new THREE.Vector3(0, 0, 0);
+  let targetCamPos = CAM.roadview.pos.clone();
+  let targetLookAt = new THREE.Vector3(0, 0, 0);
+  camera.position.copy(camPos);
+
+  // ─── OVERLAY COLORS ───
+  const overlayColors = {
+    roadview: new THREE.Color(0.30, 0.43, 0.11),
+    overview: new THREE.Color(0.30, 0.43, 0.11),
+    listview: new THREE.Color(0.06, 0.12, 0.04),
+    about: new THREE.Color(0.53, 0.66, 0.18),
+  };
+  let currentOverlayColor = new THREE.Color(0.30, 0.43, 0.11);
+  let targetOverlayColor = new THREE.Color(0.30, 0.43, 0.11);
+  let overlayOpacity = 0;
+  let targetOverlayOpacity = 0;
+
+  // ─── SCROLL HANDLING (wheel-based like original) ───
+  const SCROLL_HEIGHT = 15000;
+  let scrollPixels = 0;
+
+  window.addEventListener('wheel', (e) => {
+    if (!entered || viewType !== 'roadview') return;
+    scrollPixels = Math.max(0, Math.min(SCROLL_HEIGHT, scrollPixels + e.deltaY));
+    targetScrollValue = scrollPixels / SCROLL_HEIGHT;
+  }, {passive: true});
+
+  // ─── VIEW SWITCHING ───
+  const menuIcons = document.querySelectorAll('.menu__icon');
+  const aboutIcon = document.querySelector('[data-view="about"]');
+
+  menuIcons.forEach(icon => {
+    icon.addEventListener('click', () => {
+      const target = icon.dataset.view;
+      if (icon.classList.contains('active') || !introFinished) return;
+      switchView(target);
+    });
+  });
+
+  function switchView(view) {
+    viewType = view;
+
+    menuIcons.forEach(m => {
+      m.classList.toggle('active', m.dataset.view === view);
+    });
+
+    const listviewEl = document.getElementById('listview');
+    const aboutEl = document.getElementById('aboutView');
+    const scrollTextEl = document.getElementById('scrollText');
+    const projInfoEl = document.getElementById('projectInfo');
+    const overviewEl = document.getElementById('overviewLabels');
+    const overlayEl = document.getElementById('overlay');
+
+    listviewEl.classList.remove('visible');
+    aboutEl.classList.remove('visible');
+    projInfoEl.classList.remove('visible');
+    overviewEl.classList.remove('visible');
+
+    switch (view) {
+      case 'roadview':
+        aboutIcon.classList.add('menu-hidden');
+        targetCamPos.copy(getRoadCameraPos(scrollValue));
+        targetLookAt.copy(mainTrail.getPoint(Math.min(1, scrollValue + 0.05)));
+        scrollTextEl.classList.remove('hidden');
+        targetOverlayOpacity = 0;
+        document.body.classList.add('can-scroll');
+        break;
+
+      case 'overview':
+        aboutIcon.classList.remove('menu-hidden');
+        targetCamPos.copy(CAM.overview.pos);
+        targetLookAt.copy(CAM.overview.lookAt);
+        scrollTextEl.classList.add('hidden');
+        targetOverlayOpacity = 0;
+        document.body.classList.remove('can-scroll');
+        break;
+
+      case 'listview':
+        aboutIcon.classList.remove('menu-hidden');
+        targetCamPos.copy(CAM.listview.pos);
+        targetLookAt.copy(CAM.listview.lookAt);
+        scrollTextEl.classList.add('hidden');
+        listviewEl.classList.add('visible');
+        targetOverlayOpacity = 0.1;
+        targetOverlayColor.copy(overlayColors.listview);
+        overlayEl.style.background = `rgb(${Math.round(overlayColors.listview.r*255)},${Math.round(overlayColors.listview.g*255)},${Math.round(overlayColors.listview.b*255)})`;
+        document.body.classList.remove('can-scroll');
+        break;
+
+      case 'about':
+        aboutIcon.classList.add('menu-hidden');
+        menuIcons[0].classList.add('active');
+        targetCamPos.copy(CAM.about.pos);
+        targetLookAt.copy(CAM.about.lookAt);
+        scrollTextEl.classList.add('hidden');
+        aboutEl.classList.add('visible');
+        targetOverlayOpacity = 0.15;
+        targetOverlayColor.copy(overlayColors.about);
+        overlayEl.style.background = `rgb(${Math.round(overlayColors.about.r*255)},${Math.round(overlayColors.about.g*255)},${Math.round(overlayColors.about.b*255)})`;
+        document.body.classList.remove('can-scroll');
+        break;
+    }
+  }
+
+  function getRoadCameraPos(t) {
+    const pt = mainTrail.getPoint(t);
+    const tangent = mainTrail.getTangent(t);
+    const side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+    return new THREE.Vector3(
+      pt.x + side.x * 4 + tangent.x * 5,
+      pt.y + 2.5,
+      pt.z + side.z * 4 + tangent.z * 5
+    );
+  }
+
+  // ─── ENTER ───
+  document.getElementById('enterBtn').addEventListener('click', () => {
+    entered = true;
+    document.getElementById('intro').classList.add('hidden');
+    document.body.classList.add('can-scroll');
+
+    setTimeout(() => {
+      introFinished = true;
+      const initial = getRoadCameraPos(0);
+      targetCamPos.copy(initial);
+      targetLookAt.copy(mainTrail.getPoint(0.05));
+    }, 500);
+  });
+
+  // ─── FIND ACTIVE PROJECT ───
+  function getActiveProject(sv) {
+    let closest = 0;
+    let minDist = Infinity;
+    markerGroups.forEach((mg, i) => {
+      const d = Math.abs(sv - mg.t);
+      const dWrap = Math.min(d, 1 - d);
+      if (dWrap < minDist) { minDist = dWrap; closest = i; }
+    });
+    return {index: closest, distance: minDist};
+  }
+
+  // ─── PROGRESS INDICATOR ───
+  const progressPath = document.getElementById('progressIndicator').querySelector('path');
+  const PROGRESS_LENGTH = 1352;
+  progressPath.style.strokeDasharray = PROGRESS_LENGTH;
+  progressPath.style.strokeDashoffset = -PROGRESS_LENGTH;
+
+  // ─── ANIMATION ───
+  const clock = new THREE.Clock();
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const time = clock.getElapsedTime();
+
+    // Smooth scroll
+    scrollValue = lerp(scrollValue, targetScrollValue, 0.06);
+
+    // Road view: camera follows path
+    if (viewType === 'roadview' && entered) {
+      const roadPos = getRoadCameraPos(scrollValue);
+      targetCamPos.copy(roadPos);
+      const lookPoint = mainTrail.getPoint(Math.min(1, scrollValue + 0.05));
+      targetLookAt.copy(lookPoint);
+
+      // Project info
+      const active = getActiveProject(scrollValue);
+      const projInfo = document.getElementById('projectInfo');
+      if (active.distance < 0.04 && scrollValue > 0.005) {
+        const p = PROJECTS[active.index];
+        projInfo.classList.add('visible');
+        document.getElementById('projTitle').textContent = p.title;
+        document.getElementById('projSub').textContent = p.subtitle;
+        document.getElementById('projAwards').textContent = p.awards.join(' · ');
+      } else {
+        projInfo.classList.remove('visible');
+      }
+
+      // Scroll text
+      if (scrollValue > 0.01) {
+        document.getElementById('scrollText').classList.add('hidden');
+      }
+
+      // Progress
+      progressPath.style.strokeDashoffset = -(PROGRESS_LENGTH - scrollValue * PROGRESS_LENGTH);
+    }
+
+    // Overview: show project name when hovering markers
+    if (viewType === 'overview') {
+      const overviewEl = document.getElementById('overviewLabels');
+      overviewEl.classList.add('visible');
+      const active = getActiveProject(scrollValue);
+      const p = PROJECTS[active.index];
+      document.getElementById('ovTitle').textContent = p.title;
+      document.getElementById('ovSub').textContent = p.subtitle;
+    }
+
+    // Smooth camera interpolation
+    const camSpeed = viewType === 'roadview' ? 0.04 : 0.03;
+    camPos.lerp(targetCamPos, camSpeed);
+    camLookAt.lerp(targetLookAt, camSpeed);
+
+    camera.position.copy(camPos);
+    camera.lookAt(camLookAt);
+
+    // Overlay opacity
+    overlayOpacity = lerp(overlayOpacity, targetOverlayOpacity, 0.04);
+    document.getElementById('overlay').style.opacity = overlayOpacity;
+
+    // Sky follows camera (for infinite sky effect)
+    skyMesh.position.copy(camera.position);
+
+    // Update shader time
+    roadMat.uniforms.uTime.value = time;
+    atmoMat.uniforms.uTime.value = time;
+    markerGroups.forEach(mg => { mg.mat.uniforms.uTime.value = time; });
+
+    // Timed lyrics overlay (map scroll progress to lyric timing)
+    if (entered && viewType === 'roadview') {
+      const totalDurationMs = 210000;
+      const currentMs = scrollValue * totalDurationMs;
+      let lyricIdx = -1;
+      for (let i = 0; i < TIMED_LYRICS.length; i++) {
+        if (TIMED_LYRICS[i].t <= currentMs) lyricIdx = i;
+        else break;
+      }
+      const lyricsEl = document.getElementById('lyricsOverlay');
+      if (lyricIdx >= 0) {
+        const nextT = lyricIdx < TIMED_LYRICS.length - 1 ? TIMED_LYRICS[lyricIdx + 1].t : totalDurationMs;
+        const elapsed = currentMs - TIMED_LYRICS[lyricIdx].t;
+        const fadeDuration = 800;
+        const displayDuration = nextT - TIMED_LYRICS[lyricIdx].t;
+        if (elapsed < fadeDuration) {
+          lyricsEl.style.opacity = elapsed / fadeDuration;
+        } else if (elapsed > displayDuration - fadeDuration) {
+          lyricsEl.style.opacity = Math.max(0, (displayDuration - elapsed) / fadeDuration);
+        } else {
+          lyricsEl.style.opacity = 1;
+        }
+        lyricsEl.textContent = TIMED_LYRICS[lyricIdx].text;
+      } else {
+        lyricsEl.style.opacity = 0;
+        lyricsEl.textContent = '';
+      }
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // ─── RESIZE ───
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+})();
+</script>
+</body>
+</html>

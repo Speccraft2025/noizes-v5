@@ -46,6 +46,9 @@
     ? buildLyricLines({ timedLines, landmarks, bandCentresHz: bandCentres, durationSeconds: duration })
     : [];
   $: problems = landmarkProblems({ lyricLines, durationSeconds: duration });
+  $: guidedPoints = $transcendence.guided_points?.length
+    ? $transcendence.guided_points
+    : defaultGuidedPoints(duration);
 
   const update = (patch) => transcendence.update((value) => ({ ...value, ...patch }));
   const setArt = (patch) => update({ art_direction: { ...art, ...patch } });
@@ -60,6 +63,32 @@
   function moveLandmark(index, patch) {
     const next = landmarks.map((landmark, i) => (i === index ? { ...landmark, ...patch } : landmark));
     update({ landmarks: next });
+  }
+
+  function defaultGuidedPoints(seconds) {
+    const end = Math.max(1, Number(seconds) || 1);
+    return [
+      { id: 'p1', label: 'Start', time: 0, height: 620, pan: 0, easterEgg: 'none' },
+      { id: 'p2', label: 'First trough', time: end * .22, height: 260, pan: -18, easterEgg: 'none' },
+      { id: 'p3', label: 'Peak traverse', time: end * .44, height: 420, pan: 12, easterEgg: 'none' },
+      { id: 'p4', label: 'Pinned note', time: end * .63, height: 360, pan: -10, easterEgg: 'note' },
+      { id: 'p5', label: 'Video trough', time: end * .82, height: 240, pan: 16, easterEgg: 'video' },
+      { id: 'p6', label: 'Finish', time: end, height: 520, pan: 0, easterEgg: 'none' },
+    ].map((point) => ({ ...point, time: Number(point.time.toFixed(2)) }));
+  }
+
+  function ensureGuidedPoints() {
+    if (!$transcendence.guided_points?.length) update({ guided_points: defaultGuidedPoints(duration) });
+  }
+
+  function updateGuidedPoint(index, patch) {
+    const next = guidedPoints.map((point, pointIndex) => pointIndex === index ? { ...point, ...patch } : point);
+    update({ guided_points: next });
+  }
+
+  function addHiddenPoint() {
+    const index = guidedPoints.length - 5;
+    update({ guided_points: [...guidedPoints, { id: `hidden-${Date.now()}`, label: `Hidden ${Math.max(1, index)}`, time: duration * .5, height: 300, pan: 0, easterEgg: 'note', hidden: true }] });
   }
 
   async function analyse() {
@@ -259,10 +288,10 @@
           <span class="text-sm font-black text-white">ULTRA</span>
           {#if $template === CANONICAL_TEMPLATE}<span class="text-[10px] font-bold" style="color:#7B5CF0;">SELECTED</span>{/if}
         </div>
-        <p class="text-xs leading-relaxed" style="color: var(--ink-secondary);">
-          A cinematic guided player. You supply the media and the words; the template
-          arranges them. Works for any release, of any length.
+          <p class="text-xs leading-relaxed" style="color: var(--ink-secondary);">
+          A ready-made cinematic player. Add your media, lyrics and cover art; ULTRA handles the presentation for you.
         </p>
+        <p class="text-[10px] mt-3 uppercase tracking-widest" style="color:#9a82ff;">Fast path · no visual setup required</p>
       </button>
 
       <button type="button" class="text-left rounded-2xl p-4 transition-all duration-200"
@@ -395,6 +424,42 @@
               <input type="range" min="0.5" max="2" step="0.05" class="w-full mt-1"
                 value={art.timeScale} on:input={(e) => setArt({ timeScale: Number(e.currentTarget.value) })}>
             </label>
+          </div>
+
+          <div class="mt-7 pt-5" style="border-top:1px solid var(--border-dim);">
+            <div class="flex items-start justify-between gap-4 mb-3">
+              <div>
+                <p class="text-xs font-bold text-white">Guided route</p>
+                <p class="text-[11px] mt-1" style="color:var(--ink-muted);">Set the six stops for autoplay. Start and finish are fixed; the middle four shape the ride through peaks and troughs.</p>
+              </div>
+              <button type="button" class="btn-ghost text-[11px] shrink-0" on:click={ensureGuidedPoints}>Reset route</button>
+            </div>
+            <div class="space-y-2">
+              {#each guidedPoints.slice(0, 6) as point, index}
+                <div class="rounded-xl p-3" style="background:rgba(255,255,255,.025);border:1px solid {index === 0 || index === 5 ? 'rgba(123,92,240,.35)' : 'var(--border-dim)'};">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black" style="background:rgba(123,92,240,.2);color:#c8bdff;">{index + 1}</span>
+                    <input class="input-field flex-1 text-xs" value={point.label} aria-label={`Point ${index + 1} label`} on:change={(e) => updateGuidedPoint(index, { label: e.currentTarget.value })} />
+                    <span class="text-[10px] uppercase tracking-wider" style="color:var(--ink-muted);">{index === 0 || index === 5 ? 'fixed' : 'route'}</span>
+                  </div>
+                  <div class="grid grid-cols-3 gap-2">
+                    <label class="text-[10px]" style="color:var(--ink-muted);">Time
+                      <input class="input-field w-full mt-1 text-xs font-mono" type="number" min="0" max={duration} step="0.1" value={point.time} disabled={index === 0 || index === 5} on:change={(e) => updateGuidedPoint(index, { time: Number(e.currentTarget.value) })} />
+                    </label>
+                    <label class="text-[10px]" style="color:var(--ink-muted);">Camera height
+                      <input class="input-field w-full mt-1 text-xs font-mono" type="number" min="80" max="1400" step="10" value={point.height} on:change={(e) => updateGuidedPoint(index, { height: Number(e.currentTarget.value) })} />
+                    </label>
+                    <label class="text-[10px]" style="color:var(--ink-muted);">Easter egg
+                      <select class="input-field w-full mt-1 text-xs" value={point.easterEgg} on:change={(e) => updateGuidedPoint(index, { easterEgg: e.currentTarget.value })}>
+                        <option value="none">None</option><option value="note">Pinned note</option><option value="video">Video player</option><option value="voice">Voice recording</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              {/each}
+            </div>
+            <button type="button" class="btn-ghost text-xs mt-3" on:click={addHiddenPoint}>+ Add hidden explore point</button>
+            <p class="text-[11px] mt-2" style="color:var(--ink-muted);">After the route, visitors can switch to Explore and roam freely. Hidden points stay off the guided path.</p>
           </div>
 
           <div class="mt-4">

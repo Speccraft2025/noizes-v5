@@ -18,6 +18,10 @@
     dispatch('navigate', { stepIndex, sectionIndex: 0 });
   }
 
+  function handleContinue() {
+    dispatch('continue');
+  }
+
   function stepState(step, index) {
     if (index === currentStepIndex) return 'current';
     const completion = getStepCompletion(completionMap, step);
@@ -87,9 +91,9 @@
     </div>
 
     <div class="dock-right">
-      {#if nextStepLabel}
-        <span class="dock-next-hint">Up next: {nextStepLabel} →</span>
-      {/if}
+      <button type="button" class="dock-continue" on:click={handleContinue}>
+        {nextStepLabel ? `Continue to ${nextStepLabel}` : 'Finish release'} →
+      </button>
     </div>
   </div>
 </nav>
@@ -274,11 +278,8 @@
     text-align: right;
   }
 
-  .dock-next-hint {
-    font-size: 0.7rem;
-    color: var(--ink-muted);
-    white-space: nowrap;
-  }
+  .dock-continue { border:0; border-radius:8px; padding:8px 12px; background:var(--spectral-violet); color:#fff; font:inherit; font-size:.72rem; font-weight:800; white-space:nowrap; cursor:pointer; }
+  .dock-continue:hover { filter:brightness(1.08); }
 
   /* Responsive: tablet */
   @media (max-width: 900px) {
@@ -286,9 +287,8 @@
       display: none;
     }
 
-    .dock-next-hint {
-      display: none;
-    }
+    .dock-continue { font-size:0; padding:8px; }
+    .dock-continue::after { content:'→'; font-size:1rem; }
 
     .dock-inner {
       padding: 10px 16px 12px;

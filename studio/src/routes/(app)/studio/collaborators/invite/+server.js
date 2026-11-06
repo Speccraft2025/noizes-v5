@@ -36,7 +36,11 @@ export async function POST({ request, locals, url }) {
     .maybeSingle();
   if (lookupError) throw error(500, `Could not check collaborator access: ${lookupError.message}`);
 
-  const useResend = resendInviteConfigured(env);
+  // Private module exports are individual bindings in SvelteKit; there is no
+  // ambient `env` object in this route. Passing the explicit configuration
+  // keeps this branch deterministic and prevents a ReferenceError before the
+  // invitation reaches either provider.
+  const useResend = resendInviteConfigured({ RESEND_API_KEY, RESEND_FROM_EMAIL });
   let existingProfile = null;
   if (useResend) {
     const { data: profile, error: profileLookupError } = await admin

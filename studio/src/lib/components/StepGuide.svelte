@@ -35,6 +35,7 @@
   $: activeTrackJourney = journey.track_journeys.find((entry) => entry.track_id === activeScope);
   $: activeMoments = activeScope === 'release' ? journey.release_moments : (activeTrackJourney?.moments || []);
   $: activeMoment = activeMoments.find((moment) => moment.moment_id === activeMomentId) || activeMoments[0];
+  $: activeMomentIndex = Math.max(0, activeMoments.findIndex((moment) => moment.moment_id === activeMoment?.moment_id));
   $: scopedAssets = activeScope === 'release'
     ? $releaseProject.release_assets
     : [...$releaseProject.release_assets, ...$releaseProject.track_assets.filter((asset) => asset.track_id === activeScope)];
@@ -210,14 +211,12 @@
       {#if activeMoments.length}
         <div class="moment-carousel" aria-label="Moments in this direction">
           <button class="carousel-arrow" type="button" on:click={() => moveActiveMoment(-1)} disabled={activeMoments[0]?.moment_id === activeMoment?.moment_id} aria-label="Previous moment">←</button>
-          <div class="moment-cards">
-            {#each activeMoments as moment, index (moment.moment_id)}
-              <button type="button" class:chosen={moment.moment_id === activeMoment?.moment_id} class="moment-tile" on:click={() => selectMoment(moment.moment_id)}>
-                <small>{index + 1}</small>
-                <strong>{moment.title || LABELS[moment.type]}</strong>
-                <span>{activeScope === 'release' ? LABELS[moment.placement] : formatTime(moment.at_ms)}</span>
-              </button>
-            {/each}
+          <div class="moment-cards" aria-live="polite">
+            <article class="moment-tile chosen" aria-label={`Real-time preview, moment ${activeMomentIndex + 1} of ${activeMoments.length}`}>
+              <small>{activeMomentIndex + 1} / {activeMoments.length}</small>
+              <strong>{activeMoment?.title || LABELS[activeMoment?.type]}</strong>
+              <span>{activeScope === 'release' ? LABELS[activeMoment?.placement] : formatTime(activeMoment?.at_ms)}</span>
+            </article>
           </div>
           <button class="carousel-arrow" type="button" on:click={() => moveActiveMoment(1)} disabled={activeMoments.at(-1)?.moment_id === activeMoment?.moment_id} aria-label="Next moment">→</button>
         </div>
@@ -280,8 +279,8 @@
   .moment-card { background:linear-gradient(135deg,#bd6de0,#8748f2); } .track-card { background:#5f20dc; color:#fff; } .transition-card { background:#353741; color:#e1e3e9; width:60px; } .add-card { background:transparent; border:1px dashed #5e6069; color:#b4bac2; width:78px; }
   .editor-layout { box-sizing:border-box; display:grid; width:100%; max-width:100%; min-width:0; grid-template-columns:minmax(0,1fr) minmax(290px,340px); margin-top:14px; min-height:0; overflow:hidden; border:1px solid var(--line); border-radius:16px; background:var(--surface); }
   .moment-stage { padding:18px; min-width:0; background:var(--surface); } .stage-title { display:flex; align-items:start; justify-content:space-between; gap:12px; } .stage-title h2 { font-size:18px; font-weight:900; margin-top:4px; } .add-moment { border-radius:8px; background:var(--violet); color:white; padding:8px 11px; font-size:12px; font-weight:800; white-space:nowrap; }
-  .moment-carousel { display:grid; width:100%; max-width:100%; min-width:0; grid-template-columns:36px minmax(0,1fr) 36px; align-items:center; gap:8px; min-height:245px; } .moment-cards { display:flex; width:0; min-width:100%; gap:10px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; padding:10px 2px; }
-  .moment-tile { scroll-snap-align:start; flex:0 0 clamp(180px,25%,230px); min-height:185px; border-radius:10px; padding:13px; display:flex; flex-direction:column; text-align:left; justify-content:space-between; background:linear-gradient(135deg,#a75ccb,#6231c9); color:#0b0610; opacity:.56; transition:opacity .15s, transform .15s, outline-color .15s; } .moment-tile:nth-child(3n+2) { background:linear-gradient(135deg,#8752d8,#5832ae); } .moment-tile:nth-child(3n) { background:linear-gradient(135deg,#6522c8,#3f178b); color:white; } .moment-tile.chosen { opacity:1; transform:translateY(-2px); outline:2px solid white; } .moment-tile small { font-size:23px; font-weight:900; } .moment-tile strong { font-size:17px; line-height:1.08; } .moment-tile span { font-size:10px; font-weight:800; text-transform:uppercase; }
+  .moment-carousel { display:grid; width:100%; max-width:100%; min-width:0; grid-template-columns:36px minmax(0,1fr) 36px; align-items:center; gap:8px; min-height:245px; } .moment-cards { display:grid; min-width:0; min-height:205px; place-items:center; padding:10px 2px; }
+  .moment-tile { width:min(100%, 320px); min-height:185px; border-radius:10px; padding:13px; display:flex; flex-direction:column; text-align:left; justify-content:space-between; background:linear-gradient(135deg,#a75ccb,#6231c9); color:#0b0610; } .moment-tile.chosen { transform:translateY(-2px); outline:2px solid white; } .moment-tile small { font-size:23px; font-weight:900; } .moment-tile strong { font-size:17px; line-height:1.08; } .moment-tile span { font-size:10px; font-weight:800; text-transform:uppercase; }
   .carousel-arrow { border-radius:50%; width:36px; height:36px; background:#5aaee6; color:#103f72; font-size:23px; font-weight:900; } .carousel-arrow:disabled { opacity:.25; } .empty-stage { width:100%; margin-top:40px; padding:42px 20px; border:1px dashed #4c5057; border-radius:10px; color:#b8bec7; }
   .attributes-panel { min-width:0; background:var(--surface-raised); border-left:1px solid var(--line); color:#f4f1ff; padding:18px; } .attributes-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:14px; } .attributes-heading .t-caption { color:#b9b2ca; } .remove-moment { color:#f19aaa; font-size:11px; font-weight:800; } .editor-label { display:block; font-size:10px; text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin:11px 0 5px; color:#aca9b5; } .editor-input { width:100%; min-width:0; color:white; background:#1a1a23; border-color:rgba(255,255,255,.12); } .attribute-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; } .editor-textarea { min-height:64px; resize:vertical; } .empty-attributes { margin-top:90px; text-align:center; color:#a9a8af; font-size:13px; }
   .playback-details { box-sizing:border-box; width:100%; max-width:100%; margin-top:14px; padding:13px 16px; background:rgba(255,255,255,.03); color:var(--ink-muted); font-size:13px; } .playback-details summary { cursor:pointer; color:white; font-weight:800; } .playback-controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:9px 14px; margin-top:10px; } .navigation-toggle { display:flex; align-items:center; gap:7px; font-size:12px; }

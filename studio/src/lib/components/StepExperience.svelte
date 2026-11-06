@@ -32,9 +32,13 @@
   $: duration = analysis?.duration_seconds ?? 0;
 
   // The audio the creator actually attached to the selected track.
+  // Prefer the track's explicit primary reference. Older drafts can have a
+  // stale/missing `track_id` on an otherwise valid referenced asset, so only
+  // use the role-and-track lookup as the compatibility fallback.
   $: audioAsset = ($releaseProject.audio_assets ?? []).find((asset) =>
-    asset.track_id === selectedTrackId && asset.file
-    && (asset.asset_id === selectedTrack?.primary_audio_ref || asset.role === 'primary_master'));
+    asset.asset_id === selectedTrack?.primary_audio_ref && asset.file)
+    ?? ($releaseProject.audio_assets ?? []).find((asset) =>
+      asset.track_id === selectedTrackId && asset.file && asset.role === 'primary_master');
 
   $: timedLines = ($releaseProject.lyrics ?? [])
     .find((entry) => entry.track_id === selectedTrackId)?.timed_lines ?? [];

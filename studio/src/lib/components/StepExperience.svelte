@@ -16,6 +16,7 @@
   import TerrainPreview from './TerrainPreview.svelte';
 
   let analysing = false;
+  let showSystemPicker = false;
   let analysisError = '';
   let progress = { percent: 0, label: '' };
   let controller = null;
@@ -55,6 +56,7 @@
 
   function chooseSystem(next) {
     template.set(next);
+    showSystemPicker = false;
     if ((next === TRANSCENDENCE_V2_TEMPLATE || next === TRANSCENDENCE_V3_TEMPLATE) && !$transcendence.track_id && selectedTrackId) {
       update({ track_id: selectedTrackId });
     }
@@ -278,7 +280,13 @@
       What a collector opens. Two systems, and they make different kinds of object.<HelpTip field="experience_system" />
     </p>
 
-    <div class="grid gap-3 sm:grid-cols-2">
+    {#if $template === CANONICAL_TEMPLATE && !showSystemPicker}
+      <div class="flex items-center justify-between gap-4 mb-5 rounded-xl px-3 py-2" style="background:rgba(123,92,240,.07);border:1px solid rgba(123,92,240,.20);">
+        <p class="text-xs" style="color:var(--ink-secondary);"><strong class="text-white">ULTRA</strong> · cinematic release experience</p>
+        <button type="button" class="text-[11px] font-bold shrink-0" style="color:#a991ff;" on:click={() => showSystemPicker = true}>Change system</button>
+      </div>
+    {:else}
+    <div class="grid gap-3 sm:grid-cols-2 mb-5">
       <button type="button" class="text-left rounded-2xl p-4 transition-all duration-200"
         style={$template === CANONICAL_TEMPLATE
           ? 'background: rgba(123,92,240,0.10); border: 1px solid rgba(123,92,240,0.55);'
@@ -309,6 +317,7 @@
         </p>
       </button>
     </div>
+    {/if}
   </div>
 
   {#if $template === CANONICAL_TEMPLATE}

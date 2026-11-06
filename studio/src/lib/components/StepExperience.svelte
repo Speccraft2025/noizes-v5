@@ -273,7 +273,7 @@
   };
 </script>
 
-<div class="space-y-8">
+<div class="experience-editor space-y-8">
   <div>
     <h2 class="t-title mb-1">Experience</h2>
     <p class="text-xs mb-5" style="color: var(--ink-muted);">
@@ -723,3 +723,13 @@
     </div>
   {/if}
 </div>
+
+<style>
+  /* Studio centers slot content; without a definite width the horizontal Journey
+     rails contribute their max-content size and can widen the whole workspace. */
+  .experience-editor {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+</style>

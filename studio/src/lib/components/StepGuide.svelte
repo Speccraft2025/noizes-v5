@@ -25,6 +25,7 @@
   };
 
   let activeScope = 'release';
+  let activeMomentId = '';
   let initialized = false;
 
   $: tracks = orderedTracks($releaseProject.tracks);
@@ -33,6 +34,7 @@
   $: activeTrack = tracks.find((track) => track.track_id === activeScope);
   $: activeTrackJourney = journey.track_journeys.find((entry) => entry.track_id === activeScope);
   $: activeMoments = activeScope === 'release' ? journey.release_moments : (activeTrackJourney?.moments || []);
+  $: activeMoment = activeMoments.find((moment) => moment.moment_id === activeMomentId) || activeMoments[0];
   $: scopedAssets = activeScope === 'release'
     ? $releaseProject.release_assets
     : [...$releaseProject.release_assets, ...$releaseProject.track_assets.filter((asset) => asset.track_id === activeScope)];
@@ -78,9 +80,11 @@
     setJourney((value) => {
       if (activeScope === 'release') {
         const moment = createReleaseMoment({ type: 'story', title: 'New release Moment', order: value.release_moments.length + 1 }, { idFactory: createUuid });
+        activeMomentId = moment.moment_id;
         return { ...value, release_moments: [...value.release_moments, moment] };
       }
       const moment = createTrackMoment({ track_id: activeScope, type: 'story', title: 'New track Moment', at_ms: 0 }, { trackId: activeScope, idFactory: createUuid });
+      activeMomentId = moment.moment_id;
       return {
         ...value,
         track_journeys: value.track_journeys.map((entry) => entry.track_id === activeScope
@@ -149,249 +153,138 @@
     const seconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
     return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   }
+
+  function selectScope(scope) {
+    activeScope = scope;
+    activeMomentId = '';
+  }
+
+  function selectMoment(momentId) {
+    activeMomentId = momentId;
+  }
+
+  function moveActiveMoment(direction) {
+    const index = activeMoments.findIndex((moment) => moment.moment_id === activeMoment?.moment_id);
+    const next = activeMoments[index + direction];
+    if (next) activeMomentId = next.moment_id;
+  }
 </script>
 
-<div class="space-y-6">
-  <div>
-    <p class="t-caption mb-2">Step 6</p>
-    <h2 class="text-2xl font-black tracking-tight text-white">Journey</h2>
-    <p class="text-sm mt-1 max-w-2xl" style="color: var(--ink-muted);">
-      Direct the complete release encounter, then place track Moments against the music. The overview keeps the album visible as one authored work.
-    </p>
-  </div>
+<div class="journey-editor">
+  <header class="journey-heading">
+    <p class="t-caption">Release timeline overview</p>
+    <p>Choose a moment to edit its attributes, or select a track to direct its own timeline.</p>
+  </header>
 
-  <section class="glass rounded-2xl p-4 space-y-4" aria-labelledby="playback-heading">
-    <div>
-      <p class="t-caption" id="playback-heading">Release playback</p>
-      <p class="text-xs mt-1" style="color:var(--ink-muted);">One playback engine carries the collector across every track and Journey timeline.</p>
-    </div>
-    <div class="grid sm:grid-cols-2 gap-3">
-      <div>
-        <label class="label-dark" for="playback-mode">Transition mode<HelpTip field="playback_mode" /></label>
-        <select id="playback-mode" class="input-dark" value={journey.playback_mode}
-          on:change={(event) => setPlayback({ playback_mode: event.currentTarget.value })}>
-          <option value="sequential">Sequential</option>
-          <option value="gapless">Gapless</option>
-          <option value="crossfade">Crossfade</option>
-        </select>
-      </div>
-      {#if journey.playback_mode === 'crossfade'}
-        <div>
-          <label class="label-dark" for="crossfade-duration">Global crossfade (ms)<HelpTip field="crossfade_duration" /></label>
-          <input id="crossfade-duration" class="input-dark" type="number" min="250" max="12000" step="250"
-            value={journey.transitions.find((transition) => !transition.from_track_id && transition.type === 'crossfade')?.duration_ms || 1500}
-            on:input={(event) => setCrossfadeDuration(event.currentTarget.value)} />
-        </div>
-      {:else}
-        <div class="rounded-xl px-3 py-2 flex items-center" style="background:rgba(255,255,255,.03);">
-          <p class="text-xs" style="color:var(--ink-muted);">{journey.playback_mode === 'gapless' ? 'The next master is preloaded for a continuous handoff.' : 'Each track completes before the next begins.'}</p>
-        </div>
-      {/if}
-    </div>
-    <div class="grid sm:grid-cols-2 gap-2 text-xs">
-      {#each [
-        ['allow_track_skip', 'Allow track selection', 'nav_track_skip'],
-        ['allow_seek', 'Allow seeking', 'nav_seek'],
-        ['allow_shuffle', 'Allow shuffle', 'nav_shuffle'],
-        ['allow_repeat', 'Allow repeat', 'nav_repeat'],
-        ['resume_enabled', 'Remember listening position', 'nav_resume'],
-        ['allow_archive_during_journey', 'Archive during Journey', 'nav_archive'],
-      ] as [field, label, help]}
-        <label class="flex items-center gap-2 rounded-lg px-3 py-2" style="background:rgba(255,255,255,.03);color:var(--ink-muted);">
-          <input type="checkbox" checked={journey.navigation[field]} on:change={(event) => setNavigation(field, event.currentTarget.checked)} />
-          {label}<HelpTip field={help} />
-        </label>
+  <section class="timeline-shell" aria-label="Release timeline">
+    <div class="timeline-strip">
+      {#each timeline as item, index}
+        {#if item.kind === 'track'}
+          <button type="button" class:active={activeScope === item.track.track_id} class="timeline-card track-card" on:click={() => selectScope(item.track.track_id)}>
+            <b>{index + 1}</b><span>{item.track.title || `Track ${item.track.track_number}`}</span>
+          </button>
+        {:else if item.kind === 'moment'}
+          <button type="button" class:active={activeScope === 'release' && activeMomentId === item.moment.moment_id} class="timeline-card moment-card" on:click={() => { selectScope('release'); selectMoment(item.moment.moment_id); }}>
+            <b>{index + 1}</b><span>{item.moment.title || LABELS[item.moment.type]}</span>
+          </button>
+        {:else}
+          <button type="button" class="timeline-card transition-card" title="Set a transition override" on:click={() => addTransitionOverride(item.from_track_id, item.to_track_id)}>
+            <b>→</b><span>Transition</span>
+          </button>
+        {/if}
       {/each}
-    </div>
-    {#if journey.navigation.allow_shuffle}
-      <p class="text-xs" style="color:#F0B06B;">Shuffle can break an authored Journey. It remains off by default.</p>
-    {/if}
-    {#if journey.playback_mode === 'crossfade' && tracks.length > 1}
-      <div class="pt-3" style="border-top:1px solid rgba(255,255,255,.07);">
-        <p class="text-[10px] uppercase tracking-widest mb-2" style="color:var(--ink-muted);">Optional transition overrides<HelpTip field="track_crossfade" /></p>
-        <div class="space-y-2">
-          {#each tracks.slice(0, -1) as track, index (track.track_id)}
-            {@const nextTrack = tracks[index + 1]}
-            {@const override = journey.transitions.find((transition) => transition.from_track_id === track.track_id && transition.to_track_id === nextTrack.track_id)}
-            <div class="grid grid-cols-[minmax(0,1fr)_110px] gap-3 items-center">
-              <p class="text-xs truncate" style="color:var(--ink-muted);">{track.title || `Track ${index + 1}`} → {nextTrack.title || `Track ${index + 2}`}</p>
-              <input class="input-dark" aria-label="Crossfade from {track.title} to {nextTrack.title}" type="number" min="250" max="12000" step="250"
-                value={override?.duration_ms || journey.transitions.find((transition) => !transition.from_track_id && transition.type === 'crossfade')?.duration_ms || 1500}
-                on:change={(event) => setTransitionDuration(track.track_id, nextTrack.track_id, event.currentTarget.value)} />
-            </div>
-          {/each}
-        </div>
-      </div>
-    {/if}
-  </section>
-
-  <section aria-labelledby="overview-heading">
-    <div class="flex items-end justify-between gap-3 mb-3">
-      <div>
-        <p class="t-caption" id="overview-heading">Release timeline overview</p>
-        <p class="text-xs mt-1" style="color:var(--ink-muted);">Select a track to direct its synchronized timeline.</p>
-      </div>
-      <span class="text-xs font-mono" style="color:var(--ink-muted);">{tracks.length} track{tracks.length === 1 ? '' : 's'}</span>
-    </div>
-    <div class="overflow-x-auto pb-2">
-      <div class="flex items-stretch gap-2 min-w-max">
-        {#each timeline as item}
-          {#if item.kind === 'track'}
-            <button type="button" class="w-36 text-left rounded-xl p-3 transition-colors"
-              style="background:{activeScope === item.track.track_id ? 'rgba(123,92,240,.2)' : 'rgba(255,255,255,.045)'};border:1px solid {activeScope === item.track.track_id ? '#7B5CF0' : 'rgba(255,255,255,.09)'};"
-              on:click={() => activeScope = item.track.track_id}>
-              <span class="text-[10px] font-mono" style="color:#9a82ff;">D{item.track.disc_number} · T{String(item.track.track_number).padStart(2, '0')}</span>
-              <span class="block text-sm text-white font-bold mt-1 truncate">{item.track.title || 'Untitled track'}</span>
-              <span class="block text-[10px] mt-1" style="color:var(--ink-muted);">{journey.track_journeys.find((entry) => entry.track_id === item.track.track_id)?.moments.length || 0} Moments</span>
-            </button>
-          {:else if item.kind === 'transition'}
-            <button type="button" class="w-20 rounded-xl px-2 flex flex-col items-center justify-center" title="Create or replace a transition override"
-              style="background:rgba(255,255,255,.025);border:1px dashed rgba(255,255,255,.1);color:var(--ink-muted);"
-              on:click={() => addTransitionOverride(item.from_track_id, item.to_track_id)}>
-              <span class="text-lg">→</span><span class="text-[9px] uppercase tracking-wider">Transition</span>
-            </button>
-          {:else}
-            <button type="button" class="w-28 text-left rounded-xl p-3" style="background:rgba(240,75,216,.07);border:1px solid rgba(240,75,216,.18);"
-              on:click={() => activeScope = 'release'}>
-              <span class="text-[9px] uppercase tracking-wider" style="color:#F04BD8;">{LABELS[item.moment.placement]}</span>
-              <span class="block text-xs text-white font-bold mt-1 line-clamp-2">{item.moment.title}</span>
-            </button>
-          {/if}
-        {/each}
-      </div>
+      <button type="button" class="timeline-card add-card" on:click={addMoment}><b>+</b><span>Add moment</span></button>
     </div>
   </section>
 
-  <section class="grid lg:grid-cols-[220px_minmax(0,1fr)] gap-4" aria-labelledby="direction-heading">
-    <aside class="rounded-2xl p-3 h-fit" style="background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);">
-      <p class="t-caption px-2 mb-2">Journey hierarchy</p>
-      <button type="button" class="w-full text-left rounded-xl px-3 py-3 mb-1"
-        style="background:{activeScope === 'release' ? 'rgba(123,92,240,.18)' : 'transparent'};color:#fff;"
-        on:click={() => activeScope = 'release'}>
-        <span class="text-sm font-bold">Release Journey</span>
-        <span class="block text-[10px] mt-1" style="color:var(--ink-muted);">{journey.release_moments.length} release Moments</span>
-      </button>
-      {#each tracks as track, index (track.track_id)}
-        <button type="button" class="w-full text-left rounded-xl px-3 py-2.5 mb-1"
-          style="background:{activeScope === track.track_id ? 'rgba(123,92,240,.18)' : 'transparent'};color:#fff;"
-          on:click={() => activeScope = track.track_id}>
-          <span class="text-[10px] font-mono" style="color:#9a82ff;">TRACK {String(index + 1).padStart(2, '0')}</span>
-          <span class="block text-xs font-bold truncate">{track.title || 'Untitled track'}</span>
-        </button>
-      {/each}
-    </aside>
-
-    <div class="space-y-3">
-      <div class="flex items-start justify-between gap-3">
+  <section class="editor-layout" aria-labelledby="direction-heading">
+    <div class="moment-stage">
+      <div class="stage-title">
         <div>
           <p class="t-caption" id="direction-heading">{activeScope === 'release' ? 'Release-level direction' : `Track ${String(activeTrack?.track_number || '').padStart(2, '0')} direction`}</p>
-          <h3 class="text-lg text-white font-black mt-1">{activeScope === 'release' ? $releaseProject.release.title || 'Complete release' : activeTrack?.title || 'Untitled track'}</h3>
-          <p class="text-xs mt-1" style="color:var(--ink-muted);">{activeScope === 'release' ? 'Moments may sit outside song timestamps.' : 'Moments fire against this track’s own clock.'}</p>
+          <h2>{activeScope === 'release' ? $releaseProject.release.title || 'Complete release' : activeTrack?.title || 'Untitled track'}</h2>
         </div>
-        <button type="button" class="px-3 py-2 rounded-lg text-xs font-bold shrink-0"
-          style="background:#7B5CF0;color:white;" on:click={addMoment}>＋ Add Moment</button>
+        <button type="button" class="add-moment" on:click={addMoment}>+ Add moment</button>
       </div>
 
-      {#if !activeMoments.length}
-        <div class="rounded-2xl p-8 text-center" style="border:1px dashed rgba(255,255,255,.13);color:var(--ink-muted);">
-          No authored Moments yet. Playback still works, but the generated default will be used.
+      {#if activeMoments.length}
+        <div class="moment-carousel" aria-label="Moments in this direction">
+          <button class="carousel-arrow" type="button" on:click={() => moveActiveMoment(-1)} disabled={activeMoments[0]?.moment_id === activeMoment?.moment_id} aria-label="Previous moment">←</button>
+          <div class="moment-cards">
+            {#each activeMoments as moment, index (moment.moment_id)}
+              <button type="button" class:chosen={moment.moment_id === activeMoment?.moment_id} class="moment-tile" on:click={() => selectMoment(moment.moment_id)}>
+                <small>{index + 1}</small>
+                <strong>{moment.title || LABELS[moment.type]}</strong>
+                <span>{activeScope === 'release' ? LABELS[moment.placement] : formatTime(moment.at_ms)}</span>
+              </button>
+            {/each}
+          </div>
+          <button class="carousel-arrow" type="button" on:click={() => moveActiveMoment(1)} disabled={activeMoments.at(-1)?.moment_id === activeMoment?.moment_id} aria-label="Next moment">→</button>
         </div>
+      {:else}
+        <button type="button" class="empty-stage" on:click={addMoment}>Add the first Moment for this {activeScope === 'release' ? 'release' : 'track'}.</button>
       {/if}
-
-      <div class="grid sm:grid-cols-2 gap-3">
-      {#each activeMoments as moment, index (moment.moment_id)}
-        <article class="rounded-2xl p-3 flex flex-col gap-2" style="background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.09);">
-          <div class="flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black shrink-0" style="background:rgba(123,92,240,.2);color:#a995ff;">{index + 1}</span>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs font-bold text-white truncate">{moment.title || LABELS[moment.type]}</p>
-              <p class="text-[9px] uppercase tracking-wider" style="color:var(--ink-muted);">
-                {activeScope === 'release' ? LABELS[moment.placement] : formatTime(moment.at_ms)} · {LABELS[moment.type] || moment.type}
-              </p>
-            </div>
-            {#if activeScope === 'release'}
-              <button type="button" class="w-6 h-6 rounded text-[10px] disabled:opacity-20" disabled={index === 0} aria-label="Move Moment up" on:click={() => moveReleaseMoment(index, -1)}>↑</button>
-              <button type="button" class="w-6 h-6 rounded text-[10px] disabled:opacity-20" disabled={index === activeMoments.length - 1} aria-label="Move Moment down" on:click={() => moveReleaseMoment(index, 1)}>↓</button>
-            {/if}
-            <button type="button" class="w-6 h-6 rounded text-[10px]" style="color:#F06B82;" aria-label="Remove Moment" on:click={() => removeMoment(moment.moment_id)}>×</button>
-          </div>
-
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="label-dark text-[10px]" for="moment-type-{moment.moment_id}">Type<HelpTip field="moment_type" /></label>
-              <select class="input-dark text-xs" id="moment-type-{moment.moment_id}" value={moment.type} on:change={(event) => updateMoment(moment.moment_id, { type: event.currentTarget.value })}>
-                {#each activeScope === 'release' ? RELEASE_MOMENT_TYPES : TRACK_MOMENT_TYPES as type}
-                  <option value={type}>{LABELS[type] || type.replaceAll('_', ' ')}</option>
-                {/each}
-              </select>
-            </div>
-            {#if activeScope === 'release'}
-              <div>
-                <label class="label-dark text-[10px]" for="moment-placement-{moment.moment_id}">Placement<HelpTip field="moment_placement" /></label>
-                <select class="input-dark text-xs" id="moment-placement-{moment.moment_id}" value={moment.placement} on:change={(event) => updateMoment(moment.moment_id, { placement: event.currentTarget.value })}>
-                  {#each RELEASE_PLACEMENTS as placement}<option value={placement}>{LABELS[placement]}</option>{/each}
-                </select>
-              </div>
-            {:else}
-              <div>
-                <label class="label-dark text-[10px]" for="moment-time-{moment.moment_id}">Time (s)<HelpTip field="moment_time" /></label>
-                <input class="input-dark text-xs" id="moment-time-{moment.moment_id}" type="number" min="0" step="0.1" value={moment.at_ms / 1000}
-                  on:input={(event) => updateMoment(moment.moment_id, { at_ms: Math.round((Number(event.currentTarget.value) || 0) * 1000) })} />
-              </div>
-            {/if}
-          </div>
-
-          {#if activeScope === 'release' && ['before_track', 'after_track', 'during_transition'].includes(moment.placement)}
-            <div>
-              <label class="label-dark text-[10px]" for="moment-anchor-{moment.moment_id}">Anchor track<HelpTip field="moment_anchor" /></label>
-              <select class="input-dark text-xs" id="moment-anchor-{moment.moment_id}" value={moment.anchor_track_id} on:change={(event) => updateMoment(moment.moment_id, { anchor_track_id: event.currentTarget.value })}>
-                <option value="">Choose a track</option>
-                {#each tracks as track}<option value={track.track_id}>Disc {track.disc_number} · T{track.track_number} — {track.title}</option>{/each}
-              </select>
-            </div>
-          {/if}
-
-          <div>
-            <label class="label-dark text-[10px]" for="moment-title-{moment.moment_id}">Title<HelpTip field="moment_title" /></label>
-            <input class="input-dark text-xs" id="moment-title-{moment.moment_id}" value={moment.title} on:input={(event) => updateMoment(moment.moment_id, { title: event.currentTarget.value })} />
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="label-dark text-[10px]" for="moment-effect-{moment.moment_id}">Atmosphere<HelpTip field="moment_effect" /></label>
-              <select class="input-dark text-xs" id="moment-effect-{moment.moment_id}" value={moment.effect} on:change={(event) => updateMoment(moment.moment_id, { effect: event.currentTarget.value })}>
-                {#each MOMENT_EFFECTS as effect}<option value={effect}>{effect.replaceAll('_', ' ')}</option>{/each}
-              </select>
-            </div>
-            <div>
-              <label class="label-dark text-[10px]" for="moment-duration-{moment.moment_id}">Duration (seconds)<HelpTip field="moment_duration" /></label>
-              <input class="input-dark text-xs" id="moment-duration-{moment.moment_id}" type="number" min="0" step="0.5" value={moment.duration_ms / 1000}
-                on:input={(event) => updateMoment(moment.moment_id, { duration_ms: Math.max(0, Math.round((Number(event.currentTarget.value) || 0) * 1000)) })} />
-            </div>
-          </div>
-          <div>
-            <label class="label-dark text-[10px]" for="moment-body-{moment.moment_id}">Words or direction<HelpTip field="moment_body" /></label>
-            <textarea class="input-dark text-xs min-h-14 resize-y" id="moment-body-{moment.moment_id}" value={moment.body} on:input={(event) => updateMoment(moment.moment_id, { body: event.currentTarget.value })}></textarea>
-          </div>
-          <div>
-            <label class="label-dark text-[10px]" for="moment-asset-{moment.moment_id}">Visual<HelpTip field="moment_asset" /></label>
-            <select class="input-dark text-xs" id="moment-asset-{moment.moment_id}" value={moment.asset_ref} on:change={(event) => updateMoment(moment.moment_id, { asset_ref: event.currentTarget.value })}>
-              <option value="">Cover / automatic</option>
-              {#each scopedAssets as asset}<option value={asset.asset_id}>{asset.title || asset.filename || asset.role}</option>{/each}
-            </select>
-          </div>
-        </article>
-      {/each}
-      </div>
     </div>
+
+    <aside class="attributes-panel" aria-label="Edit moment attributes">
+      {#if activeMoment}
+        <div class="attributes-heading">
+          <p class="t-caption">Edit moment’s attributes</p>
+          <button type="button" class="remove-moment" aria-label="Remove Moment" on:click={() => removeMoment(activeMoment.moment_id)}>Remove</button>
+        </div>
+        <label class="editor-label" for="moment-title-{activeMoment.moment_id}">Title<HelpTip field="moment_title" /></label>
+        <input class="input-dark editor-input" id="moment-title-{activeMoment.moment_id}" value={activeMoment.title} on:input={(event) => updateMoment(activeMoment.moment_id, { title: event.currentTarget.value })} />
+        <div class="attribute-grid">
+          <div><label class="editor-label" for="moment-type-{activeMoment.moment_id}">Type<HelpTip field="moment_type" /></label><select class="input-dark editor-input" id="moment-type-{activeMoment.moment_id}" value={activeMoment.type} on:change={(event) => updateMoment(activeMoment.moment_id, { type: event.currentTarget.value })}>{#each activeScope === 'release' ? RELEASE_MOMENT_TYPES : TRACK_MOMENT_TYPES as type}<option value={type}>{LABELS[type] || type.replaceAll('_', ' ')}</option>{/each}</select></div>
+          {#if activeScope === 'release'}
+            <div><label class="editor-label" for="moment-placement-{activeMoment.moment_id}">Placement<HelpTip field="moment_placement" /></label><select class="input-dark editor-input" id="moment-placement-{activeMoment.moment_id}" value={activeMoment.placement} on:change={(event) => updateMoment(activeMoment.moment_id, { placement: event.currentTarget.value })}>{#each RELEASE_PLACEMENTS as placement}<option value={placement}>{LABELS[placement]}</option>{/each}</select></div>
+          {:else}
+            <div><label class="editor-label" for="moment-time-{activeMoment.moment_id}">Time (seconds)<HelpTip field="moment_time" /></label><input class="input-dark editor-input" id="moment-time-{activeMoment.moment_id}" type="number" min="0" step="0.1" value={activeMoment.at_ms / 1000} on:input={(event) => updateMoment(activeMoment.moment_id, { at_ms: Math.round((Number(event.currentTarget.value) || 0) * 1000) })} /></div>
+          {/if}
+        </div>
+        {#if activeScope === 'release' && ['before_track', 'after_track', 'during_transition'].includes(activeMoment.placement)}
+          <label class="editor-label" for="moment-anchor-{activeMoment.moment_id}">Anchor track<HelpTip field="moment_anchor" /></label><select class="input-dark editor-input" id="moment-anchor-{activeMoment.moment_id}" value={activeMoment.anchor_track_id} on:change={(event) => updateMoment(activeMoment.moment_id, { anchor_track_id: event.currentTarget.value })}><option value="">Choose a track</option>{#each tracks as track}<option value={track.track_id}>T{track.track_number} — {track.title}</option>{/each}</select>
+        {/if}
+        <div class="attribute-grid">
+          <div><label class="editor-label" for="moment-effect-{activeMoment.moment_id}">Atmosphere<HelpTip field="moment_effect" /></label><select class="input-dark editor-input" id="moment-effect-{activeMoment.moment_id}" value={activeMoment.effect} on:change={(event) => updateMoment(activeMoment.moment_id, { effect: event.currentTarget.value })}>{#each MOMENT_EFFECTS as effect}<option value={effect}>{effect.replaceAll('_', ' ')}</option>{/each}</select></div>
+          <div><label class="editor-label" for="moment-duration-{activeMoment.moment_id}">Duration (seconds)<HelpTip field="moment_duration" /></label><input class="input-dark editor-input" id="moment-duration-{activeMoment.moment_id}" type="number" min="0" step="0.5" value={activeMoment.duration_ms / 1000} on:input={(event) => updateMoment(activeMoment.moment_id, { duration_ms: Math.max(0, Math.round((Number(event.currentTarget.value) || 0) * 1000)) })} /></div>
+        </div>
+        <label class="editor-label" for="moment-body-{activeMoment.moment_id}">Words or direction<HelpTip field="moment_body" /></label><textarea class="input-dark editor-input editor-textarea" id="moment-body-{activeMoment.moment_id}" value={activeMoment.body} on:input={(event) => updateMoment(activeMoment.moment_id, { body: event.currentTarget.value })}></textarea>
+        <label class="editor-label" for="moment-asset-{activeMoment.moment_id}">Visual<HelpTip field="moment_asset" /></label><select class="input-dark editor-input" id="moment-asset-{activeMoment.moment_id}" value={activeMoment.asset_ref} on:change={(event) => updateMoment(activeMoment.moment_id, { asset_ref: event.currentTarget.value })}><option value="">Cover / automatic</option>{#each scopedAssets as asset}<option value={asset.asset_id}>{asset.title || asset.filename || asset.role}</option>{/each}</select>
+      {:else}
+        <p class="empty-attributes">Select a moment to edit it, or add a new one.</p>
+      {/if}
+    </aside>
   </section>
 
-  <div class="rounded-2xl p-4" style="background:rgba(123,92,240,.08);border:1px solid rgba(123,92,240,.25);">
-    <p class="text-sm font-bold text-white">Generated album Journey</p>
-    <p class="text-xs mt-1 leading-relaxed" style="color:var(--ink-muted);">
-      New releases begin with an object encounter, identity and tracklist reveal; each track receives a brief title reveal; the release closes with reflection, credits, collector message, Archive and History invitations. Your edits above replace that direction without adding repetitive introductions between songs.
-    </p>
-    {#if !$releaseProject.lyrics.some((entry) => entry.timed_lines?.length) && !$play.games?.length && !$assets.guide?.nodes?.length}
-      <p class="text-xs mt-2" style="color:var(--ink-muted);">Add lyrics, extras or games to give the Journey more material to reveal.</p>
-    {/if}
-  </div>
+  <details class="playback-details">
+    <summary>Playback & navigation</summary>
+    <div class="playback-controls">
+      <label class="editor-label" for="playback-mode">Transition mode<HelpTip field="track_crossfade" /></label><select id="playback-mode" class="input-dark editor-input" value={journey.playback_mode} on:change={(event) => setPlayback({ playback_mode: event.currentTarget.value })}><option value="sequential">Sequential</option><option value="gapless">Gapless</option><option value="crossfade">Crossfade</option></select>
+      {#if journey.playback_mode === 'crossfade'}<div><label class="editor-label" for="crossfade-duration">Global crossfade (ms)<HelpTip field="crossfade_duration" /></label><input id="crossfade-duration" class="input-dark editor-input" type="number" min="250" max="12000" step="250" value={journey.transitions.find((transition) => !transition.from_track_id && transition.type === 'crossfade')?.duration_ms || 1500} on:input={(event) => setCrossfadeDuration(event.currentTarget.value)} /></div>{/if}
+      {#each [['allow_track_skip', 'Allow track selection', 'nav_track_skip'], ['allow_seek', 'Allow seeking', 'nav_seek'], ['allow_shuffle', 'Allow shuffle', 'nav_shuffle'], ['allow_repeat', 'Allow repeat', 'nav_repeat'], ['resume_enabled', 'Remember listening position', 'nav_resume'], ['allow_archive_during_journey', 'Archive during Journey', 'nav_archive']] as [field, label, help]}
+        <label class="navigation-toggle"><input type="checkbox" checked={journey.navigation[field]} on:change={(event) => setNavigation(field, event.currentTarget.checked)} />{label}<HelpTip field={help} /></label>
+      {/each}
+    </div>
+  </details>
 </div>
+
+<style>
+  .journey-editor { --violet:#6516ed; --lilac:#b964e0; --slate:#c6d0db; color:white; max-width:1440px; }
+  .journey-heading { margin-bottom:14px; } .journey-heading p:last-child { color:var(--ink-muted); font-size:12px; margin-top:4px; }
+  .timeline-shell { background:rgba(255,255,255,.025); padding:12px; overflow-x:auto; }
+  .timeline-strip { display:flex; gap:7px; min-width:max-content; }
+  .timeline-card { width:106px; min-height:92px; text-align:left; padding:8px; display:flex; flex-direction:column; justify-content:space-between; color:#070707; background:#737980; transition:transform .15s, outline-color .15s; }
+  .timeline-card:hover, .timeline-card.active { outline:3px solid #fff; outline-offset:1px; transform:translateY(-2px); }
+  .timeline-card b { font-size:21px; line-height:1; } .timeline-card span { font-size:12px; font-weight:800; line-height:1.2; }
+  .moment-card { background:linear-gradient(135deg,var(--lilac),#8c4aff); } .track-card { background:var(--violet); color:#fff; } .transition-card { background:#737980; color:#111; width:72px; } .add-card { background:transparent; border:1px dashed #737980; color:#b4bac2; width:92px; }
+  .editor-layout { display:grid; grid-template-columns:minmax(0, 1fr) 360px; margin-top:18px; min-height:430px; }
+  .moment-stage { background:#050505; padding:18px 16px; min-width:0; } .stage-title { display:flex; align-items:start; justify-content:space-between; gap:12px; } .stage-title h2 { font-size:18px; font-weight:900; margin-top:4px; } .add-moment { background:var(--violet); color:white; padding:8px 11px; font-size:12px; font-weight:800; white-space:nowrap; }
+  .moment-carousel { display:grid; grid-template-columns:42px minmax(0,1fr) 42px; align-items:center; gap:10px; min-height:350px; } .moment-cards { display:flex; gap:14px; overflow-x:auto; scroll-snap-type:x mandatory; padding:12px 0; }
+  .moment-tile { scroll-snap-align:start; flex:0 0 min(280px, 70%); min-height:255px; padding:14px; display:flex; flex-direction:column; text-align:left; justify-content:space-between; background:linear-gradient(135deg,#c264df,#7752fd); color:#0b0610; opacity:.62; transition:opacity .15s, transform .15s; } .moment-tile:nth-child(3n+2) { background:linear-gradient(135deg,#9650ff,#7132ef); } .moment-tile:nth-child(3n) { background:linear-gradient(135deg,#6c17ed,#5213c5); color:white; } .moment-tile.chosen { opacity:1; transform:scale(1.025); outline:3px solid white; } .moment-tile small { font-size:28px; font-weight:900; } .moment-tile strong { font-size:22px; line-height:1.05; } .moment-tile span { font-size:11px; font-weight:800; text-transform:uppercase; }
+  .carousel-arrow { border-radius:50%; width:42px; height:42px; background:#6cb9ed; color:#1763ab; font-size:28px; font-weight:900; } .carousel-arrow:disabled { opacity:.3; } .empty-stage { width:100%; margin-top:70px; padding:50px 20px; border:1px dashed #4c5057; color:#b8bec7; }
+  .attributes-panel { background:var(--slate); color:#10141b; padding:24px; } .attributes-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:22px; } .attributes-heading .t-caption { color:#313946; } .remove-moment { color:#8c2634; font-size:11px; font-weight:800; } .editor-label { display:block; font-size:10px; text-transform:uppercase; letter-spacing:.08em; font-weight:900; margin:12px 0 5px; color:#343c49; } .editor-input { width:100%; color:white; } .attribute-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; } .editor-textarea { min-height:78px; resize:vertical; } .empty-attributes { margin-top:150px; text-align:center; color:#4d5663; font-size:13px; }
+  .playback-details { margin-top:14px; padding:13px 16px; background:rgba(255,255,255,.03); color:var(--ink-muted); font-size:13px; } .playback-details summary { cursor:pointer; color:white; font-weight:800; } .playback-controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:9px 14px; margin-top:10px; } .navigation-toggle { display:flex; align-items:center; gap:7px; font-size:12px; }
+  @media (max-width: 900px) { .editor-layout { grid-template-columns:1fr; } .attributes-panel { min-height:0; } }
+  @media (max-width: 560px) { .moment-stage { padding:14px 10px; } .moment-carousel { grid-template-columns:32px minmax(0,1fr) 32px; gap:5px; min-height:290px; } .carousel-arrow { width:32px; height:32px; font-size:21px; } .moment-tile { flex-basis:88%; min-height:210px; } .attribute-grid { grid-template-columns:1fr; } .attributes-panel { padding:18px; } }
+</style>

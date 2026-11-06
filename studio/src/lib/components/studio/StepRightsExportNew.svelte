@@ -89,10 +89,17 @@
     finally { inviting = false; }
   }
   function updateReleaseAuthority(confirmed) { rights.update((v) => ({ ...v, authority_confirmed: confirmed })); }
-  function updateAssetPermission(assetId, patch) {
+  function updateAssetDeclaration(confirmed) {
     releaseProject.update((p) => {
-      const cur = p.rights.asset_permissions?.find((e) => e.asset_id === assetId) ?? { asset_id: assetId, confirmed: false, basis: '', notes: '' };
-      return { ...p, rights: { ...p.rights, asset_permissions: [...(p.rights.asset_permissions || []).filter((e) => e.asset_id !== assetId), { ...cur, ...patch, asset_id: assetId }] } };
+      const assetIds = new Set(permissionAssets.map((asset) => asset.asset_id));
+      const retained = (p.rights.asset_permissions || []).filter((entry) => !assetIds.has(entry.asset_id));
+      const declarations = permissionAssets.map((asset) => ({
+        ...(p.rights.asset_permissions || []).find((entry) => entry.asset_id === asset.asset_id),
+        asset_id: asset.asset_id,
+        confirmed,
+        basis: confirmed ? 'authority_declaration' : '',
+      }));
+      return { ...p, rights: { ...p.rights, asset_permissions: [...retained, ...declarations] } };
     });
   }
   function updateTrackRights(patch) {
@@ -238,30 +245,14 @@
     {/if}
 
     {#if permissionAssets.length}
-      <div class="permissions-section">
-        <p class="section-subtitle">Asset permissions</p>
-        <p class="section-hint">Declare authority for every file in the package.</p>
-        {#each permissionAssets as asset (asset.asset_id)}
-          {@const perm = $releaseProject.rights.asset_permissions?.find((e) => e.asset_id === asset.asset_id)}
-          <div class="permission-row">
-            <label class="permission-check">
-              <input type="checkbox" checked={perm?.confirmed === true} on:change={(e) => updateAssetPermission(asset.asset_id, { confirmed: e.currentTarget.checked })} />
-              <span>
-                <span class="permission-name">{asset.title || asset.filename || asset.role}</span>
-                <span class="permission-type">{asset.type || 'asset'} · {(asset.role || 'supporting').replaceAll('_', ' ')}</span>
-              </span>
-            </label>
-            <select class="permission-select" value={perm?.basis || ''} on:change={(e) => updateAssetPermission(asset.asset_id, { basis: e.currentTarget.value })}>
-              <option value="">Permission basis</option>
-              <option value="owned">Owned / created</option>
-              <option value="licensed">Licensed</option>
-              <option value="commissioned">Commissioned</option>
-              <option value="public_domain">Public domain</option>
-              <option value="other">Other declaration</option>
-            </select>
-          </div>
-        {/each}
-      </div>
+      {@const assetsDeclared = permissionAssets.every((asset) => $releaseProject.rights.asset_permissions?.find((entry) => entry.asset_id === asset.asset_id)?.confirmed === true)}
+      <label class="asset-declaration">
+        <input type="checkbox" checked={assetsDeclared} on:change={(e) => updateAssetDeclaration(e.currentTarget.checked)} />
+        <span>
+          <span class="authority-title">Acknowledgement &amp; declaration of authority</span>
+          <span class="authority-note">I acknowledge that I have the authority to include and publish every uploaded asset in this release.</span>
+        </span>
+      </label>
     {/if}
   </FocusedSection>
 {/if}
@@ -419,7 +410,6 @@
   .rights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .export-panel { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-dim); }
   .section-subtitle { font-size: 0.82rem; font-weight: 700; color: var(--ink-secondary); margin: 0 0 8px; letter-spacing: 0.02em; }
-  .section-hint { font-size: 0.72rem; color: var(--ink-muted); margin: 0 0 12px; }
 
   .credits-section { display: flex; flex-direction: column; gap: 12px; }
   .credits-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -478,20 +468,8 @@
   .inherit-title { display: block; font-size: 0.85rem; font-weight: 700; color: #fff; }
   .inherit-note { display: block; font-size: 0.7rem; color: var(--ink-muted); margin-top: 2px; }
 
-  .permissions-section { display: flex; flex-direction: column; gap: 8px; padding-top: 20px; border-top: 1px solid var(--border-dim); }
-  .permission-row {
-    display: grid; grid-template-columns: 1fr 150px; gap: 12px; align-items: center;
-    padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-dim); border-radius: 10px;
-  }
-  .permission-check { display: flex; align-items: flex-start; gap: 10px; min-width: 0; cursor: pointer; }
-  .permission-check input { margin-top: 3px; }
-  .permission-name { display: block; font-size: 0.85rem; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .permission-type { display: block; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); margin-top: 2px; }
-  .permission-select {
-    padding: 6px 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-dim); border-radius: 8px;
-    color: var(--ink-secondary); font-size: 0.75rem; font-family: inherit; outline: none;
-  }
-  .permission-select option { background: var(--charcoal); color: #fff; }
+  .asset-declaration { display:flex; align-items:flex-start; gap:12px; padding:14px 16px; border-radius:12px; background:rgba(123,92,240,.08); border:1px solid rgba(123,92,240,.2); cursor:pointer; }
+  .asset-declaration input { margin-top:2px; }
 
   .validation-block { padding: 16px 20px; border-radius: 12px; }
   .validation-block-title { font-size: 0.82rem; font-weight: 700; margin: 0 0 8px; }
@@ -562,6 +540,5 @@
     .rights-grid { grid-template-columns: 1fr; }
     .credits-grid { grid-template-columns: 1fr; }
     .modal-grid { grid-template-columns: 1fr; }
-    .permission-row { grid-template-columns: 1fr; gap: 8px; }
   }
 </style>

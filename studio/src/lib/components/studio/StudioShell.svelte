@@ -2,7 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import StudioDock from './StudioDock.svelte';
   import SaveStatus from './SaveStatus.svelte';
-  import { currentStep, currentStepIndex, currentSectionIndex, STEPS, sectionCompletion, getStepCompletion, navigateToSection } from '#lib/stores/studio-nav.js';
+  import { currentStep, currentStepIndex, currentSection, currentSectionIndex, STEPS, sectionCompletion, getStepCompletion, markSectionState, navigateToSection, nextSection } from '#lib/stores/studio-nav.js';
   import { releaseProject } from '#lib/stores/package.js';
 
   export let draftStatus = 'saved';
@@ -12,6 +12,11 @@
 
   function handleSaveExit() {
     dispatch('save-exit');
+  }
+
+  function handleContinue() {
+    markSectionState($currentStep.id, $currentSection.id, 'complete');
+    nextSection();
   }
 
   $: release = $releaseProject.release;
@@ -99,6 +104,7 @@
     currentSectionIndex={$currentSectionIndex}
     completionMap={$sectionCompletion}
     on:navigate={(e) => navigateToSection(e.detail.stepIndex, e.detail.sectionIndex ?? 0)}
+    on:continue={handleContinue}
   />
 </div>
 

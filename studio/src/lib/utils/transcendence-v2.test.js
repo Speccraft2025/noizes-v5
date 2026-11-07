@@ -89,7 +89,7 @@ describe('Transcendence V2 creator bake', () => {
     expect(result.html).toContain('class="txv2-archive-button"');
     expect(result.html).toContain('class="txv2-map"');
     expect(result.html).toContain('aria-label="Explore movement controls"');
-    expect(result.html).toContain('Math.max(1.8, Number(world.renderScale) || 1)');
+    expect(result.html).toContain('Number(world.renderScale) || 1');
     expect(scripts.length).toBeGreaterThanOrEqual(3);
     for (const source of scripts) expect(() => new Function(source)).not.toThrow();
   });

@@ -145,6 +145,9 @@ class ExperienceDirector {
       this.director = new CameraDirector(this.world.camera, {
         THREE: THREE_NS, analysis: this.analysis, world: this.world, reducedMotion: this.reducedMotion,
       });
+      this.freeRoam = new FreeRoamCamera(this.world.camera, {
+        THREE: THREE_NS, world: this.world, root: this.el.stage,
+      });
       this._watchContextLoss();
 
       this._buildLandmarks();
@@ -606,7 +609,10 @@ class ExperienceDirector {
       }).init();
       this._buildLandmarks();
       this.director = new CameraDirector(this.world.camera, {
-        THREE, analysis: this.analysis, reducedMotion: this.reducedMotion,
+        THREE, analysis: this.analysis, world: this.world, reducedMotion: this.reducedMotion,
+      });
+      this.freeRoam = new FreeRoamCamera(this.world.camera, {
+        THREE, world: this.world, root: this.el.stage,
       });
       this._watchContextLoss();
       this._resize();
@@ -757,7 +763,17 @@ class ExperienceDirector {
     if (nt.ahead) { const v = evaluateTrack(nt.ahead, exact); if (v !== null) frame.ahead = clamp(v, 0, 2); }
     if (nt.air) { const v = evaluateTrack(nt.air, exact); if (v !== null) frame.presence.air = clamp(v, 0, 2); }
 
-    if (this.world && this.director) {
+    if (this.world && this.freeRoam && this.freeRoam.active) {
+      const lens = this.freeRoam.update(dt);
+      if (lens) {
+        frame.focus = lens.focus;
+        frame.focusRange = lens.focusRange;
+        frame.altitude = lens.altitude;
+        frame.specimen = 0;
+      }
+      this.world.update(frame);
+      this.world.render(this.world.camera);
+    } else if (this.world && this.director) {
       const lens = this.director.update(state, dt, { attention });
       frame.focus = lens.focus;
       frame.focusRange = lens.focusRange;
@@ -802,6 +818,9 @@ class ExperienceDirector {
     this.el.residueStatement.textContent = summary.statement;
     this.el.residue.hidden = false;
     this.a11y.announce(`The recording has ended. ${summary.statement} This copy is identified ${summary.hash.split('').join(' ')}.`);
+    if (this.freeRoam && this.world && !this.freeRoam.active) {
+      this.freeRoam.activate(this.world.camera);
+    }
   }
 
   /* ------------------------------------------------------------- inspector */
@@ -886,6 +905,7 @@ class ExperienceDirector {
     this.running = false;
     window.cancelAnimationFrame(this.rafHandle);
     this.interaction?.dispose();
+    this.freeRoam?.dispose();
     this.clock.dispose();
     this.audio.dispose();
     this.world?.dispose();

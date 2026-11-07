@@ -3,7 +3,7 @@
   import { identity, edition, releaseProject, template, play, extras, transcendence } from '#lib/stores/package.js';
   import { buildPackage } from '#lib/utils/packager.js';
   import { editionErrors } from '#lib/utils/project.js';
-  import { validateReleaseProject } from '#lib/domain/release.js';
+  import { packageAssetErrors, validateReleaseProject } from '#lib/domain/release.js';
   import { estimatePackageSize, formatBytes } from '#lib/domain/package-size.js';
   import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '#lib/utils/viewer.js';
   import { goto } from '$app/navigation';
@@ -25,7 +25,11 @@
   let previewIframe;
 
   $: projectValidation = validateReleaseProject({ ...$releaseProject, extras: $extras });
-  $: validationErrors = [...editionErrors($edition), ...projectValidation.errors.map((issue) => issue.message)];
+  $: validationErrors = [
+    ...editionErrors($edition),
+    ...projectValidation.errors.map((issue) => issue.message),
+    ...packageAssetErrors($releaseProject),
+  ];
   $: validationWarnings = projectValidation.warnings;
   $: mainCover = $releaseProject.release_assets.find((asset) => asset.role === 'main_cover');
   $: canExport = Boolean($identity.title && $identity.year && mainCover?.file && !validationErrors.length);

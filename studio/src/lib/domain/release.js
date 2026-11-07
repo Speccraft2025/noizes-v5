@@ -763,3 +763,34 @@ export function validateReleaseProject(project, options = {}) {
 
   return { valid: errors.length === 0, errors, warnings };
 }
+
+/**
+ * Checks whether a Studio draft still has the browser file handles required to
+ * build a portable archive. Metadata may survive a recovery-only draft restore
+ * even when the corresponding local file cannot, so this intentionally lives
+ * beside (rather than inside) publication metadata validation.
+ */
+export function packageAssetErrors(project) {
+  const releaseAssets = Array.isArray(project?.release_assets) ? project.release_assets : [];
+  const audioAssets = Array.isArray(project?.audio_assets) ? project.audio_assets : [];
+  const tracks = Array.isArray(project?.tracks) ? project.tracks : [];
+  const errors = [];
+
+  const mainCover = releaseAssets.find((asset) => asset.role === 'main_cover');
+  if (!mainCover?.file) {
+    errors.push('Reattach the main cover file in Assets before compiling.');
+  }
+
+  for (const track of tracks.filter((track) => !track.hidden)) {
+    const primaryAudio = audioAssets.find((asset) =>
+      asset.asset_id === track.primary_audio_ref && asset.track_id === track.track_id,
+    ) ?? audioAssets.find((asset) =>
+      asset.track_id === track.track_id && asset.role === 'primary_master',
+    );
+    if (!primaryAudio?.file) {
+      errors.push(`Reattach the primary audio for “${track.title || 'Untitled track'}” in Assets before compiling.`);
+    }
+  }
+
+  return errors;
+}

@@ -10,6 +10,7 @@ import {
   normalizeReleaseProject,
   normalizeReleaseType,
   orderedTracks,
+  packageAssetErrors,
   removeTrack,
   reorderTrack,
   stableUuid,
@@ -193,6 +194,22 @@ describe('normalized release project', () => {
   });
 });
 describe('release publication validation', () => {
+  it('identifies file handles that must be reattached before baking', () => {
+    const project = publishableProject();
+    project.release_assets = [{
+      asset_id: 'cover', scope: 'release', type: 'image', role: 'main_cover', filename: 'cover.png', file: null,
+    }];
+
+    expect(packageAssetErrors(project)).toEqual([
+      'Reattach the main cover file in Assets before compiling.',
+      'Reattach the primary audio for “Steady” in Assets before compiling.',
+    ]);
+
+    project.release_assets[0].file = { name: 'cover.png' };
+    project.audio_assets[0].file = { name: 'steady.wav' };
+    expect(packageAssetErrors(project)).toEqual([]);
+  });
+
   it('accepts a complete Single', () => {
     expect(validateReleaseProject(publishableProject())).toEqual({ valid: true, errors: [], warnings: [] });
   });

@@ -1,0 +1,104 @@
+{
+  "release_id": "nz-house-rooms-test-001",
+  "edition_id": "house-rooms-test-edition",
+  "copy_id": "house-rooms-test-copy-001",
+  "title": "The House That Remembered Us",
+  "primary_artist": "",
+  "year": "2026",
+  "description": "A test release in a four-floor house: a corridor on every floor and a room for each song.",
+  "cover_source": "source-art/1.webp",
+  "tracks": [
+    {
+      "file": "Ipo siku.mp3",
+      "title": "Ipo siku",
+      "artist": ""
+    },
+    {
+      "file": "Ujuzi ft Fello.mp3",
+      "title": "Ujuzi ft Fello",
+      "artist": "",
+      "screen": {
+        "provider": "youtube",
+        "video_id": "oXCxc4EpIzc",
+        "label": "Watch the video"
+      }
+    },
+    {
+      "file": "Nadai Kurap.wav",
+      "title": "Nadai Kurap",
+      "artist": ""
+    },
+    {
+      "file": "Nakili.mp3",
+      "title": "Nakili",
+      "artist": ""
+    }
+  ],
+  "mattes": {
+    "outside": {
+      "source": "source-art/1.webp",
+      "note": "Proof of rendition projection using the supplied exterior reference image."
+    }
+  },
+  "notes": {
+    "0": {
+      "title": "Note from the artist",
+      "text": "(Placeholder \u2014 the artist's own words for this room go here, set in release.json under notes.)",
+      "placeholder": true
+    },
+    "1": {
+      "title": "Note from the artist",
+      "text": "(Placeholder \u2014 the artist's own words for this room go here, set in release.json under notes.)",
+      "placeholder": true
+    },
+    "2": {
+      "title": "Note from the artist",
+      "text": "(Placeholder \u2014 the artist's own words for this room go here, set in release.json under notes.)",
+      "placeholder": true
+    }
+  },
+  "rooms": {
+    "count": 20,
+    "note": "Rooms are filled by cycling through the tracks in order. Give a list under 'assign' (track numbers, 1-based) to place songs by hand."
+  },
+  "eggs": [
+    {
+      "room": 7,
+      "title": "You found it",
+      "message": "Sample reward. Replace this text, the code and where to use it in release.json under eggs.",
+      "code": "HOUSE-SAMPLE-10",
+      "where": "Name the store or ticketing page where this code works.",
+      "sample": true
+    }
+  ],
+  "frames": [
+    {
+      "source": "source-art/1.webp",
+      "caption": "The house at dusk"
+    },
+    {
+      "source": "source-art/2.webp",
+      "caption": "The corridor"
+    },
+    {
+      "source": "source-art/3.webp",
+      "crop": "iw/3:ih:0:0",
+      "caption": "Amber room study"
+    },
+    {
+      "source": "source-art/2.webp",
+      "animate": true,
+      "caption": "Moving picture (stand-in for a GIF)"
+    },
+    {
+      "source": "source-art/3.webp",
+      "crop": "iw/3:ih:iw/3:0",
+      "caption": "Blue room study"
+    },
+    {
+      "source": "source-art/3.webp",
+      "crop": "iw/3:ih:2*iw/3:0",
+      "caption": "Green room study"
+    }
+  ]
+}

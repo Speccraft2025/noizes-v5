@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { sha256Hex } from '../domain/package-validation.js';
-import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from './viewer.js';
+import { parseMediaRequest, prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from './viewer.js';
 
 async function viewerPackage() {
   const zip = new JSZip();
@@ -45,5 +45,35 @@ describe('offline viewer preparation', () => {
     expect(VIEWER_FRAME_BOOTSTRAP).toContain('window.NZ_RESOURCE_URLS');
     expect(VIEWER_FRAME_BOOTSTRAP).toContain("html.split(\"'\"+resource.path+\"'\")");
     expect(VIEWER_FRAME_BOOTSTRAP).toContain('document.write(html)');
+  });
+});
+
+describe('viewer media overlay requests', () => {
+  it('tells the experience the viewer can show YouTube', async () => {
+    const result = await prepareNzForViewer(await viewerPackage(), { storage: { getItem: () => null } });
+    expect(result.html).toContain('"capabilities":{"media_overlay":["youtube"]}');
+  });
+
+  it('accepts a YouTube video id and builds the privacy-enhanced embed itself', () => {
+    const media = parseMediaRequest({ type: 'noizes:media:open', provider: 'youtube', video_id: 'oXCxc4EpIzc', title: '  Ujuzi \n ft Fello ' });
+    expect(media).toEqual({
+      provider: 'youtube',
+      videoId: 'oXCxc4EpIzc',
+      title: 'Ujuzi ft Fello',
+      embedUrl: 'https://www.youtube-nocookie.com/embed/oXCxc4EpIzc?autoplay=1&playsinline=1&rel=0&modestbranding=1',
+    });
+  });
+
+  it('rejects anything that is not a bare YouTube id', () => {
+    for (const video_id of ['', 'short', 'oXCxc4EpIzc&list=x', 'https://evil.example/', '../../../etc', 'oXCxc4EpIz"', 42]) {
+      expect(parseMediaRequest({ type: 'noizes:media:open', provider: 'youtube', video_id })).toBeNull();
+    }
+    expect(parseMediaRequest({ type: 'noizes:media:open', provider: 'vimeo', video_id: 'oXCxc4EpIzc' })).toBeNull();
+    expect(parseMediaRequest({ type: 'noizes:storage:set', provider: 'youtube', video_id: 'oXCxc4EpIzc' })).toBeNull();
+    expect(parseMediaRequest(null)).toBeNull();
+  });
+
+  it('caps the title length', () => {
+    expect(parseMediaRequest({ type: 'noizes:media:open', provider: 'youtube', video_id: 'oXCxc4EpIzc', title: 'x'.repeat(500) }).title).toHaveLength(160);
   });
 });

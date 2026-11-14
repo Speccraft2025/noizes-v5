@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '#lib/utils/viewer.js';
+  import { parseMediaRequest, prepareNzForViewer, VIEWER_FRAME_BOOTSTRAP } from '#lib/utils/viewer.js';
 
   let dragging = false;
   let loading = false;
@@ -13,6 +13,9 @@
   let frameSent = false;
   let validationResult = null;
   let storageKeys = null;
+  let media = null;
+  let mediaEl;
+  let mediaMax = false;
 
   let showInstallBanner = false;
   let showInstallTip = false;
@@ -30,6 +33,11 @@
         ready = false;
         return;
       }
+      if (message?.type === 'noizes:media:open') {
+        media = parseMediaRequest(message);
+        if (!media) tellExperience({ type: 'noizes:media:closed' });
+        return;
+      }
       if (!message || !['noizes:storage:set', 'noizes:storage:remove'].includes(message.type)) return;
       if (![storageKeys?.resumeKey, storageKeys?.noteKey].includes(message.key)) return;
       try {
@@ -39,9 +47,38 @@
         // Playback remains functional when browser storage is unavailable.
       }
     };
+    const handleKey = (event) => { if (media && event.key === 'Escape') closeMedia(); };
     window.addEventListener('message', handleStorageMessage);
-    return () => window.removeEventListener('message', handleStorageMessage);
+    window.addEventListener('keydown', handleKey);
+    return () => { window.removeEventListener('message', handleStorageMessage); window.removeEventListener('keydown', handleKey); };
   });
+
+  function tellExperience(message) {
+    try { iframeEl?.contentWindow?.postMessage(message, '*'); } catch { /* frame already gone */ }
+  }
+
+  // The experience asked to show a video. It plays here, above the experience, so the listener never leaves Noizes.
+  function closeMedia() {
+    if (!media) return;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    media = null;
+    mediaMax = false;
+    tellExperience({ type: 'noizes:media:closed' });
+    iframeEl?.focus();
+  }
+
+  // Real full screen where the browser allows it (iPhone Safari and some embedded browsers do not);
+  // otherwise the player fills the viewer edge to edge.
+  function toggleMediaFullscreen() {
+    if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+    if (mediaMax) { mediaMax = false; return; }
+    let request = null;
+    try { request = mediaEl?.requestFullscreen?.(); } catch { request = null; }
+    if (!request) { mediaMax = true; return; }
+    request.catch(() => { mediaMax = true; });
+    // some embedded browsers neither enter full screen nor reject; fill the viewer if nothing happened
+    setTimeout(() => { if (media && !document.fullscreenElement) mediaMax = true; }, 700);
+  }
 
   function loadExperienceFrame() {
     if (!iframeEl?.contentWindow || !preparedFrame || frameSent) return;
@@ -63,6 +100,7 @@
     frameSent = false;
     validationResult = null;
     storageKeys = null;
+    media = null;
   }
 
   async function loadNZ(file) {
@@ -121,6 +159,30 @@
       allow="autoplay"
       sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
     ></iframe>
+    {#if media}
+      <div bind:this={mediaEl} role="dialog" aria-modal="true" aria-label={media.title ? `${media.title} video` : 'Video'}
+        class="fixed inset-0 z-[70] flex flex-col"
+        style="background:#000;padding:{mediaMax ? '0' : 'max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))'};">
+        <div class="flex items-center gap-4" style="min-height:48px;padding:{mediaMax ? 'max(4px,env(safe-area-inset-top)) 12px 0' : '0 4px 8px'};{mediaMax ? 'position:absolute;top:0;right:0;z-index:1;' : ''}">
+          {#if !mediaMax}<p class="flex-1 truncate" style="margin:0;color:rgba(255,255,255,.86);font-size:15px;">{media.title}</p>{/if}
+          <button type="button" on:click={toggleMediaFullscreen}
+            style="min-height:44px;padding:0 6px;color:rgba(255,255,255,.8);font-size:11px;letter-spacing:.2em;text-transform:uppercase;background:none;border:0;cursor:pointer;">{mediaMax ? 'Exit full screen' : 'Full screen'}</button>
+          <button type="button" on:click={closeMedia}
+            style="min-height:44px;padding:0 6px;color:rgba(255,255,255,.8);font-size:11px;letter-spacing:.2em;text-transform:uppercase;background:none;border:0;cursor:pointer;">Close</button>
+        </div>
+        <div class="flex-1 min-h-0 flex items-center justify-center">
+          <iframe
+            title={media.title ? `${media.title} video` : 'Video'}
+            src={media.embedUrl}
+            class="border-0"
+            style={mediaMax ? 'width:100%;height:100%;' : 'width:min(100%, calc((100dvh - 96px) * 16 / 9));aspect-ratio:16/9;max-height:100%;'}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowfullscreen
+            referrerpolicy="strict-origin-when-cross-origin"
+          ></iframe>
+        </div>
+      </div>
+    {/if}
   </div>
 
 {:else}

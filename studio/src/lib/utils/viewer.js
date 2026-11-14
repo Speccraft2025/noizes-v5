@@ -41,6 +41,28 @@ export const VIEWER_FRAME_BOOTSTRAP = `<!doctype html>
 })();
 </script></body></html>`;
 
+// What the viewer offers an experience beyond storage. An experience checks
+// NZ_VIEWER_STATE.capabilities before asking for any of these.
+export const VIEWER_CAPABILITIES = Object.freeze({ media_overlay: Object.freeze(['youtube']) });
+
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+
+// An experience cannot play YouTube from inside its opaque sandbox, so it asks
+// the viewer to show the player instead. Only a bare video id crosses the
+// boundary; the viewer builds the embed URL itself on the privacy-enhanced host.
+export function parseMediaRequest(message) {
+  if (!message || message.type !== 'noizes:media:open' || message.provider !== 'youtube') return null;
+  const videoId = typeof message.video_id === 'string' ? message.video_id.trim() : '';
+  if (!YOUTUBE_ID.test(videoId)) return null;
+  const title = typeof message.title === 'string' ? message.title.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+  return {
+    provider: 'youtube',
+    videoId,
+    title,
+    embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&playsinline=1&rel=0&modestbranding=1`,
+  };
+}
+
 async function readJson(zip, path) {
   const entry = zip.file(path);
   if (!entry) return {};
@@ -91,6 +113,7 @@ export async function prepareNzForViewer(file, options = {}) {
   const viewerState = {
     resume,
     collector_note: readStorage(storage, noteKey) || '',
+    capabilities: VIEWER_CAPABILITIES,
   };
   const stateScript = `window.NZ_VIEWER_STATE = ${JSON.stringify(viewerState).replace(/</g, '\\u003c')};\n`;
   const configAssignment = /window\.NZ_CONFIG\s*=/;

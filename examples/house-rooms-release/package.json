@@ -1,0 +1,11 @@
+{
+  "name": "noizes-house-rooms-release",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "analyze": "node scripts/analyze.mjs",
+    "build": "node scripts/build.mjs",
+    "validate": "node scripts/validate.mjs",
+    "serve": "node scripts/serve.mjs"
+  }
+}
